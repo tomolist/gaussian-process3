@@ -3,6 +3,10 @@
 
 使い方: python run_nb.py <ノートのパス> [カーネル名 (既定: gaussian-process3)]
 カーネルの作業ディレクトリはノートのあるフォルダ。エラーが出たセルで止め、そこまでの出力を保存する。
+
+カーネルは、このスクリプトを動かしている Python (sys.executable。uv run なら .venv の Python) で起動する。
+登録済みのカーネル定義 (%APPDATA%\\jupyter\\kernels) はフォルダを移すとパスが古くなるので使わず、
+リポジトリ直下の _tmp/kernelspec に同名の定義を作って、JUPYTER_PATH で優先させる。
 """
 import json
 import os
@@ -34,6 +38,14 @@ def main():
     kernel_name = sys.argv[2] if len(sys.argv) > 2 else "gaussian-process3"
     with open(nb_path, encoding="utf-8") as f:
         nb = json.load(f)
+
+    spec_root = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "_tmp", "kernelspec")
+    spec_dir = os.path.join(spec_root, "kernels", kernel_name)
+    os.makedirs(spec_dir, exist_ok=True)
+    with open(os.path.join(spec_dir, "kernel.json"), "w", encoding="utf-8") as f:
+        json.dump({"argv": [sys.executable, "-m", "ipykernel_launcher", "-f", "{connection_file}"],
+                   "display_name": kernel_name, "language": "python"}, f, ensure_ascii=False, indent=1)
+    os.environ["JUPYTER_PATH"] = spec_root + os.pathsep + os.environ.get("JUPYTER_PATH", "")
 
     km = KernelManager(kernel_name=kernel_name)
     km.start_kernel(cwd=os.path.dirname(nb_path))

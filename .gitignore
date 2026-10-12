@@ -12,6 +12,9 @@ wheels/
 # Jupyter Notebookの自動保存ファイル
 .ipynb_checkpoints/
 
+# 一時スクリプト・実行用ノートのコピー
+_tmp/
+
 # OSが自動生成する隠しファイル
 .DS_Store
 Thumbs.db
