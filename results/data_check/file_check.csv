@@ -1,0 +1,13 @@
+﻿材料,組,外れ値,行数,条件数,ショット/条件,BOM,列名,欠損,L推定 [mm],c推定 [MPa],算出式の最大誤差 [%],Δt の刻み [µs],ファイル
+PP,5data,なし,460,93,4〜5,True,True,0,17.5,0.3001,0.0271,5.0,.\02_機械学習データ\NR500\02_バージンPP再々実験_5data\03_pp_max_5data\外れ値なし\結合_03_pp_max_5data_外れ値なし.csv
+PP,5data,あり,465,93,5〜5,True,True,0,17.5,0.3001,0.0271,5.0,.\02_機械学習データ\NR500\02_バージンPP再々実験_5data\03_pp_max_5data\外れ値あり\結合_03_pp_max_5data_外れ値あり.csv
+PP,3data,なし,104,36,2〜3,True,True,0,17.499,0.3002,0.0333,5.0,.\03_予測検証用テストデータ\NR500\02_バージンPP再々実験_5data用検証データ(3data)\02_pp_max_3data\外れ値なし\結合_02_pp_max_3data_外れ値なし.csv
+PP,3data,あり,108,36,3〜3,True,True,0,17.499,0.3002,0.0333,5.0,.\03_予測検証用テストデータ\NR500\02_バージンPP再々実験_5data用検証データ(3data)\02_pp_max_3data\外れ値あり\結合_02_pp_max_3data_外れ値あり.csv
+PP,Alldata,なし,1266,129,2〜10,True,True,0,17.5,0.3001,0.0333,5.0,.\02_機械学習データ\NR500\01_バージンPP再々実験_alldata\01_pp_max_Alldata\外れ値なし\結合_01_pp_max_Alldata_外れ値なし.csv
+PP,Alldata,あり,1290,129,10〜10,True,True,0,17.5,0.3001,0.0333,5.0,.\02_機械学習データ\NR500\01_バージンPP再々実験_alldata\01_pp_max_Alldata\外れ値あり\結合_01_pp_max_Alldata_外れ値あり.csv
+粉砕材混合PP,5data,なし,459,93,4〜5,True,True,0,17.5,0.3001,0.0281,5.0,.\02_機械学習データ\NR500\04_粉砕材混合PP実験_5data\03_mixpp_max_5data\外れ値なし\結合_03_mixpp_max_5data_外れ値なし.csv
+粉砕材混合PP,5data,あり,465,93,5〜5,True,True,0,17.5,0.3001,0.0281,5.0,.\02_機械学習データ\NR500\04_粉砕材混合PP実験_5data\03_mixpp_max_5data\外れ値あり\結合_03_mixpp_max_5data_外れ値あり.csv
+粉砕材混合PP,3data,なし,101,36,1〜3,True,True,0,17.499,0.3002,0.0288,5.0,.\03_予測検証用テストデータ\NR500\04_粉砕材混合PP実験_5data用検証データ(3data)\02_mixpp_max_3data\外れ値なし\結合_02_mixpp_max_3data_外れ値なし.csv
+粉砕材混合PP,3data,あり,108,36,3〜3,True,True,0,17.499,0.3002,0.0288,5.0,.\03_予測検証用テストデータ\NR500\04_粉砕材混合PP実験_5data用検証データ(3data)\02_mixpp_max_3data\外れ値あり\結合_02_mixpp_max_3data_外れ値あり.csv
+粉砕材混合PP,Alldata,なし,560,129,1〜5,True,True,0,17.5,0.3001,0.0288,5.0,.\02_機械学習データ\NR500\03_粉砕材混合PP実験_alldata\01_mixpp_max_Alldata\外れ値なし\結合_01_mixpp_max_Alldata_外れ値なし.csv
+粉砕材混合PP,Alldata,あり,573,129,3〜5,True,True,0,17.5,0.3001,0.0288,5.0,.\02_機械学習データ\NR500\03_粉砕材混合PP実験_alldata\01_mixpp_max_Alldata\外れ値あり\結合_01_mixpp_max_Alldata_外れ値あり.csv

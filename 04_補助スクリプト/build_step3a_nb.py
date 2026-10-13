@@ -20,6 +20,12 @@ def code(src):
     cells.append({"cell_type": "code", "execution_count": None, "metadata": {}, "outputs": [], "source": src})
 
 
+# 全ノートに共通の部分（使い方、設定エリア、共通の部品）
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+from nb_parts import COMMON_CELL, settings_cell, usage_md  # noqa: E402
+
+
 # ---------------------------------------------------------------- 0. タイトル
 md(r'''# 手順3a：圧力列の検討（新データ）
 
@@ -57,37 +63,23 @@ GPR はすべて ARD Matern 5/2 ＋ WhiteKernel（`n_restarts_optimizer=5`）。
 | LOCO | 条件を1つずつ抜く交差検証 | ハイパーパラメータは全データで推定して固定し、閉じた式で計算（近似） |''')
 
 # ---------------------------------------------------------------- 1. 設定
+md(usage_md("3a", "results/step3a", "results/学習結果説明_手順3a.pdf", 11, hr=False))
 md(r'''## 1. 設定''')
-code(r'''# セル1：ライブラリと設定
+code(settings_cell())
+code(r'''# セル1.5：ライブラリ、フォント、出力先
 %matplotlib inline
 import os
 import sys
-import time
-import warnings
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.font_manager as fm
-from sklearn.exceptions import ConvergenceWarning
-from sklearn.preprocessing import StandardScaler
-from sklearn.gaussian_process import GaussianProcessRegressor
-from sklearn.gaussian_process.kernels import DotProduct, Matern, ConstantKernel as C, WhiteKernel
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import r2_score, mean_squared_error
 
-SEED = 42
-NOISE_LB = 1e-6                    # ノイズ分散の下限（CLAUDE.md §5。旧ノートは 1e-3）
-N_RESTARTS = 5
-DATA_DIR = os.path.join("..", "02_機械学習データ", "NR500")
-TEST_DIR = os.path.join("..", "03_予測検証用テストデータ", "NR500")
-OUT_DIR = os.path.join("..", "results", "step3a")
+OUT_DIR = os.path.join(REPO, "results", "step3a")
 os.makedirs(OUT_DIR, exist_ok=True)
-
-FIG_DPI = 200                      # 保存する PNG の解像度
 plt.rcParams["figure.dpi"] = 80    # ノート内の表示は小さめにする
 pd.set_option("display.width", 220)
 pd.set_option("display.max_columns", 40)
-warnings.filterwarnings("ignore", category=ConvergenceWarning)   # 下限への張り付きは kernels.csv に記録する
 
 # 図の日本語フォント（IPAexGothic。ない文字は DejaVu Sans で表示）
 try:
@@ -98,53 +90,25 @@ plt.rcParams["font.family"] = ["IPAexGothic", "DejaVu Sans"]
 
 print("Python:", sys.executable, "/", sys.version.split()[0])
 print("出力先:", os.path.abspath(OUT_DIR))''')
+md(r'''### 共通の部品
+
+データの読み込み、問題データ一覧の「除外」、モデル（GPR・線形回帰）、評価、データの分け方、条件を1つずつ抜く交差検証の関数。中身は `04_補助スクリプト/nb_common.py` と同じ（直すときは、そのファイルを直して、ノートを作り直す）。''')
+code(COMMON_CELL)
 
 # ---------------------------------------------------------------- 2. データ
 md(r'''## 2. データの読み込みと確認
 
-結合ファイルは、列名・欠損・元ファイル名と列の一致を確かめてから使う。設定温度・厚み・射出速度は列にあるので、条件番号は (設定温度, 厚み, 射出速度) の組で作る。''')
-code(r'''# セル2：読み込み
-MATS = {"PP": "PP", "MIX": "粉砕材混合PP"}
-FILES = {   # (材料, 組): (上位フォルダ, 中間フォルダ, フォルダ, ファイル名)
-    ("PP", "5data"): (DATA_DIR, "02_バージンPP再々実験_5data", "03_pp_max_5data", "結合_03_pp_max_5data_外れ値{o}.csv"),
-    ("PP", "3data"): (TEST_DIR, "02_バージンPP再々実験_5data用検証データ(3data)", "05_pp_max_3data(no1.5-3.0)", "結合_05_pp_max_3data(no1.5-3.0)_外れ値{o}.csv"),
-    ("PP", "Alldata"): (DATA_DIR, "01_バージンPP再々実験_alldata", "04_pp_max_Alldata(no1.5-3.0)", "結合_04_pp_max_Alldata(no1.5-3.0)_外れ値{o}.csv"),
-    ("MIX", "5data"): (DATA_DIR, "04_粉砕材混合PP実験_5data", "03_mixpp_max_5data", "結合_03_mixpp_max_5data_外れ値{o}.csv"),
-    ("MIX", "3data"): (TEST_DIR, "04_粉砕材混合PP実験_5data用検証データ(3data)", "02_mixpp_max_3data", "結合_02_mixpp_max_3data_外れ値{o}.csv"),
-    ("MIX", "Alldata"): (DATA_DIR, "03_粉砕材混合PP実験_alldata", "01_mixpp_max_Alldata", "結合_01_mixpp_max_Alldata_外れ値{o}.csv"),
-}
-COLS = {"元ファイル": "file", "キャビ厚": "H", "射出速度[mm/s]": "v", "樹脂粘度η34(Pa・s)": "eta", "せん断速度γ34(1/s)": "gd",
-        "流動中樹脂圧力P3_1(MPa)": "P31", "流動中樹脂圧力P3_2(MPa)": "P32", "加熱シリンダ温度[℃]": "Tset", "流動中樹脂温度(℃)": "Tff"}
-RE_SRC = r"^(\d{3})_(\d+)℃_(\d{3})_([\d.]+)mm\.csv$"
-
-
-def path_of(mat, grp, o):
-    top, d1, d2, fn = FILES[(mat, grp)]
-    return os.path.join(top, d1, d2, f"外れ値{o}", fn.format(o=o))
-
-
-def load(mat, grp, o):
-    df = pd.read_csv(path_of(mat, grp, o), encoding="utf-8-sig")
-    assert list(df.columns) == list(COLS), f"列名が想定と違う: {list(df.columns)}"
-    df = df.rename(columns=COLS)
-    assert df.isna().sum().sum() == 0, "欠損がある"
-    p = df["file"].str.extract(RE_SRC)
-    assert p.notna().all().all(), "ファイル名の形式に合わない行がある"
-    assert np.allclose(p[1].astype(float), df["Tset"]) and np.allclose(p[2].astype(float), df["v"]) \
-        and np.allclose(p[3].astype(float), df["H"]), "ファイル名と列の値が一致しない"
-    df["shot"] = p[0].astype(int)
-    df["cond"] = df["Tset"].astype(int).astype(str) + "_" + df["H"].astype(str) + "_" + df["v"].astype(int).astype(str)
-    df["ln_eta"], df["ln_gd"], df["ln_H"] = np.log(df["eta"]), np.log(df["gd"]), np.log(df["H"])
-    df["ln_P31"], df["ln_P32"] = np.log(df["P31"] * 1e6), np.log(df["P32"] * 1e6)   # CSV の圧力は MPa。Pa に直してから ln をとる
-    df["ln_v"] = np.log(df["v"])
-    df["ln_Tff"] = np.log(df["Tff"] + 273.15)          # 流動先端温度 [K]
-    return df
-
-
-D = {(mat, grp, o): load(mat, grp, o) for mat in MATS for grp in ["5data", "3data", "Alldata"] for o in ["なし", "あり"]}
-for mat in MATS:
-    for o in ["なし", "あり"]:
-        assert not (set(D[(mat, "5data", o)]["cond"]) & set(D[(mat, "3data", o)]["cond"])), "学習と検証で条件が重なっている"
+全条件の結合ファイルを読み、列名・欠損・元ファイル名と列の一致を確かめる。`02_機械学習データ/問題データ一覧.csv` の「除外」の条件（今は、PP の厚み 1.5 mm・射出速度 3 mm/s）を除く。「感度確認」の条件は残し、`sens` 列に ID を付ける。圧力は MPa なので、Pa に直してから ln をとる。条件番号は (設定温度, 厚み, 射出速度) の組で作る。''')
+code(r'''# セル2：読み込み（全条件のファイルを読み、一覧の「除外」を除く）
+D = load_all()
+pl = read_problem_list()
+print("問題データ一覧（除外・感度確認）")
+print(pl[pl["区分"].isin(["除外", "感度確認"])][["ID", "区分", "材料", "設定温度", "厚み", "射出速度", "再測定", "今の扱い"]].to_string(index=False))
+print("\n一覧の「除外」で除いた行数:", {f"{MATS[m]} {g} {o}": n for (m, g, o), n in REMOVED.items() if n})
+leg = legacy_check(D)
+print("\n全条件のファイルから一覧で除いたデータが、no1.5-3.0 のファイルと同じ行か")
+print(leg.to_string(index=False))
+judge(bool(leg["同じ行"].all()) or not USE_EXCLUSIONS, "一覧の「除外」を除いたデータが、これまでの no1.5-3.0 のファイルと同じ（取り直した後は違ってよい）")
 
 rows = []
 for (mat, grp, o), df in D.items():
@@ -179,19 +143,7 @@ print(formula_df.round(4).to_string(index=False))''')
 md(r'''### 2.2 同じ条件のショット間のばらつき（純粋誤差）
 
 同じ条件（設定温度・厚み・射出速度）の中で、ln η がどれだけばらつくか。ショットごとの γ̇ と連動するので、ln γ̇ で説明した残りも出す。外れ値なしは、中央値から 20% の打ち切りを含むので、ばらつきが小さめに出る。''')
-code(r'''# セル4：純粋誤差
-def within_stats(df):
-    """同じ条件内のばらつき（プール）。dof：自由度、var_after_gd：ln γ̇ で説明した残りの分散"""
-    g = df.groupby("cond")
-    dof = int((g.size() - 1).sum())
-    de = df["ln_eta"] - g["ln_eta"].transform("mean")
-    dg = df["ln_gd"] - g["ln_gd"].transform("mean")
-    var_e = float((de ** 2).sum() / dof)
-    b = float((de * dg).sum() / (dg ** 2).sum())
-    return {"dof": dof, "var_ln_eta": var_e, "sd_ln_eta": var_e ** 0.5, "corr_with_ln_gd": float((de * dg).sum() / np.sqrt((de ** 2).sum() * (dg ** 2).sum())),
-            "slope_vs_ln_gd": b, "var_after_gd": float(((de - b * dg) ** 2).sum() / (dof - 1))}
-
-
+code(r'''# セル4：純粋誤差（within_stats は共通の部品）
 rows = [{"材料": MATS[mat], "組": grp, "外れ値": o, **within_stats(df)} for (mat, grp, o), df in D.items()]
 pure_df = pd.DataFrame(rows)
 pure_df.to_csv(os.path.join(OUT_DIR, "pure_error.csv"), index=False, encoding="utf-8-sig")
@@ -235,8 +187,8 @@ md(r'''## 3. モデルと評価の関数
 - GPR の予測標準偏差 `sd` には、ノイズ分散が含まれる。潜在関数の標準偏差 `sd_f` は、`sd² − ノイズ分散` から求める。
 - 評価（ln η）：R²、RMSE、95% 予測区間の被覆率（|z| ≤ 1.96）、NLPD（各ショットの予測分布の負の対数密度の平均）。
 - LOCO（条件を1つずつ抜く）：ハイパーパラメータを全データで推定して固定し、条件 g を除いた予測分布を `平均 = y_g − [K⁻¹_gg]⁻¹ (K⁻¹y)_g`、`共分散 = [K⁻¹_gg]⁻¹` で求める（閉じた式）。中心化と標準化は全データで計算するので、少し甘い評価になる。''')
-code(r'''# セル5：モデルの定義と、学習・予測・評価の関数
-MODELS = {
+code(r'''# セル5：モデルの定義（学習・予測・評価の関数は共通の部品）
+MODELS.update({
     "L0": {"kind": "ols", "cols": ["ln_gd", "ln_H"]},
     "L1": {"kind": "ols", "cols": ["ln_P31", "ln_gd", "ln_H"]},
     "L2": {"kind": "ols", "cols": ["ln_P32", "ln_gd", "ln_H"]},
@@ -244,7 +196,7 @@ MODELS = {
     "A1": {"kind": "gpr", "cols": ["ln_gd", "ln_H", "ln_Tff", "ln_P31"]},
     "A2": {"kind": "gpr", "cols": ["ln_gd", "ln_H", "ln_Tff", "ln_P32"]},
     "A1p": {"kind": "gpr", "cols": ["ln_gd", "ln_Tff", "ln_P31"]},
-}
+})
 LABELS = {
     "L0": r"L0：線形［$\dot{\gamma}$, $H$］",
     "L1": r"L1：線形［P3_1, $\dot{\gamma}$, $H$］",
@@ -258,119 +210,6 @@ OLS_KEYS = ["L0", "L1", "L2"]
 GPR_KEYS = ["A0", "A1", "A2", "A1p"]
 ALL_KEYS = OLS_KEYS + GPR_KEYS
 INPUT_JA = {"ln_gd": "γ̇", "ln_H": "H", "ln_Tff": "Tff", "ln_P31": "P3_1", "ln_P32": "P3_2"}
-
-
-def make_gpr(d):
-    kernel = C(1.0, (1e-3, 1e3)) * Matern(length_scale=[1.0] * d, length_scale_bounds=(1e-2, 1e2), nu=2.5) + \
-             WhiteKernel(noise_level=0.1, noise_level_bounds=(NOISE_LB, 1e1))
-    return GaussianProcessRegressor(kernel=kernel, n_restarts_optimizer=N_RESTARTS, random_state=SEED)
-
-
-def fit_ols(X_tr, y_tr):
-    """切片ありの最小二乗回帰。係数、(XᵀX)⁻¹、残差分散を返す"""
-    A_tr = np.column_stack([np.ones(len(X_tr)), X_tr])
-    beta, *_ = np.linalg.lstsq(A_tr, y_tr, rcond=None)
-    resid = y_tr - A_tr @ beta
-    return beta, np.linalg.inv(A_tr.T @ A_tr), resid @ resid / (len(y_tr) - A_tr.shape[1])
-
-
-def predict_ols(model, X):
-    """予測平均と、新しい1ショットに対する予測標準偏差"""
-    beta, XtX_inv, s2 = model
-    A_new = np.column_stack([np.ones(len(X)), X])
-    lev = np.einsum("ij,jk,ik->i", A_new, XtX_inv, A_new)
-    return A_new @ beta, np.sqrt(s2 * (1.0 + lev))
-
-
-def fit_model(key, tr):
-    spec = MODELS[key]
-    X, y = tr[spec["cols"]].to_numpy(), tr["ln_eta"].to_numpy()
-    if spec["kind"] == "ols":
-        return {"kind": "ols", "model": fit_ols(X, y)}
-    sc = StandardScaler().fit(X)              # 標準化と中心化は学習データだけで計算する
-    y0 = y.mean()
-    gp = make_gpr(X.shape[1]).fit(sc.transform(X), y - y0)
-    return {"kind": "gpr", "gp": gp, "sc": sc, "y0": y0}
-
-
-def predict_model(key, fit, te):
-    """予測平均、予測標準偏差(ノイズ込み)、潜在関数の標準偏差、ノイズの標準偏差"""
-    X = te[MODELS[key]["cols"]].to_numpy()
-    if fit["kind"] == "ols":
-        mu, sd = predict_ols(fit["model"], X)
-        return mu, sd, np.full(len(X), np.nan), float(np.sqrt(fit["model"][2]))
-    mu, sd = fit["gp"].predict(fit["sc"].transform(X), return_std=True)
-    noise = fit["gp"].kernel_.k2.noise_level
-    return mu + fit["y0"], sd, np.sqrt(np.maximum(sd ** 2 - noise, 0.0)), float(np.sqrt(noise))
-
-
-def evaluate(y, mu, sd):
-    z = (y - mu) / sd
-    return {"R2": r2_score(y, mu) if len(y) > 1 else np.nan, "RMSE": float(np.sqrt(mean_squared_error(y, mu))),
-            "coverage95": float(np.mean(np.abs(z) <= 1.96)),
-            "NLPD": float(np.mean(0.5 * np.log(2 * np.pi * sd ** 2) + 0.5 * z ** 2)), "mean_sd": float(np.mean(sd))}
-
-
-def kernel_row(key, fit):
-    gp = fit["gp"]
-    k = gp.kernel_
-    ls = np.atleast_1d(k.k1.k2.length_scale)
-    row = {"amplitude": float(np.sqrt(k.k1.k1.constant_value)), "noise_var": float(k.k2.noise_level),
-           "noise_sd": float(np.sqrt(k.k2.noise_level)), "LML": float(gp.log_marginal_likelihood_value_),
-           "noise_at_lower_bound": bool(k.k2.noise_level < NOISE_LB * 1.05),
-           "ls_at_bound": bool(np.any(ls > 99) or np.any(ls < 0.0105))}
-    row.update({f"ls_{c}": float(l) for c, l in zip(MODELS[key]["cols"], ls)})
-    return row
-
-
-METRICS, KERNELS, OLSROWS, PRED = [], [], [], {}
-
-
-def run_split(mat, split, data, tr, te, keys=ALL_KEYS):
-    """tr, te：学習・テストの DataFrame（te には group 列がある）。全モデルを学習し、指標・カーネル・予測を記録する"""
-    subsets = {"全体": np.ones(len(te), bool)}
-    for g in te["group"].unique():
-        if g != "全体":
-            subsets[g] = (te["group"] == g).to_numpy()
-    pure = within_stats(tr)
-    y_te = te["ln_eta"].to_numpy()
-    for key in keys:
-        t0 = time.time()
-        fit = fit_model(key, tr)
-        mu, sd, sd_f, noise_sd = predict_model(key, fit, te)
-        PRED[(mat, split, data, key)] = pd.DataFrame({"y": y_te, "mu": mu, "sd": sd, "sd_f": sd_f, "v": te["v"].to_numpy(), "H": te["H"].to_numpy(),
-                                                      "Tset": te["Tset"].to_numpy(), "cond": te["cond"].to_numpy(), "group": te["group"].to_numpy()})
-        for sub, mask in subsets.items():
-            ev = evaluate(y_te[mask], mu[mask], sd[mask])
-            METRICS.append({"material": MATS[mat], "split": split, "data": data, "model": key, "subset": sub, "n_train": len(tr),
-                            "n_test": int(mask.sum()), "n_cond_test": int(te.loc[mask, "cond"].nunique()), **ev,
-                            "mean_sd_latent": float(np.nanmean(sd_f[mask])) if fit["kind"] == "gpr" else np.nan, "noise_sd": noise_sd})
-        base = {"material": MATS[mat], "split": split, "data": data, "model": key, "n_train": len(tr)}
-        if fit["kind"] == "gpr":
-            KERNELS.append({**base, **kernel_row(key, fit), "pure_sd_ln_eta": pure["sd_ln_eta"], "pure_sd_after_gd": pure["var_after_gd"] ** 0.5})
-        else:
-            names = ["intercept"] + MODELS[key]["cols"]
-            OLSROWS.append({**base, "resid_sd": noise_sd, **dict(zip(names, map(float, fit["model"][0])))})
-        print(f"{MATS[mat]} {split} {data} {key}: 学習 {len(tr)} 行、{time.time() - t0:.1f} 秒")
-
-
-def split_V(mat, o):
-    tr, te = D[(mat, "5data", o)].copy(), D[(mat, "3data", o)].copy()
-    te["group"] = np.where(te["v"] <= 5, "低速側", np.where(te["v"] >= 280, "高速側", "その他"))
-    assert (te["group"] != "その他").all()
-    return tr, te
-
-
-def split_random(df):
-    idx_tr, idx_te = train_test_split(np.arange(len(df)), test_size=0.2, random_state=SEED)
-    te = df.iloc[idx_te].copy()
-    te["group"] = "全体"
-    return df.iloc[idx_tr].copy(), te
-
-
-def pool_of(mat, o):
-    """5data と 3data をまとめたデータ（PP は no1.5-3.0）"""
-    return pd.concat([D[(mat, "5data", o)], D[(mat, "3data", o)]], ignore_index=True)
 
 
 for mat in MATS:
@@ -438,35 +277,7 @@ print(f"\n合計 {(time.time() - t_all) / 60:.1f} 分")''')
 md(r'''## 6. 条件を1つずつ抜く交差検証（LOCO）
 
 5data＋3data（PP は no1.5-3.0）の全条件を対象に、条件を1つずつ抜いて予測する。低速側・高速側は射出速度で分ける（3・5 mm/s、280・320 mm/s）。''')
-code(r'''# セル8：LOCO
-def loco_gpr(key, pool):
-    spec = MODELS[key]
-    X, y = pool[spec["cols"]].to_numpy(), pool["ln_eta"].to_numpy()
-    sc = StandardScaler().fit(X)
-    Xs, yc = sc.transform(X), y - y.mean()
-    gp = make_gpr(X.shape[1]).fit(Xs, yc)
-    Kinv = np.linalg.inv(gp.kernel_(Xs))              # ノイズ込みの共分散行列の逆行列
-    alpha = Kinv @ yc
-    mu, sd = np.empty(len(y)), np.empty(len(y))
-    for idx in pool.groupby("cond").indices.values():
-        Minv = np.linalg.inv(Kinv[np.ix_(idx, idx)])
-        mu[idx] = y[idx] - Minv @ alpha[idx]
-        sd[idx] = np.sqrt(np.diag(Minv))
-    return mu, sd, gp
-
-
-def loco_ols(key, pool):
-    cols = MODELS[key]["cols"]
-    X, y = pool[cols].to_numpy(), pool["ln_eta"].to_numpy()
-    mu, sd = np.empty(len(y)), np.empty(len(y))
-    for idx in pool.groupby("cond").indices.values():
-        keep = np.ones(len(y), bool)
-        keep[idx] = False
-        m, s = predict_ols(fit_ols(X[keep], y[keep]), X[idx])
-        mu[idx], sd[idx] = m, s
-    return mu, sd
-
-
+code(r'''# セル8：LOCO（loco_gpr・loco_ols は共通の部品）
 LOCO_ROWS, LOCO_PRED = [], {}
 t_all = time.time()
 for mat in MATS:
@@ -696,7 +507,28 @@ for mat in MATS:
         print(f"  {MATS[mat]} {key}：検証 R² {te_r2:.4f}、係数 ln P = {r[cname]:.3f}、ln γ̇ = {r['ln_gd']:.3f}、ln H = {r['ln_H']:.3f}")
 print("\n【観点2 予測のときに使えるか】射出速度・厚み・設定温度は成形条件として事前に決まる。γ̇（ショットごとの実測）、Tff、P3_1、P3_2 は流動の結果で、事前には分からない。")
 print("\n【観点5 ノイズ分散】S_V の学習で、GPR のノイズの標準偏差（noise_sd）と、同じ条件内の標準偏差（純粋誤差）")
-print(kernels_df.query("split == 'S_V' and data == 'なし'")[["material", "model", "noise_sd", "pure_sd_ln_eta", "pure_sd_after_gd", "noise_at_lower_bound"]].round(4).to_string(index=False))''')
+print(kernels_df.query("split == 'S_V' and data == 'なし'")[["material", "model", "noise_sd", "pure_sd_ln_eta", "pure_sd_after_gd", "noise_at_lower_bound"]].round(4).to_string(index=False))
+
+# ---- 判定（基準は、文の中に書いてある）
+def mval(mat, model, sub, col="RMSE", split="S_V"):
+    r = metrics_df[(metrics_df["material"] == MATS[mat]) & (metrics_df["split"] == split) & (metrics_df["data"] == "なし")
+                   & (metrics_df["model"] == model) & (metrics_df["subset"] == sub)]
+    return float(r[col].iloc[0])
+
+
+print("\n【判定】（OK＝想定どおり／★要確認＝想定と違う、または注意が要る）")
+for mat in MATS:
+    n = MATS[mat]
+    judge(mval(mat, "L1", "全体", "R2") >= 0.999, f"{n}：P3_1 を入れた線形回帰（L1）の検証 R² = {mval(mat, 'L1', '全体', 'R2'):.4f}（0.999 以上なら、粘度の算出式のリークを確認 → P3_1 は説明変数に使えない）")
+    judge(mval(mat, "L2", "全体") >= 0.9 * mval(mat, "L0", "全体"), f"{n}：P3_2 を足した線形回帰（L2）の検証 RMSE {mval(mat, 'L2', '全体'):.3f} が、圧力なし（L0）{mval(mat, 'L0', '全体'):.3f} の 0.9 倍以上（改善が 1 割未満 → P3_2 は効果が小さい）")
+    judge(mval(mat, "A0", "低速側") >= 1.0, f"{n}：定数平均の GPR（A0）の低速側 RMSE = {mval(mat, 'A0', '低速側'):.3f}（1.0 以上なら、低速側へ外挿できない。想定どおり。線形カーネルで解決する → 手順3b）")
+    judge(mval(mat, "A0", "高速側") < 0.1, f"{n}：A0 の高速側 RMSE = {mval(mat, 'A0', '高速側'):.3f}（0.1 未満なら、高速側は当たっている）")
+    cov = mval(mat, "A0", "高速側", "coverage95")
+    judge(0.9 <= cov <= 0.99, f"{n}：A0 の高速側の 95% 予測区間の被覆率 = {cov:.2f}（0.90〜0.99 なら、区間の幅が適切。外れるなら、区間が狭すぎる）")
+    ks = kernels_df[(kernels_df["split"] == "S_V") & (kernels_df["data"] == "なし") & (kernels_df["material"] == MATS[mat]) & (kernels_df["model"] == "A0")].iloc[0]
+    judge(ks["noise_sd"] < 0.5 * ks["pure_sd_ln_eta"], f"{n}：A0 のノイズの標準偏差 {ks['noise_sd']:.4f} が、同じ条件内の標準偏差（純粋誤差）{ks['pure_sd_ln_eta']:.4f} の半分未満（ショットごとの γ̇ を入力にしたため小さい。想定どおり）")
+    rr = mval(mat, "A0", "全体", "RMSE", "S_R1")
+    judge(rr < 0.5 * mval(mat, "A0", "高速側"), f"{n}：ランダム 20% の RMSE {rr:.3f} が、検証（高速側 {mval(mat, 'A0', '高速側'):.3f}）の半分未満（ランダム分割は評価が甘い。想定どおり）")''')
 
 # ---------------------------------------------------------------- 11. 付録
 md(r'''## 11. 付録：線形の傾向を入れた試算（3b 以降の準備）
@@ -707,15 +539,7 @@ md(r'''## 11. 付録：線形の傾向を入れた試算（3b 以降の準備）
 - **(b) カーネルに線形項を足す**：GPR のカーネルに線形項（DotProduct）を足す。傾きも GPR の中で、データから同時に推定され、傾きの不確かさも予測区間に入る。ユーザーの決定（10-12）で、3b 以降はこの (b) を使う。
 
 (a) は二重学習にはならない。GPR が学ぶのは、線形回帰で説明しきれなかった残りだけで、テストデータは学習に使わない。ただし、傾きと残りを別々に決めるので、全体として最適とは限らない。''')
-code(r'''# セル16：線形の傾向を入れた試算
-def make_gpr_dot(d):
-    """(b)：ARD Matern 5/2 ＋ 線形カーネル（DotProduct）＋ ノイズ"""
-    kernel = C(1.0, (1e-3, 1e3)) * Matern(length_scale=[1.0] * d, length_scale_bounds=(1e-2, 1e2), nu=2.5) + \
-             C(1.0, (1e-3, 1e3)) * DotProduct(sigma_0=1.0, sigma_0_bounds=(1e-5, 1e3)) + \
-             WhiteKernel(noise_level=0.1, noise_level_bounds=(NOISE_LB, 1e1))
-    return GaussianProcessRegressor(kernel=kernel, n_restarts_optimizer=N_RESTARTS, random_state=SEED)
-
-
+code(r'''# セル16：線形の傾向を入れた試算（(b) は、共通の部品の make_gpr(d, linear=True)）
 TREND = {"A0": "定数平均（A0）", "a": "(a) 線形回帰の残差を GPR", "b": "(b) 線形カーネルを足す"}
 TREND_PRED, trend_rows = {}, []
 for mat in MATS:
@@ -733,7 +557,7 @@ for mat in MATS:
     gp = make_gpr(3).fit(Xtr, y_tr - A @ beta)
     mu, sd = gp.predict(Xte, return_std=True)
     out["a"] = (np.column_stack([np.ones(len(te)), te[["ln_gd", "ln_H"]]]) @ beta + mu, sd, gp)
-    gp = make_gpr_dot(3).fit(Xtr, y_tr - y_tr.mean())                   # (b) 線形カーネルを足す
+    gp = make_gpr(3, linear=True).fit(Xtr, y_tr - y_tr.mean())          # (b) 線形カーネルを足す
     mu, sd = gp.predict(Xte, return_std=True)
     out["b"] = (mu + y_tr.mean(), sd, gp)
     for k, (mu, sd, gp) in out.items():

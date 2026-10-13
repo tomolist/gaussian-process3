@@ -1,0 +1,393 @@
+% 学習結果説明（手順3b：設定温度の比較。用語集と図の見方）
+% results フォルダで「lualatex 学習結果説明_手順3b.tex」を2回実行すると PDF を作り直せる（TeX Live の LuaLaTeX を使用）。
+% 図は results/step3b/ の PNG を相対パスで読み込む。
+\documentclass[paper=a4paper,fontsize=10.5pt,line_length=44zw,number_of_lines=38]{jlreq}
+\usepackage[haranoaji]{luatexja-preset}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{enumitem}
+\usepackage{float}
+\usepackage{xcolor}
+\usepackage[hidelinks,bookmarksnumbered]{hyperref}
+\graphicspath{{step3b/}}
+
+\newcommand{\file}[1]{\texttt{\detokenize{#1}}}
+\newcommand{\gd}{\dot{\gamma}}
+\newcommand{\PII}{P3\_2}
+\newcommand{\Tff}{T_{\mathrm{ff}}}
+\newcommand{\Tset}{T_{\mathrm{set}}}
+\newenvironment{termlist}{\begin{itemize}[label=・,leftmargin=1\zw,labelwidth=1\zw,labelsep=0pt,itemsep=0.4ex,topsep=0.6ex,parsep=0pt]}{\end{itemize}}
+\newcommand{\term}[1]{\item \textbf{#1}：}
+\newenvironment{points}{\begin{itemize}[label=$\triangleright$,leftmargin=1.5\zw,itemsep=0.3ex,topsep=0.5ex,parsep=0pt]}{\end{itemize}}
+\newcommand{\pt}[1]{\item \textbf{#1}：}
+\renewcommand{\arraystretch}{1.25}
+
+\title{樹脂粘度モデル開発　手順3bの学習結果の説明\\[0.6ex]{\large 設定温度の比較：用語集とグラフの見方（機械学習・統計を初めて学ぶ人向け）}}
+\author{}
+\date{@@DATE@@}
+
+\begin{document}
+\maketitle
+{\small\tableofcontents}
+
+% =====================================================================
+\section{この文書について}
+
+この文書は、\file{results/step3b/} にある手順3bの結果（図と表）を、機械学習や統計を初めて学ぶ人でも読めるように説明したものです。手順3a・手順2の説明書（\file{学習結果説明_手順3a.pdf}・\file{学習結果説明.pdf}）と同じ形で、重なる用語は短く繰り返しています。
+
+\begin{points}
+\pt{対象の結果}\file{results/step3b/}：粘度の予測に、加熱シリンダの設定温度 $\Tset$ を入力として足すと、何が変わるかを調べた結果です（図 @@N_FIG@@ 枚、CSV @@N_CSV@@ 個）。あわせて、流動先端温度 $\Tff$ と圧力 \PII\ が本当に要らないか、ショットごとの $\gd$ を使うか条件ごとの平均を使うかを比べました。
+\pt{読み方}2章で何をしたかをつかみ、分からない言葉は3章の用語集で調べてください。4章で図の見方、5章で表の見方、6章で結果のまとめと、質問への答えを説明します。
+\pt{数値について}文中の数値は、この文書を作った時点の results の表から取り出したものです。
+\pt{元のノート}\file{01_機械学習コードフォルダ} の \file{手順3b_新データ_設定温度の比較.ipynb} です。ノートの先頭に使い方があり、「設定エリア」だけを直せば設定を変えられます。各節の最後に出る「判定」（\texttt{OK} と \texttt{★要確認}）の読み方は、3.4節にあります。報告書・発表資料用の高解像度のグラフ（せん断速度 ― 粘度）は、ノート11章のセルで作ります（4章の最後）。
+\pt{記号表}記号・モデル名（B0T、R3 など）・列名の一覧は、\file{学習結果説明_記号表.pdf} にあります。
+\pt{作り直し方}\file{results} フォルダで \texttt{lualatex 学習結果説明\_手順3b.tex} を2回実行すると、この PDF を作り直せます。
+\end{points}
+
+% =====================================================================
+\section{何をしたか（概要）}
+
+\subsection{目的}
+これまでの手順で、粘度の予測に使える入力は「せん断速度 $\gd$」と「キャビティ厚み $H$」だとわかりました（手順3a）。圧力 $P3\_1$ は粘度の算出式そのものなので使えず、$\PII$ は効果が小さく、予測の場面で使いにくい値です。手順3bでは、次の4点を確かめました。
+
+\begin{table}[H]
+\caption{確かめた4つの点}
+\begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}p{9\zw}>{\raggedright\arraybackslash}p{19\zw}X@{}}
+\toprule
+点 & 確かめること & 見る場所 \\
+\midrule
+1 設定温度は要るか & $\Tset$ を入力に足すと、予測が良くなるか。190 ℃ と 230 ℃ の粘度の差を、実測どおりに出せるか。 & 図1・図5、表\ref{tab:eff}・\ref{tab:st} \\
+2 $\Tff$ は要るか & 流動先端温度（実測値）を足すと、予測が良くなるか。（ユーザー決定：「あり」と「なし」の両方を、目で見て比べる） & 図1、表\ref{tab:sv_pp}・\ref{tab:sv_mix}・\ref{tab:st} \\
+3 \PII\ は要るか & 圧力 \PII\ を足すと、予測が良くなるか。 & 同上 \\
+4 $\gd$ の入れ方 & ショットごとの $\gd$ と、条件ごとの平均の $\gd$ のどちらを入力にするか。 & 図2・図7、表\ref{tab:noise} \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+あわせて、問題データ一覧の「感度確認」の条件（P02：190 ℃・0.5 mm・20 mm/s、P03：PP の 190 ℃・0.5 mm・320 mm/s）の影響を調べ、影響が大きければ、その条件だけを除いたデータファイルを新しく作る、という決まりに従って判断しました（表\ref{tab:sens}）。
+
+\subsection{データ}
+\begin{points}
+\pt{データ}手順3aと同じです。5data（学習）と 3data（検証）は、条件が重ならず、合わせて 129 条件です。外れ値なしのファイルを主に使い、PP は、問題データ一覧の「除外」（厚み 1.5 mm・射出速度 3 mm/s の3条件）を除きます。学習は PP が @@PP_NTR@@ 行（@@PP_NCTR@@ 条件）、粉砕材混合 PP が @@MIX_NTR@@ 行（@@MIX_NCTR@@ 条件）、検証は PP が @@PP_NTE@@ 行（@@PP_NCTE@@ 条件）、粉砕材混合 PP が @@MIX_NTE@@ 行（@@MIX_NCTE@@ 条件）です。
+\pt{圧力の単位}CSV の圧力は MPa です。Pa に直してから $\ln$ をとりました。
+\end{points}
+
+\subsection{比べたモデル}
+目的変数（予測したい量）は、どのモデルも粘度の自然対数 $\ln\eta$ です。入力はすべて $\ln$ をとった値です（$\Tset$ は ℃ のまま。$\Tff$ は K で）。名前の付け方は、B 系が「ショットごとの $\gd$ を使う」、R 系が「条件ごとの平均の $\gd$ を使う（Rは Reference：設定値から見た形）」です。
+
+\begin{table}[H]
+\caption{比べた15のモデル（ln は自然対数）}
+\begin{tabularx}{\linewidth}{@{}l>{\raggedright\arraybackslash}p{8\zw}X@{}}
+\toprule
+記号 & 種類 & 入力 \\
+\midrule
+L0・L0T & 線形回帰（基準） & $\gd$，$H$ ／ さらに $\Tset$ \\
+B0 & GPR（ショットごと） & $\gd$，$H$ \\
+B0T & GPR（ショットごと） & $\gd$，$H$，$\Tset$ \\
+B0F・B0FT & GPR（ショットごと、$\Tff$ あり） & $\gd$，$H$，$\Tff$ ／ さらに $\Tset$ \\
+B2・B2T & GPR（ショットごと、\PII\ あり） & $\gd$，$H$，\PII ／ さらに $\Tset$ \\
+B2F・B2FT & GPR（ショットごと、$\Tff$・\PII\ あり） & $\gd$，$H$，$\Tff$，\PII ／ さらに $\Tset$ \\
+R0 & GPR（条件ごとの値） & 条件平均の $\gd$，$H$ \\
+R2 & GPR（設定値だけ） & 射出速度 $v$，$H$，$\Tset$ \\
+R3 & GPR（条件ごとの値） & 条件平均の $\gd$，$H$，$\Tset$ \\
+R3F & GPR（条件ごとの値、$\Tff$ あり） & 条件平均の $\gd$，$H$，$\Tset$，$\Tff$（条件平均） \\
+R3P & GPR（条件ごとの値、\PII\ あり） & 条件平均の $\gd$，$H$，$\Tset$，\PII（条件平均） \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+GPR はすべて、ARD 付き Matern 5/2 カーネルに、\textbf{線形カーネル（DotProduct）}とノイズ項を足したものです（ユーザー決定：低速側への外挿のため）。R3 が、CLAUDE.md §6 の「比較用の通常の GPR」にあたります。
+
+\subsection{データの分け方}
+\begin{table}[H]
+\caption{学習データとテストデータの分け方}
+\begin{tabularx}{\linewidth}{@{}lX@{}}
+\toprule
+記号 & 分け方 \\
+\midrule
+S\_V & 5data で学習し、3data で検証する（射出速度の両端の外挿）。低速側（3・5 mm/s）と高速側（280・320 mm/s）に分けて評価する。 \\
+S\_T & 5data の 190 ℃ と 230 ℃ だけで学習し、5data の 210 ℃ の全条件をテストする（設定温度の内挿。中間の温度を、両側から予測できるか）。 \\
+S\_T3 & S\_T と同じ学習で、3data の 210 ℃ をテストする（温度の内挿に、速度の外挿が重なる）。 \\
+S\_R1・S\_R2 & 従来の、行単位のランダム 20\%（S\_R1：Alldata、S\_R2：PP の 5data＋3data）。評価の甘さを見る。 \\
+LOCO & 条件を1つずつ抜く交差検証（ハイパーパラメータは全データで決めて固定。近似）。 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{そのほかの設定}
+\begin{points}
+\pt{標準化と中心化}学習データだけで計算しました。
+\pt{ハイパーパラメータ}最尤推定で、1組だけ求めました（最終候補の MCMC は手順3c）。ノイズ分散の下限は $10^{-6}$ です。
+\pt{感度確認}問題データ一覧の P02・P03 を学習から除いて学習し直した結果と、外れ値ありのデータでの結果を並べました。
+\pt{乱数}シードは 42 に固定しました。
+\end{points}
+
+% =====================================================================
+\section{用語集}
+
+手順3a・手順2の用語集になかったものを中心に、「・用語：説明」の形で並べました。
+
+\subsection{温度とせん断速度の入れ方}
+\begin{termlist}
+\term{加熱シリンダ設定温度 $\Tset$}成形機に設定した樹脂の温度（190・210・230 ℃）。成形条件として事前に決まる値で、予測のときも指定できます。
+\term{流動先端温度 $\Tff$}センサの間を流れている樹脂の先端の温度（実測値）。流れの速さで上下する、流れの「結果」の量です。
+\term{ショットごとの $\gd$ と、条件ごとの平均の $\gd$}同じ条件で何度も成形すると、$\gd$ はショットごとに少しゆれます。そのゆれは、粘度のゆれと強く連動しています（相関 $-0.98$）。ショットごとの $\gd$ を入力にすると、GPR がこの連動を利用でき、ノイズ分散が極端に小さくなります（$5\times10^{-5}$ ほど）。条件ごとの平均を入力にすると、成形条件から見た「ほんとうのばらつき」が出ます。この文書では、前者を\textbf{ショットごと（shot）}、後者を\textbf{条件平均（cm。condition mean）}と呼びます。
+\term{設定温度の効果（粘度の比）}同じ厚み・同じ $\gd$ で、190 ℃ の粘度が 230 ℃ の何倍か。実測は 1.07〜1.20 倍で、厚いほど大きくなります。モデルでは、他の入力はそのままで、$\Tset$ だけを 190 ℃ と 230 ℃ にして予測した粘度の比で表します。
+\term{設定値と、測定値}射出速度・厚み・設定温度は、成形条件として決める「設定値」です。$\gd$・$\Tff$・\PII\ は、成形してから測る「測定値」で、事前には分かりません。
+\end{termlist}
+
+\subsection{評価に関する用語}
+\begin{termlist}
+\term{S\_T（中間温度のホールドアウト）}210 ℃ のデータを、学習から全部除いて、190 ℃ と 230 ℃ だけで学習し、210 ℃ を予測する検証。温度の影響を、補間で出せるかを見ます。
+\term{内挿と外挿}手順3aの用語集と同じです。S\_T は温度についての内挿、S\_V は速度についての外挿、S\_T3 は両方が重なります。
+\term{RMSE・被覆率・NLPD}手順3aの用語集と同じです。RMSE は予測の平均的な誤差（$\ln\eta$。0.05 なら粘度で約 5\%）、被覆率は 95\% 予測区間に実測が入った割合（0.95 が理想）、NLPD は予測の当たり具合と区間の適切さをまとめた指標（小さいほど良い）です。
+\term{感度確認}ある条件を学習や評価から除いたとき、結果がどれだけ変わるかを見ること。変わりが大きい条件は、結果を左右しているので、扱いを決める必要があります。
+\term{長さスケールの張り付き}GPR の長さスケールは、入力がどれだけ変わると出力が大きく変わるかの目安です。探索範囲の下限（0.01）に張り付くと、「その入力は、少しでも違えば、別物」とみなす（滑らかさを捨てる）ことになり、間の値を内挿できなくなります。設定温度のように水準が少ない入力で起きやすい現象です。
+\term{線形カーネル（DotProduct）}手順3aの用語集と同じです。GPR に「直線的な傾向」を加え、学習範囲の外でも、傾きを延ばして予測できるようにします。
+\end{termlist}
+
+\subsection{ノートの「判定」の読み方}
+ノートの各節の最後に、\texttt{>> 判定：OK} か \texttt{>> 判定：★要確認} が出ます。\texttt{OK} は、文の中に書いた基準を満たす（想定どおり）、\texttt{★要確認} は満たさない（想定と違う、または注意が要る）ことを表します。\texttt{★} が出ても、エラーではありません。結果を読むときに注意する点の目印です。この文書の6章で、主な \texttt{★} の意味を説明します。
+
+% =====================================================================
+\section{図の見方}
+
+図ごとに、「何を示す図か」「軸と記号」「見るポイント」「今回の結果」の順に説明します。図のファイルは \file{results/step3b/} にあります。
+
+% ---------------------------------------------------------------------
+\subsection{図1：設定温度ごとの予測曲線（Tff・\PII\ の有無を目で比べる）}
+\begin{figure}[H]
+\centering
+\includegraphics[width=\linewidth]{fig1a_tset_curves_PP.png}
+\caption{PP：設定温度ごとの予測曲線（5data で学習。行：厚み、列：モデル）}
+\end{figure}
+\begin{points}
+\pt{ファイル}\file{results/step3b/fig1a_tset_curves_PP.png}（PP）、\file{fig1b_tset_curves_MIX.png}（粉砕材混合 PP）
+\pt{何を示す図か}5data で学習したモデルが、設定温度ごとにどんな粘度曲線を予測するかを、データと重ねた図です。$\Tff$ と \PII\ の「あり・なし」の違いを、グラフで確かめるための図です（ユーザー決定）。
+\pt{軸と記号}横軸が $\gd$ [1/s]、縦軸が $\eta$ [Pa$\cdot$s]（どちらも対数軸）。行が厚み（0.5〜2.0 mm）、列がモデル（B0T：ショットごと、R3：条件平均、R3F：さらに $\Tff$、R3P：さらに \PII）。線の色が設定温度（青 190 ℃、緑 210 ℃、赤 230 ℃）、帯が 95\% 予測区間。塗りつぶしの丸が学習の条件平均、白抜きの四角が検証（3data）の条件平均、黒い×が感度確認の条件です。$\Tff$・\PII\ は、同じ設定温度・厚みの条件平均を $\ln\gd$ で内挿した値を入力にしています。
+\pt{見るポイント}(1) 3 本の線が、温度の順（190 ℃ が上）に並ぶか。(2) 白抜きの四角（外挿の検証）が、線と帯に乗るか。(3) $\Tff$・\PII\ を足した列（R3F・R3P）が、R3 と違って見えるか。(4) 帯が、低速側で広がるか。
+\pt{今回の結果}@@FIG1_TXT@@
+\end{points}
+
+% ---------------------------------------------------------------------
+\subsection{図2：検証データ（S\_V）のパリティ図}
+\begin{figure}[H]
+\centering
+\includegraphics[width=\linewidth]{fig2_parity_S_V.png}
+\caption{5data $\to$ 3data のパリティ図（上段 PP、下段 粉砕材混合 PP）}
+\end{figure}
+\begin{points}
+\pt{ファイル}\file{results/step3b/fig2_parity_S_V.png}
+\pt{何を示す図か}6つのモデル（列）の予測が、検証データでどれだけ当たったかを、2つの材料（行）で比べる図です。
+\pt{軸と記号}横軸は実測の $\ln\eta$、縦軸は予測の $\ln\eta$。青が低速側、赤が高速側、灰色の縦線が 95\% 予測区間、黒い破線が理想線、黒い × が感度確認の条件（P03）です。各パネルの上に、モデルと低速側・高速側の RMSE を示しました。
+\pt{見るポイント}点が破線に沿っているか。青い点（低速側）が破線から離れていないか。灰色の縦線が破線にかかっているか。
+\pt{今回の結果}@@FIG2_TXT@@
+\end{points}
+
+% ---------------------------------------------------------------------
+\subsection{図3：S\_T（210 ℃ のホールドアウト）のパリティ図}
+\begin{figure}[H]
+\centering
+\includegraphics[width=\linewidth]{fig3_parity_S_T.png}
+\caption{210 ℃ を全部テストにして、190・230 ℃ で学習した場合のパリティ図（色：厚み）}
+\end{figure}
+\begin{points}
+\pt{ファイル}\file{results/step3b/fig3_parity_S_T.png}
+\pt{何を示す図か}設定温度の内挿の検証です。190 ℃ と 230 ℃ のデータだけで学習し、間の 210 ℃ を予測します。
+\pt{軸と記号}図2と同じです。色は厚み（赤 0.5 mm、青 1.0 mm、橙 1.5 mm、緑 2.0 mm）。
+\pt{見るポイント}$\Tset$ を入力に持つモデル（B0T、R3、R3F）が、持たないモデル（B0、R0）より当たっているか。
+\pt{今回の結果}@@FIG3_TXT@@
+\end{points}
+
+% ---------------------------------------------------------------------
+\subsection{図4：分け方ごとの評価の違い}
+\begin{figure}[H]
+\centering
+\includegraphics[width=\linewidth]{fig4_metrics_by_split.png}
+\caption{分け方ごとの RMSE（上段）と NLPD（下段）}
+\end{figure}
+\begin{points}
+\pt{ファイル}\file{results/step3b/fig4_metrics_by_split.png}
+\pt{何を示す図か}15 のモデルを、5つの検証の方法で比べた図です。左が PP、右が粉砕材混合 PP。
+\pt{軸と記号}横軸がモデル、縦軸が RMSE（上段。対数軸）と NLPD（下段。小さいほど良い）。棒の色が検証の方法（青 S\_V 低速側、赤 S\_V 高速側、紫 S\_T、茶 S\_T3、緑 ランダム 20\%）。ランダム 20\% を計算していないモデルは、棒が 0 です。
+\pt{見るポイント}同じモデルで、緑の棒（ランダム）が、ほかの棒より大幅に低くないか（評価が甘い）。
+\pt{今回の結果}@@FIG4_TXT@@
+\end{points}
+
+% ---------------------------------------------------------------------
+\subsection{図5：設定温度の効果}
+\begin{figure}[H]
+\centering
+\includegraphics[width=\linewidth]{fig5_temperature_effect.png}
+\caption{190 ℃ と 230 ℃ の粘度の比。黒の太線が実測}
+\end{figure}
+\begin{points}
+\pt{ファイル}\file{results/step3b/fig5_temperature_effect.png}
+\pt{何を示す図か}同じ厚み・同じせん断速度で、190 ℃ の粘度が 230 ℃ の何倍かを、実測とモデルの予測で比べた図です（モデルは、$\Tset$ だけを 190 ℃・230 ℃ にして予測）。
+\pt{軸と記号}横軸が厚み、縦軸が粘度の比。黒の太線が実測、色の線がモデル（$\Tset$ を入力に持つモデルだけ）。
+\pt{見るポイント}実測の線（厚いほど大きい）に、モデルの線が近いか。水平な線（厚みによらず一定）になっていないか。
+\pt{今回の結果}@@FIG5_TXT@@
+\end{points}
+
+% ---------------------------------------------------------------------
+\subsection{図6：ARD の感度}
+\begin{figure}[H]
+\centering
+\includegraphics[width=\linewidth]{fig6_ard_sensitivity.png}
+\caption{GPR の入力ごとの感度（1／長さスケール）}
+\end{figure}
+\begin{points}
+\pt{ファイル}\file{results/step3b/fig6_ard_sensitivity.png}
+\pt{何を示す図か}GPR が、どの入力をよく使っているかを示す図です（5data で学習したモデル）。
+\pt{軸と記号}横軸が入力、縦軸が感度（長さスケールの逆数。標準化した入力に対する値。対数軸）。棒の色がモデル。棒がない入力は、そのモデルに入っていません。感度 0.01 は、長さスケールが上限の 100 に張り付いた（ほとんど使われていない）ことを表し、100 に近い値は、下限の 0.01 に近い（入力のわずかな違いに敏感）ことを表します。
+\pt{見るポイント}$\Tset$ の棒が、モデルによってどれくらい違うか（0 に近いなら、ほとんど使われていない）。$\gd$ の棒が、B 系（ショットごと）と R 系（条件平均）で、どれだけ違うか。
+\pt{今回の結果}@@FIG6_TXT@@
+\end{points}
+
+% ---------------------------------------------------------------------
+\subsection{図7：ノイズの標準偏差と純粋誤差}
+\begin{figure}[H]
+\centering
+\includegraphics[width=\linewidth]{fig7_noise_vs_pure_error.png}
+\caption{GPR のノイズの標準偏差と、同じ条件内のばらつき（純粋誤差）}
+\end{figure}
+\begin{points}
+\pt{ファイル}\file{results/step3b/fig7_noise_vs_pure_error.png}
+\pt{何を示す図か}GPR が見積もる「ノイズ」（ショット間のばらつき）の大きさと、実際の同じ条件内のばらつき（純粋誤差）を比べる図です。
+\pt{軸と記号}横軸がモデル、縦軸が $\ln\eta$ の標準偏差（対数軸）。青い棒がモデルのノイズの標準偏差、赤い破線が純粋誤差、橙の点線が、純粋誤差のうち $\ln\gd$ で説明できなかった残りです。
+\pt{見るポイント}青い棒が、赤い破線に近いか（成形条件から見たばらつきを表している）、橙の点線に近いか（ショットごとの $\gd$ で説明できる分を引いた残りしか表していない）。
+\pt{今回の結果}@@FIG7_TXT@@
+\end{points}
+
+% ---------------------------------------------------------------------
+\subsection{高解像度のグラフ（報告書・発表資料用）}
+\begin{points}
+\pt{ファイル}\file{results/step3b/highres/hr_<材料>_<モデル>_<学習>_by-thickness_<厚み>mm.png}（厚みごとに 1 枚。3 つの設定温度の曲線）と、\file{..._by-temperature_<温度>C.png}（設定温度ごとに 1 枚。4 つの厚みの曲線）。Git には入れません（ノートのセルで、いつでも作り直せます）。
+\pt{何を示す図か}GPR6月のノートのセル9-2 と同じ見せ方の、せん断速度 ― 粘度の学習結果グラフです。\textbf{600 dpi（15 $\times$ 10 インチ）}で、1 枚に 1 つのグラフを保存します。線は予測の平均、帯は 95\% 予測区間、塗りつぶしの点は学習に使った条件（条件平均）、白抜きの点は学習に使わなかった条件（検証）、黒い $\times$ は問題データ一覧の「感度確認」の条件です。既定は、R3（5data で学習）を、PP と粉砕材混合 PP について描きます。
+\pt{変え方}ノート11章の「高解像度のグラフ」のセルの先頭に、設定エリアがあります（描くモデル・材料・学習の種類、レイアウト、帯、点、軸の範囲、予測線の延長、図の大きさ・解像度、文字・点・線の大きさ、タイトルと軸名の表示、保存形式 png・pdf・svg）。\textbf{そのセルの設定だけを直して、そのセルだけを実行し直せます}（学習はやり直しません。ノート全体を一度実行した後で）。
+\pt{見るポイント}(1) 設定温度ごとの線が、温度の順に並ぶか。(2) 白抜きの点（外挿の検証データ）が、線と帯の上に乗るか。(3) 帯が、学習範囲の外で広がるか。
+\end{points}
+
+% =====================================================================
+\section{表の見方}
+
+\begin{table}[H]
+\caption{検証データ（5data $\to$ 3data）での指標：PP（$\ln\eta$。\file{metrics.csv}）。高速側の括弧内は、P03 を評価から除いた値}\label{tab:sv_pp}
+\begin{tabularx}{\linewidth}{@{}l*{7}{r}@{}}
+\toprule
+ & \multicolumn{3}{c}{RMSE} & \multicolumn{2}{c}{被覆率} & \multicolumn{2}{c}{NLPD} \\
+\cmidrule(lr){2-4}\cmidrule(lr){5-6}\cmidrule(l){7-8}
+モデル & 低速側 & 高速側 & （P03 除く） & 低速側 & 高速側 & 低速側 & 高速側 \\
+\midrule
+@@TABLE_SV_PP@@
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\begin{table}[H]
+\caption{検証データ（5data $\to$ 3data）での指標：粉砕材混合 PP}\label{tab:sv_mix}
+\begin{tabularx}{\linewidth}{@{}l*{7}{r}@{}}
+\toprule
+ & \multicolumn{3}{c}{RMSE} & \multicolumn{2}{c}{被覆率} & \multicolumn{2}{c}{NLPD} \\
+\cmidrule(lr){2-4}\cmidrule(lr){5-6}\cmidrule(l){7-8}
+モデル & 低速側 & 高速側 & （P03 除く） & 低速側 & 高速側 & 低速側 & 高速側 \\
+\midrule
+@@TABLE_SV_MIX@@
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\begin{table}[H]
+\caption{S\_T（5data の 210 ℃）と S\_T3（3data の 210 ℃）での指標（\file{metrics.csv}）。RMSE／NLPD}\label{tab:st}
+\begin{tabularx}{\linewidth}{@{}l*{4}{r}@{}}
+\toprule
+ & \multicolumn{2}{c}{PP} & \multicolumn{2}{c}{粉砕材混合 PP} \\
+\cmidrule(lr){2-3}\cmidrule(l){4-5}
+モデル & S\_T & S\_T3 & S\_T & S\_T3 \\
+\midrule
+@@TABLE_ST@@
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\begin{table}[H]
+\caption{190 ℃ と 230 ℃ の粘度の比（S\_V の学習。\file{tset_effect.csv}、\file{observed_ratio.csv}）}\label{tab:eff}
+\begin{tabularx}{\linewidth}{@{}l>{\raggedright\arraybackslash}p{5\zw}rrrr@{}}
+\toprule
+材料 & モデル & 0.5 mm & 1.0 mm & 1.5 mm & 2.0 mm \\
+\midrule
+@@TABLE_EFF@@
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\begin{table}[H]
+\caption{ノイズの標準偏差と純粋誤差（S\_V の学習。$\ln\eta$。\file{kernels.csv}）。「張り付き」：長さスケールが探索範囲の端（S\_V・S\_T のどちらか）}\label{tab:noise}
+\begin{tabularx}{\linewidth}{@{}l>{\raggedright\arraybackslash}p{4\zw}rrrl@{}}
+\toprule
+材料 & モデル & ノイズの標準偏差 & 純粋誤差 & 純粋誤差の残り & 張り付き \\
+\midrule
+@@TABLE_NOISE@@
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\begin{table}[H]
+\caption{感度確認（学習から P02・P03 を除く。\file{sensitivity_judgement.csv}）。RMSE の変化が 10\% 以上かつ 0.01 以上のものを「大」}\label{tab:sens}
+\begin{tabularx}{\linewidth}{@{}l>{\raggedright\arraybackslash}p{3\zw}>{\raggedright\arraybackslash}p{15\zw}rrrl@{}}
+\toprule
+材料 & モデル & 範囲 & すべて & 除く & 変化 [\%] & 影響 \\
+\midrule
+@@TABLE_SENS@@
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\begin{table}[H]
+\caption{ランダム 20\%（従来の評価。RMSE。\file{metrics.csv}）と LOCO（\file{loco_metrics.csv}）}\label{tab:random}
+\begin{tabularx}{\linewidth}{@{}l*{5}{r}@{}}
+\toprule
+ & \multicolumn{2}{c}{ランダム 20\%（PP）} & ランダム（混合） & \multicolumn{2}{c}{LOCO} \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-4}\cmidrule(l){5-6}
+モデル & S\_R1 & S\_R2 & S\_R1 & PP & 混合 PP \\
+\midrule
+@@TABLE_RANDOM@@
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\begin{table}[H]
+\caption{\file{results/step3b/} の表}
+\begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}p{19\zw}X@{}}
+\toprule
+ファイル & 中身と主な列 \\
+\midrule
+\file{metrics.csv} & 分け方・データ・モデル・評価の範囲ごとの指標。\file{split}（S\_V，S\_T，S\_T3，S\_R1，S\_R2、末尾の「\_感度除く」は、学習から感度確認の条件を除いたもの）、\file{data}（外れ値の なし・あり）、\file{subset}（全体・低速側・高速側、末尾の「（感度確認の条件を除く）」は P03 を評価から除いたもの）、\file{RMSE}、\file{R2}、\file{coverage95}、\file{NLPD}、\file{mean_sd}、\file{noise_sd}。 \\
+\file{kernels.csv} & GPR のハイパーパラメータ。\file{amplitude}、\file{lin_amplitude}・\file{lin_sigma0}（線形項）、\file{ls_*}（長さスケール）、\file{noise_sd}、\file{pure_sd_ln_eta}（純粋誤差）、\file{LML}、\file{ls_at_bound}（長さスケールの張り付き）。 \\
+\file{ols_coefficients.csv} & 線形回帰（L0，L0T）の係数。 \\
+\file{loco_metrics.csv} & 条件を1つずつ抜く交差検証の指標。 \\
+\file{tset_effect.csv} & 設定温度の効果（Tset だけを 190 → 230 ℃ にした予測の粘度比）。 \\
+\file{observed_ratio.csv} & 設定温度の効果の実測（同じ $\gd$ での 190/230 ℃ の粘度比）。 \\
+\file{sensitivity_judgement.csv} & 感度確認の結果（学習から除く前後の RMSE、予測比）。 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+% =====================================================================
+\section{結果のまとめ}
+
+\subsection{観点ごとの結論}
+@@SUMMARY@@
+
+\subsection{ノートの \texttt{★要確認} の意味}
+@@STAR_TXT@@
+
+\subsection{次の手順}
+\begin{points}
+\pt{手順3c}最終候補のモデルを、MCMC でも推定して、最尤推定と比べます（ハイパーパラメータの不確かさが、予測の幅にどれだけ効くか）。
+\pt{手順5a}温度のシフト構造の見直しです（別の説明書）。
+\end{points}
+
+\end{document}

@@ -1,0 +1,5 @@
+﻿material,structure,E_best_すべて,E_best_P02を除く,動き [kJ/mol],影響が大きい
+粉砕材混合PP,A,7.5,7.5,0.0,False
+粉砕材混合PP,H,-10.0,-10.0,0.0,False
+PP,A,7.5,7.5,0.0,False
+PP,H,-10.5,-10.0,0.5,False
