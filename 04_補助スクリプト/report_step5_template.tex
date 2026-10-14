@@ -1,0 +1,148 @@
+% 学習結果説明（手順5：シフト構造の本実装。構造 B・A・C × H の扱い (1)(2)(4)。用語集と図の見方）
+% results フォルダで「lualatex 学習結果説明_手順5.tex」を2回実行すると PDF を作り直せる（TeX Live の LuaLaTeX を使用）。
+% 図は results/step5/ の PNG を相対パスで読み込む。
+\documentclass[paper=a4paper,fontsize=10.5pt,line_length=44zw,number_of_lines=38]{jlreq}
+\usepackage[haranoaji]{luatexja-preset}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{enumitem}
+\usepackage{float}
+\usepackage{xcolor}
+\usepackage[hidelinks,bookmarksnumbered]{hyperref}
+\graphicspath{{step5/}}
+
+\newcommand{\file}[1]{\texttt{\detokenize{#1}}}
+\newcommand{\gd}{\dot{\gamma}}
+\newcommand{\Tff}{T_{\mathrm{ff}}}
+\newcommand{\Tset}{T_{\mathrm{set}}}
+\newcommand{\Eh}{E_{h}}
+\newcommand{\Ev}{E_{v}}
+\newcommand{\PI}{P3\_1}
+\newcommand{\PII}{P3\_2}
+\newenvironment{termlist}{\begin{itemize}[label=・,leftmargin=1\zw,labelwidth=1\zw,labelsep=0pt,itemsep=0.4ex,topsep=0.6ex,parsep=0pt]}{\end{itemize}}
+\newcommand{\term}[1]{\item \textbf{#1}：}
+\newenvironment{points}{\begin{itemize}[label=$\triangleright$,leftmargin=1.5\zw,itemsep=0.3ex,topsep=0.5ex,parsep=0pt]}{\end{itemize}}
+\newcommand{\pt}[1]{\item \textbf{#1}：}
+\renewcommand{\arraystretch}{1.25}
+
+\title{樹脂粘度モデル開発　手順5の学習結果の説明\\[0.6ex]{\large シフト構造の本実装（構造 B・A・C $\times$ 厚み $H$ の扱い (1)(2)(4)）：用語集とグラフの見方（機械学習・統計を初めて学ぶ人向け）}}
+\author{}
+\date{@@DATE@@}
+
+\begin{document}
+\maketitle
+{\small\tableofcontents}
+
+% =====================================================================
+\section{この文書について}
+
+この文書は、\file{results/step5/} にある手順5の結果（図と表）を、機械学習や統計を初めて学ぶ人でも読めるように説明したものです。手順5 は、「温度が変わると流動曲線がずれる」という構造（温度シフト構造）を、実際のデータで本格的に試す手順です。
+
+\begin{points}
+\pt{対象の結果}\file{results/step5/}：図 @@N_FIG@@ 枚、CSV @@N_CSV@@ 個。図は、すべて \file{results/step5/highres/} にも 600 dpi で保存されます（ほかに、せん断速度 ― 粘度のグラフ @@N_HR@@ 枚）。
+\pt{読み方}2章で何を比べたかをつかみ、分からない言葉は3章の用語集で調べてください。4章で図の見方、5章で表の見方、6章で結論と、これからの選択肢を説明します。\textbf{結論だけを知りたいときは、6章から読んでください}。
+\pt{元のノート}\file{01_機械学習コードフォルダ} の \file{手順5_シフト構造の本実装.ipynb} です。実行は約 @@RUN_HOURS@@ 時間です（設定で短くできます）。
+\pt{記号表}記号・モデル名・列名の一覧は、\file{学習結果説明_記号表.pdf} にあります。
+\pt{作り直し方}\file{results} フォルダで \texttt{lualatex 学習結果説明\_手順5.tex} を2回実行すると、この PDF を作り直せます。
+\pt{ノートの判定}ノートの各節の最後に、\file{>> 判定：OK}（想定どおり）か \file{>> 判定：★要確認}（想定と違う、または注意が要る点）が出ます。今回は、OK が @@N_OK@@ 個、★ が @@N_STAR@@ 個でした。★ はエラーではなく、「結果を読むときに気をつける点」の目印です。6章に、★ の意味を書きました。
+\end{points}
+
+% =====================================================================
+\section{何を比べたか（概要）}
+
+\subsection{温度シフト構造とは}
+同じ樹脂でも、温度を変えると、せん断速度 $\gd$ と粘度 $\eta$ の関係（流動曲線）の位置が変わります。温度を変えたときの曲線のずれを、「ずらし方の決まった式」で表したものが\textbf{温度シフト構造}です。ずらす量は、アレニウス型の式
+\[ \ln a(T;E) = \frac{E}{R}\Bigl(\frac{1}{T}-\frac{1}{T_{\mathrm{ref}}}\Bigr) \]
+（$T$ は温度 [K]、$T_{\mathrm{ref}}$ は基準温度 210 ℃ = 483.15 K、$R$ は気体定数）で決まり、$E$ が大きいほど大きくずれます。この $E$ は、文献の活性化エネルギー（PP の流動で 40 kJ/mol 前後）とは別物で、このデータの「見かけの粘度」の温度依存性を表す、データから決める係数です。
+
+\begin{table}[H]
+\caption{比べた構造（$f$ はガウス過程で表す「基準の流動曲線」。$u=\ln\gd+\ln a(\Tset;\Eh)$、$w=\ln\mathrm{Fo}$ は冷却の度合い）}\label{tab:struct}
+\begin{tabularx}{\linewidth}{@{}l>{\raggedright\arraybackslash}p{13\zw}X@{}}
+\toprule
+記号 & 式 & 何を表すか \\
+\midrule
+B（本命） & $\ln\eta=\ln a(\Tset;\Ev)+f(u,\,w)$ & 温度で、曲線が横（$\gd$ の向き、$\Eh$）にも縦（粘度の向き、$\Ev$）にもずれる \\
+A（対案） & $\ln\eta=\ln a(\Tset;\Ev)+f(\ln\gd,\,w)$ & 縦だけずれる（B の $\Eh=0$）。同じ $\gd$ で、低温ほど一定の倍率だけ粘い \\
+C（基準） & $\ln\eta=f(\ln\gd,\,\ln H,\,\Tset)$ & 構造を入れず、$\Tset$ を、ほかの入力と同じように並べた通常の GPR（手順3b・3d の R3） \\
+\bottomrule
+\end{tabularx}
+\end{table}
+構造 B・A が C と同じくらいの精度で、特に学習の範囲の外（外挿）で C を上回れば、「温度シフト構造は、データで支持された」と考えます。構造があると、温度の効果が少ないパラメータ（$\Eh$・$\Ev$）で表せて、解釈もしやすくなります。
+
+\subsection{厚み $H$ の扱い (1)(2)(4)}
+手順3e で、厚み $H$ はリークではないが、見かけの粘度は厚みで大きく違う（0.5 mm は 2.0 mm の約 2 倍以上）と分かりました。そこで、$H$ の扱いを次の 5 通りにして、構造ごとに比べました（ユーザーの決定、10 月 14 日）。
+
+\begin{table}[H]
+\caption{$H$ の扱い（$m$：材料の部分、$c$：厚み・冷却の補正。B・A の $u$ は横シフト後の $\gd$、C は $\ln\gd$ と $\Tset$）}\label{tab:hv}
+\begin{tabularx}{\linewidth}{@{}l>{\raggedright\arraybackslash}p{9\zw}X@{}}
+\toprule
+扱い & 形 & 意味 \\
+\midrule
+(1) & $f(u,w)$ & $H$（フーリエ数 Fo）を、入力に残す。基本形 \\
+(2) & $m(u)+c(w)$ & Cross-WLF のように、材料の部分 $m$ と、厚み・冷却の補正 $c$ に、足し算で分ける \\
+(4) & $f(u,p)$ & $H$ を使わず、圧力 \PII\ を入れる（$p=\ln\PII$） \\
+(1+4) & $f(u,w,p)$ & $H$ と \PII\ の両方 \\
+(2+4) & $m(u,p)+c(w)$ & (2) に \PII\ を足す \\
+\bottomrule
+\end{tabularx}
+\end{table}
+構造 3 通り $\times$ 扱い 5 通り = 15 モデルです。名前は「構造\_扱い」（例：B\_1、A\_2、C\_4）。C\_1 は R3、C\_4 は W2 と同じモデルです。
+
+\subsection{(2) と (4) の注意}
+\begin{points}
+\pt{(2) の足し算}$m$ と $c$ は、「定数だけ入れ替えられる」ので、図では $c$ の平均を 0 にそろえて見せます。$m$ は $\gd$ と温度の関数（Cross-WLF にあたる）、$c$ は $\ln\mathrm{Fo}$ だけの関数です。
+\pt{(4) の P3\_2}\PII\ は、流れの結果として測る値で、成形条件から予測するときには事前に分かりません。さらに、\PII\ は厚みでほぼ決まる量（$H^{-1.5}$ に比例）で、$H$ の代わりの目印として働きます。そこで、(4) を含むモデルは 2 通りで評価しました。
+\begin{itemize}[itemsep=0.2ex,topsep=0.3ex]
+\item \textbf{実測の \PII}：検証の条件の、実測の条件平均を使う。「\PII\ が分かっている場合」の上限。
+\item \textbf{予測した \PII}：事前に分からないとして、$(\ln\gd,\ln H,\Tset)$ から GPR で \PII\ を予測し、その予測のばらつきも含めて ln η を予測する（20 回引いて、平均と分散にまとめる）。
+\end{itemize}
+2 つの差が、「(4) の良さは、\PII\ が分かっているおかげか」を表します。\PII\ を予測するのにも $H$ が要る点に注意してください。
+\end{points}
+
+\subsection{データと評価}
+手順3d の 2 つの学習データを使います（どちらも外れ値なしで、問題データ一覧の「除外」を除く）。
+\begin{itemize}[itemsep=0.2ex,topsep=0.3ex]
+\item \textbf{5data 版}：5data（93 条件）で学習し、3data（36 条件）で検証する。S\_V（射出速度の両端への外挿。低速側・高速側）と S\_T（190・230 ℃ で学習して 210 ℃ を検証）。
+\item \textbf{Alldata 版}：全条件で学習。CV（条件単位の 10 分割の交差検証）と S\_T（テストは 5data 版と同じ行）。
+\end{itemize}
+$E$ は、学習データごとに、その学習データだけで推定します（CV の分割ごとにも推定。検証の情報は使いません）。入力の $\gd$ は条件平均（成形条件から見た予測）です。
+
+% =====================================================================
+\section{用語集}
+\begin{termlist}
+\term{プロファイル尤度}$E$ を格子（決まった間隔の値）で振り、各 $E$ について、GPR を学習して「対数周辺尤度」を求めたもの。$E$ と尤度の関係の図（尤度曲線）が山になっていれば、その山の頂点が、データに最も合う $E$。
+\term{対数周辺尤度（LML）}データが、そのモデルで、どれだけ「ありそう」か。大きいほどデータに合う。差が 2〜3 以上なら、はっきりした違い。
+\term{1.92 以内の範囲}LML が最大から 1.92 以内の $E$ の範囲。おおよその 95\% 信頼区間（尤度比検定）。範囲が狭いほど、$E$ がデータで決まっている。
+\term{$\Delta$LML（\file{dLML_vs_E0}）}$E=0$（温度の効果なし）との LML の差。大きいほど、温度の効果がデータで支持される。
+\term{$\Eh$・$\Ev$・$E_v-E_h$}B の 2 つの $E$。尤度の山が斜めの帯になると、2 つは別々には決まらず、差 $E_v-E_h$ だけが決まる。
+\term{フーリエ数（Fo）}冷却の度合い。$\ln\mathrm{Fo}=-(\ln\gd+3\ln H)$ ＋ 定数で、$H$ と $\gd$ から計算できる（$H$ と同じ情報）。
+\term{足し算のカーネル}$m$ と $c$ を足し算で表すために、2 つのカーネル（$m$ の部分、$c$ の部分）を足したもの。それぞれが、決まった入力の列だけを見る。
+\term{マスターカーブ}温度シフトでずらしたあとの、すべての温度のデータを重ねた 1 本の曲線。3 つの温度の点がよく重なれば、その構造でシフトできている。
+\term{被覆率}95\% 予測区間に、実測が入った割合。0.95 が理想。
+\term{RMSE}予測と実測の差の平均的な大きさ（$\ln\eta$ で。0.05 なら粘度で約 5\%）。
+\term{NLPD}負の対数予測密度。当たり具合と区間の適切さをまとめた指標。小さいほどよい。
+\term{純粋誤差・ノイズ}同じ条件のショット間のばらつき（$\ln\eta$ の標準偏差、約 0.04）。成形条件だけを入力にしたモデルは、これより小さい誤差にはなれない。
+\term{外挿・内挿}学習の範囲の外・内側での予測。
+\term{実測の \PII、予測した \PII}2.3 節。
+\term{CV（交差検証）}データを 10 に分け、1 つずつ検証に回して、全部の予測をまとめて評価する。同じ条件のショットは同じ側に入れる。
+\term{局所解}最適化が、本当の最大でなく、途中の小さな山で止まること。尤度曲線が、でこぼこになる原因。今回は、前の格子点の解を次の初期値にして減らした。
+\end{termlist}
+
+% =====================================================================
+\section{図の見方}
+
+@@FIGURES@@
+
+% =====================================================================
+\section{表の見方}
+
+@@TABLES@@
+
+% =====================================================================
+\section{結論と、これからの選択肢}
+
+@@CONCLUSION@@
+
+\end{document}

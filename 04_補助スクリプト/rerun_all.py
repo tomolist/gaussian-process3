@@ -28,7 +28,10 @@ STEPS = {   # 手順 → (ノート生成スクリプト, ノート名, 説明�
     "5a": ("build_step5a_nb.py", "手順5a_シフト構造の見直し.ipynb", "build_report_step5a.py"),
     "3d": ("build_step3d_nb.py", "手順3d_学習データの確認.ipynb", "build_report_step3d.py"),
     "3e": ("build_step3e_nb.py", "手順3e_厚みHの扱い.ipynb", "build_report_step3e.py"),
+    "5": ("build_step5_nb.py", "手順5_シフト構造の本実装.ipynb", "build_report_step5.py"),   # 約 2〜3 時間。RUN_NB_TIMEOUT=10800 以上を付けて実行する
+    "5b": ("build_step5b_mcmc_nb.py", "手順5b_最終候補のMCMC.ipynb", "build_report_step5b.py"),   # 手順5 の結果（results/step5/best_E.csv）を読む。約 30 分
 }
+MCMC_DIRS = {"3c": "step3c_mcmc", "5b": "step5b_mcmc"}      # 保存済みの事後サンプル（posterior_*.csv）の置き場所。実行の前に消す（--reuse-mcmc で残す）
 ENV = {**os.environ, "PYTHONIOENCODING": "utf-8", "RUN_NB_TIMEOUT": os.environ.get("RUN_NB_TIMEOUT", "14400")}   # 1セルの上限 4 時間（3c の MCMC 用）
 
 
@@ -67,9 +70,9 @@ def main():
             run([os.path.join(HERE, build), out, "--force"], f"ノートの作成（{out}）")
         if a.only_build:
             continue
-        if step == "3c" and not a.reuse_mcmc:       # データが変わっていると、古い事後サンプルは使えない
-            d = os.path.join("results", "step3c_mcmc")
-            old = [f for f in os.listdir(d) if f.startswith("posterior_") and f.endswith(".csv")] if os.path.isdir(d) else []
+        if step in MCMC_DIRS and not a.reuse_mcmc:       # データが変わっていると、古い事後サンプルは使えない
+            d = os.path.join("results", MCMC_DIRS[step])
+            old = [f for f in os.listdir(d) if f.startswith("posterior_") and f.endswith(".csv") and f != "posterior_summary.csv"] if os.path.isdir(d) else []
             for f in old:
                 os.remove(os.path.join(d, f))
             print(f"  保存済みの事後サンプル {len(old)} 個を消した（再利用するなら --reuse-mcmc）", flush=True)

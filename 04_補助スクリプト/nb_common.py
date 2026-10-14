@@ -16,7 +16,7 @@ import numpy as np
 import pandas as pd
 from sklearn.exceptions import ConvergenceWarning
 from sklearn.gaussian_process import GaussianProcessRegressor
-from sklearn.gaussian_process.kernels import ConstantKernel as C, DotProduct, Matern, WhiteKernel
+from sklearn.gaussian_process.kernels import ConstantKernel as C, DotProduct, Hyperparameter, Kernel, Matern, WhiteKernel
 from sklearn.metrics import mean_squared_error, r2_score
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
@@ -168,6 +168,58 @@ def kernel_for(d, linear=False):
     if linear:
         k = k + C(1.0, (1e-3, 1e3)) * DotProduct(sigma_0=1.0, sigma_0_bounds=(1e-5, 1e3))
     return k + WhiteKernel(noise_level=0.1, noise_level_bounds=(NOISE_LB, 1e1))
+
+
+class OnDims(Kernel):
+    """入力の一部の列 dims にだけ当てるカーネル（足し算のカーネル m(…) + c(…) を作るための部品。手順5）。
+    ハイパーパラメータは、中のカーネルのものをそのまま使う（scikit-learn の Exponentiation と同じ作り）。tag は、どの部品かの印（"m"・"c" など）"""
+
+    def __init__(self, kernel, dims, tag=""):
+        self.kernel = kernel
+        self.dims = dims                                   # 列番号のリスト（scikit-learn の clone の決まりで、受け取ったものをそのまま持つ）
+        self.tag = tag
+
+    def get_params(self, deep=True):
+        params = dict(kernel=self.kernel, dims=self.dims, tag=self.tag)
+        if deep:
+            params.update(("kernel__" + k, val) for k, val in self.kernel.get_params().items())
+        return params
+
+    @property
+    def hyperparameters(self):
+        return [Hyperparameter("kernel__" + h.name, h.value_type, h.bounds, h.n_elements) for h in self.kernel.hyperparameters]
+
+    @property
+    def theta(self):
+        return self.kernel.theta
+
+    @theta.setter
+    def theta(self, theta):
+        self.kernel.theta = theta
+
+    @property
+    def bounds(self):
+        return self.kernel.bounds
+
+    def __eq__(self, b):
+        return type(self) == type(b) and self.dims == b.dims and self.kernel == b.kernel
+
+    def __hash__(self):
+        return hash((tuple(self.dims), self.tag))
+
+    def __call__(self, X, Y=None, eval_gradient=False):
+        Xd = np.asarray(X)[:, self.dims]
+        Yd = None if Y is None else np.asarray(Y)[:, self.dims]
+        return self.kernel(Xd, Yd, eval_gradient=eval_gradient)
+
+    def diag(self, X):
+        return self.kernel.diag(np.asarray(X)[:, self.dims])
+
+    def is_stationary(self):
+        return self.kernel.is_stationary()
+
+    def __repr__(self):
+        return f"OnDims({self.tag}, dims={self.dims}, {self.kernel!r})"
 
 
 def make_gpr(d, linear=False, restarts=None):

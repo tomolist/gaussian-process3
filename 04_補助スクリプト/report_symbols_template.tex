@@ -141,6 +141,37 @@ $\Delta$LML & 温度なし（$E=0$）との LML の差（\file{dLML_vs_E0}）。
 \end{symtab}
 
 % =====================================================================
+\section{構造 × H の扱い（手順5）}
+
+\begin{symtab}
+構造 B・A・C & B：横と縦を別々にシフト（本命）。A：縦だけシフト（対案。$\Eh=0$）。C：構造なし（$\Tset$ を入力に並べた通常の GPR）。 & ― & 5 \\
+H の扱い (1)・(2)・(4) & ユーザー決定（10-14）。(1)：$H$（Fo）を残す。(2)：材料の部分 $m$ と厚み・冷却の補正 $c(\mathrm{Fo})$ に分ける。(4)：\PII\ を圧力として入れる（$H$ なし）。(3)（$H$ も圧力も外す）は除く。 & ― & 3e・5 \\
+(1+4)、(2+4) & (1) と (4) の組み合わせ（$H$ と \PII\ の両方）、(2) と (4) の組み合わせ。ノートの \file{hv} の値は、\file{"1"}・\file{"2"}・\file{"4"}・\file{"14"}・\file{"24"}。 & ― & 5 \\
+B\_1、A\_2、C\_4 など & 「構造\_H の扱い」の形のモデル名（\file{model} 列）。手順3b の B0・B2 とは別物。15 個（3 構造 $\times$ 5 通り）。 & ― & 5 \\
+$w$ & $w=\ln\mathrm{Fo}=-(\ln\gd+3\ln H)$ ＋ 定数。$H$ と $\gd$ だけで計算できる。 & ― & 5 \\
+$p$ & $p=\ln\PII$（条件平均、Pa）。(4) を含むモデルの入力。 & ― & 5 \\
+$m$、$c$ & (2) の足し算の成分。$m$：材料の部分（$\gd$・温度〔・$p$〕の関数。Cross-WLF にあたる）。$c$：厚み・冷却の補正（$\ln\mathrm{Fo}$ の関数）。$m$ と $c$ は定数だけ入れ替えられるので、図では $c$ の平均を 0 にそろえる。 & ― & 5 \\
+\file{OnDims} & 入力の一部の列だけに当てるカーネル（足し算のカーネル $m+c$ を作るための部品。\file{nb_common.py}）。 & ― & 5 \\
+実測の \PII、予測した \PII & (4) を含むモデルの評価の 2 通り。実測：検証の条件の実測の条件平均を使う（\PII\ が分かっている場合の上限）。予測：$(\ln\gd,\ln H,\Tset)$ から GPR で予測し、予測分布から \file{P32_DRAWS} 回引いて平均と分散にまとめる（\file{psrc} 列の「実測」「予測」）。 & ― & 5 \\
+$E_v-E_h$（\file{diff}） & B で決まる量。$\Eh$ と $\Ev$ は別々には決まりにくく（尤度の山が斜めの帯）、この差だけが決まる。 & kJ/mol & 5a・5 \\
+\end{symtab}
+
+% =====================================================================
+\section{最終候補の MCMC（手順5b）}
+
+\begin{symtab}
+MLE（E 固定）・MLE（同時） & 手順5b の最尤推定。E 固定：ずらし量を手順5の最良値に固定してカーネルだけ推定（手順5と同じ設定）。同時：ずらし量もカーネルと同時に推定（MCMC の初期値）。\file{mle.csv}・\file{metrics.csv} の \file{method}。 & ― & 5b \\
+条件ごとにまとめた尤度 & 入力が条件平均なので、ショットごとの尤度を、条件ごとの平均・ショット数・条件内の平方和で厳密に書き直したもの（\file{step5b_core.py} の \file{grouped_lml}）。条件の数の大きさの行列だけで済み、1 回約 1 ミリ秒。ショットごとの GPR と一致する。 & ― & 5b \\
+$\varepsilon$、$\sigma_n^2$ & ノイズ（ショット間のばらつき）と、その分散（WhiteKernel。\file{noise}・\file{log_noise}）。 & ― & 5・5b \\
+事前分布（E） & MCMC での $\Eh$・$\Ev$ の事前分布。範囲の中で一様（\file{E_PRIOR}：$\Eh$ $-40$〜$40$、$\Ev$ $-20$〜$40$ kJ/mol）。 & kJ/mol & 5b \\
+\file{amp}、\file{lin_amp}、\file{ls_<入力>}、\file{sigma0}、\file{noise} & posterior\_summary.csv の \file{param}（元の単位。振幅は $\sqrt{\text{振幅}^2}$）。入力の記号は \file{u}・\file{w}・\file{H}・\file{T}・\file{p}。 & ― & 5b \\
+\file{MLE_E_fixed}、\file{MLE_joint}、\file{profile_best_E} & posterior\_summary.csv：最尤推定（E 固定／同時）の値、手順5のプロファイル尤度の最良の E。 & ― & 5b \\
+\file{method} & metrics.csv・tset\_effect.csv：予測の方法（MLE（E 固定）、MLE（同時）、MCMC）。MCMC は、事後サンプルの予測分布の混合分布。 & ― & 5b \\
+\file{MCMC_MODELS}、\file{SETS5B} & 手順5b の設定：MCMC で推定するモデル（\file{["B_1", "C_1"]}）と、版ごとの学習データ。 & ― & 5b \\
+\file{N_WARM}、\file{N_SAMP}、\file{N_SAMP_MAX}、\file{N_PRED_DRAWS}、\file{E_START} & 手順5b の設定：調整の反復数（5000）、本番の反復数（20000）、本番の上限（100000）、予測に使う事後サンプル数（200）、手順5の結果がないときの E の出発点。 & ― & 5b \\
+\end{symtab}
+
+% =====================================================================
 \section{データの呼び名}
 
 \begin{symtab}
@@ -213,6 +244,7 @@ RFo & R3 の $H$ を、フーリエ数に替えた GPR。入力：条件平均�
 W0 & Cross-WLF と同じ変数の GPR（温度は設定温度）。入力：条件平均の $\gd$・$\Tset$。$H$ を外したモデル。W は WLF の頭文字。 & ― & 3e \\
 W1・W1T & Cross-WLF と同じ変数の GPR（温度は流動先端温度）。W1：条件平均の $\gd$・$\ln\Tff$。W1T：さらに $\Tset$。 & ― & 3e \\
 W2・W3 & Cross-WLF と同じ変数の GPR（圧力 $P$ として \PII\ を入れる。$H$ なし）。W2：条件平均の $\gd$・$\Tset$・$\ln\PII$。W3：条件平均の $\gd$・$\ln\Tff$・$\ln\PII$。精度は R3 に近いが、\PII\ が厚み（$H^{-1.5}$ に比例）を運んでいるため（手順3e）。 & ― & 3e \\
+B\_1〜C\_24 & 手順5 のモデル（構造\_H の扱い。上の「構造 $\times$ H の扱い（手順5）」）。C\_1 は R3、C\_4 は W2 と同じ。 & ― & 5 \\
 \end{symtab}
 
 % =====================================================================
@@ -277,6 +309,15 @@ $\sigma_0$ & 線形カーネルの定数項（\file{lin_sigma0}）。データ�
 \file{HR_ALL}、\file{HR_ALL_DPI} & すべての図を、高解像度でも \file{highres/} に保存するか（True）、その解像度（600 dpi）。 & ― & 3d〜 \\
 \file{HR_VERSIONS} & 高解像度のグラフ（せん断速度 ― 粘度）で描く版。 & ― & 3d・3e \\
 \file{KEYS}、\file{REF_H} & 手順3e で比べるモデル（R3・RFo・W0・W1・W1T・W2・W3）、厚みの比の基準の厚み（2.0 mm）。 & ― & 3e \\
+\file{STRUCTS}、\file{H_VARIANTS} & 手順5で比べる構造（\file{["B", "A", "C"]}）と H の扱い（\file{["1", "2", "4", "14", "24"]}）。 & ― & 5 \\
+\file{SPLITS} & 手順5で使う評価の分け方（版ごと。5data 版：\file{S_V}・\file{S_T}・\file{CV}、Alldata 版：\file{S_T}・\file{CV}・\file{S_Vall}）。 & ― & 5 \\
+\file{E_GRID_A}、\file{EH_GRID}、\file{EV_GRID}、\file{EH_GRID_CV}、\file{EV_GRID_CV} & プロファイル尤度の粗い格子（A の $\Ev$、B の $\Eh$・$\Ev$。\file{_CV} は CV の各分割用の狭い格子）。 & kJ/mol & 5 \\
+\file{FINE_A}、\file{FINE_B}、\file{FINE_B_CV} & 細かい格子の幅（最良の点の $\pm$。A は 0.5、B は 1 kJ/mol 刻み）。 & kJ/mol & 5 \\
+\file{N_RESTARTS_PROFILE} & 尤度の格子の各点での最適化のやり直し回数（3）。 & ― & 5 \\
+\file{B_EH_FIX} & None：B の $\Eh$・$\Ev$ を両方推定／数：$\Eh$ をその値に固定（$\Ev$ だけ推定）。 & kJ/mol & 5 \\
+\file{P32_DRAWS} & (4) で \PII\ を予測して使うときの、予測分布からの引き直しの回数（20）。 & ― & 5 \\
+\file{FIG_VARIANTS} & 曲線などの図に出す H の扱い（\file{["1", "2", "4"]}）。 & ― & 5 \\
+\file{HR_VERSION}、\file{HR_MODELS} & 手順5の高解像度のグラフで描く版と、モデル（\file{"B_1"} など）。 & ― & 5 \\
 \file{HR_...} & 高解像度のグラフの設定（レイアウト、帯、点、軸の範囲、文字の大きさ、保存形式など）。ノートの「高解像度のグラフ」のセルの先頭にある。 & ― & 3b・3c・3d・5a \\
 \end{symtab}
 
@@ -318,6 +359,11 @@ $\sigma_0$ & 線形カーネルの定数項（\file{lin_sigma0}）。データ�
 \file{bias} & bias\_by\_thickness.csv：厚みごとの残差の平均（実測 $-$ 予測、$\ln\eta$）。 & ln η & 3e \\
 \file{R2_lnH_base}、\file{R2_lnH_with_P32}、\file{corr_lnH_lnP32}、\file{gain} & p32\_proxy.csv：$\ln H$ を条件平均の入力で回帰したときの R2（\PII\ なし／あり）、$\ln H$ と $\ln\PII$ の相関、R2 の増加。0.3 以上増えれば、\PII\ が厚みの代わりの目印になりうる。 & ― & 3e \\
 \file{regression}、\file{coef_le}、\file{coef_lg}、\file{coef_lH}、\file{R2} & p32\_regression.csv：$\ln\PII$（比較は $\ln\PI$）を、条件平均の $\ln\eta$・$\ln\gd$・$\ln H$ で回帰した係数と R2（\file{le}・\file{lg}・\file{lH} は、それぞれ $\ln\eta$・$\ln\gd$・$\ln H$）。 & ― & 3e \\
+\file{struct}、\file{hv}、\file{model}、\file{psrc} & 手順5 の構造（B・A・C）、H の扱い（\file{1}・\file{2}・\file{4}・\file{14}・\file{24}）、モデル名（\file{B_1} など）、\PII\ の出どころ（実測・予測・\file{―}＝\PII\ を使わない）。 & ― & 5 \\
+\file{diff_best}、\file{diff_95_lo}、\file{diff_95_hi}、\file{n_in_95}、\file{at_edge} & best\_E.csv（手順5）：$\Ev-\Eh$ の最良の値と、LML が最大から 1.92 以内の範囲、その範囲の格子点の数、最良の点が格子の端に張り付いたか。 & kJ/mol & 5 \\
+\file{amp_<m|c|f>}、\file{lin_amp_*}、\file{lin_sigma0_*}、\file{ls_<m|c|f>_<入力>} & kernels.csv（手順5）：部品ごとの振幅・線形項・長さスケール。\file{f}：(1)(4)(1+4) の 1 つのカーネル、\file{m}・\file{c}：(2)(2+4) の足し算の 2 つの成分。入力の記号は \file{u}・\file{H}・\file{T}・\file{w}・\file{p}。 & ― & 5 \\
+\file{kind}（decomposition.csv）& \file{m_curve}：$m$ の曲線（設定温度ごと、$\ln\gd$ に対して）、\file{c_curve}：$c$ の曲線（$\ln\mathrm{Fo}$ に対して）、\file{c_cond}：学習の条件での $c$。 & ― & 5 \\
+\file{actual}、\file{pred}、\file{pred_sd} & p32\_pred.csv（手順5）：検証の条件の $\ln\PII$（条件平均）の実測、予測、予測の標準偏差。 & ― & 5 \\
 \file{chain}、\file{draw}、\file{lp}、\file{accepted} & MCMC のチェーンの番号、反復の番号、対数事後密度、採択したか（posterior\_*.csv）。 & ― & 3c \\
 \end{symtab}
 
