@@ -720,7 +720,7 @@ def dependency_plots_92(fit, mat, tr, out_dir, stem="依存性グラフ", **kw):
     import matplotlib.ticker as ticker
     from matplotlib.lines import Line2D
     from matplotlib.patches import Patch
-    cfg = dict(figsize=(15, 10), dpi=None, axis_fs=24, legend_fs=24, title_fs=24, tick_fs=28, plot_marker=200, legend_marker=200, show_xlabel=False, show_ylabel=False,
+    cfg = dict(figsize=(12, 10), dpi=None, axis_fs=24, legend_fs=24, title_fs=24, tick_fs=28, plot_marker=300, legend_marker=300, show_xlabel=False, show_ylabel=False,
                ylim=(0.1, 10000.0), xlim={"gd": (10.0, 100000.0)}, n_grid=100, formats=["png"], show=None)
     cfg.update(kw)
     dpi = cfg["dpi"] or FIG_DPI
@@ -797,8 +797,8 @@ def flow_inputs(sub, lg, h, t):
 
 
 FLOW_DEFAULT = dict(layouts=["temperature", "thickness"], band="predict", points="cond", show_test=True, mark_sens=True, x_range=None, extend=1.3,
-                    xlim={"thickness": None, "temperature": None}, ylim={"thickness": None, "temperature": None}, figsize=(15, 10), dpi=None,
-                    font={"axis": 24, "legend": 24, "title": 24, "tick": 28}, marker=200, marker_shot=70, line=3.0, show_title=True,
+                    xlim={"thickness": None, "temperature": None}, ylim={"thickness": None, "temperature": None}, figsize=(12, 10), dpi=None,
+                    font={"axis": 24, "legend": 24, "title": 24, "tick": 28}, marker=300, marker_shot=70, line=2.0, show_title=True,
                     show_xlabel=False, show_ylabel=False, formats=["png"], n_grid=120, show=None)
 
 
@@ -806,7 +806,7 @@ T_CURVE_COLORS = ["#d62728", "#1f77b4", "#2ca02c", "#9467bd", "#8c564b"]       #
 
 
 def flow_plot_common(fit, mat, pool, train_conds, out_dir, stem, tr=None, **kw):
-    """6月のノートのセル9-2 と同じ仕様（図の大きさ 15 × 10 インチ、文字の大きさ、点の大きさ、軸の目盛り〔両軸とも 10 の累乗〕、凡例の並べ方）で、
+    """6月のノートのセル9-2 と同じ仕様（図の大きさ〔既定 12 × 10 インチ。6月は 15 × 10〕、文字の大きさ、点の大きさ〔既定 300〕、軸の目盛り〔両軸とも 10 の累乗〕、凡例の並べ方）で、
     全キャビティ厚みの**学習データ**の点（色・形は厚み）を重ね、**厚みによらない共通の平均関数と 95% 区間**を描く。検証（3data）の点は描かない。
     曲線は、せん断速度だけを動かし、ほかの入力を固定したもの：P3_3 は学習データ（tr）の中央値、Tff は、その設定温度の学習データの中央値、Tset はその温度。
     曲線の範囲は、その設定温度の学習データの範囲を extend 倍に延ばしたもの（x_range があればそれ）。軸の範囲は、common_xlim・common_ylim（None なら、データを含む 10 の累乗の範囲）。
