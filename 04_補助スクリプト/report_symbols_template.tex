@@ -212,6 +212,7 @@ N・H40・F・C & N：温度なし（$E=0$）。H40：H で $E=40$ kJ/mol に固
 RFo & R3 の $H$ を、フーリエ数に替えた GPR。入力：条件平均の $\gd$・$\ln\mathrm{Fo}$・$\Tset$（\file{ln_Fo_cm}）。$H$ と同じ情報。 & ― & 3e \\
 W0 & Cross-WLF と同じ変数の GPR（温度は設定温度）。入力：条件平均の $\gd$・$\Tset$。$H$ を外したモデル。W は WLF の頭文字。 & ― & 3e \\
 W1・W1T & Cross-WLF と同じ変数の GPR（温度は流動先端温度）。W1：条件平均の $\gd$・$\ln\Tff$。W1T：さらに $\Tset$。 & ― & 3e \\
+W2・W3 & Cross-WLF と同じ変数の GPR（圧力 $P$ として \PII\ を入れる。$H$ なし）。W2：条件平均の $\gd$・$\Tset$・$\ln\PII$。W3：条件平均の $\gd$・$\ln\Tff$・$\ln\PII$。精度は R3 に近いが、\PII\ が厚み（$H^{-1.5}$ に比例）を運んでいるため（手順3e）。 & ― & 3e \\
 \end{symtab}
 
 % =====================================================================
@@ -275,7 +276,7 @@ $\sigma_0$ & 線形カーネルの定数項（\file{lin_sigma0}）。データ�
 \file{OUTLIER_Z}、\file{OUTLIER_RESID} & 規則 f（外れ値の検知）のしきい値：$|z|$（3.5）と |残差 $\ln\eta$|（0.1）。 & ― & 3d \\
 \file{HR_ALL}、\file{HR_ALL_DPI} & すべての図を、高解像度でも \file{highres/} に保存するか（True）、その解像度（600 dpi）。 & ― & 3d〜 \\
 \file{HR_VERSIONS} & 高解像度のグラフ（せん断速度 ― 粘度）で描く版。 & ― & 3d・3e \\
-\file{KEYS}、\file{REF_H} & 手順3e で比べるモデル（R3・RFo・W0・W1・W1T）、厚みの比の基準の厚み（2.0 mm）。 & ― & 3e \\
+\file{KEYS}、\file{REF_H} & 手順3e で比べるモデル（R3・RFo・W0・W1・W1T・W2・W3）、厚みの比の基準の厚み（2.0 mm）。 & ― & 3e \\
 \file{HR_...} & 高解像度のグラフの設定（レイアウト、帯、点、軸の範囲、文字の大きさ、保存形式など）。ノートの「高解像度のグラフ」のセルの先頭にある。 & ― & 3b・3c・3d・5a \\
 \end{symtab}
 
@@ -315,6 +316,8 @@ $\sigma_0$ & 線形カーネルの定数項（\file{lin_sigma0}）。データ�
 \file{coef_*}、\file{RMSE_test}、\file{RMSE_over_pure} & formula\_check.csv（手順3e）：線形回帰の係数、検証の RMSE、その純粋誤差に対する比（リークならほぼ 0）。 & ― & 3e \\
 \file{ratio_mean}、\file{ratio_min}、\file{ratio_max}、\file{gd_lo}、\file{gd_hi} & thickness\_ratio.csv：粘度の比（$\gd$ が重なる範囲での平均・最小・最大）と、その範囲。 & 倍、1/s & 3e \\
 \file{bias} & bias\_by\_thickness.csv：厚みごとの残差の平均（実測 $-$ 予測、$\ln\eta$）。 & ln η & 3e \\
+\file{R2_lnH_base}、\file{R2_lnH_with_P32}、\file{corr_lnH_lnP32}、\file{gain} & p32\_proxy.csv：$\ln H$ を条件平均の入力で回帰したときの R2（\PII\ なし／あり）、$\ln H$ と $\ln\PII$ の相関、R2 の増加。0.3 以上増えれば、\PII\ が厚みの代わりの目印になりうる。 & ― & 3e \\
+\file{regression}、\file{coef_le}、\file{coef_lg}、\file{coef_lH}、\file{R2} & p32\_regression.csv：$\ln\PII$（比較は $\ln\PI$）を、条件平均の $\ln\eta$・$\ln\gd$・$\ln H$ で回帰した係数と R2（\file{le}・\file{lg}・\file{lH} は、それぞれ $\ln\eta$・$\ln\gd$・$\ln H$）。 & ― & 3e \\
 \file{chain}、\file{draw}、\file{lp}、\file{accepted} & MCMC のチェーンの番号、反復の番号、対数事後密度、採択したか（posterior\_*.csv）。 & ― & 3c \\
 \end{symtab}
 

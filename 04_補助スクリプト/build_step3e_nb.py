@@ -53,8 +53,16 @@ ln η は、ΔP（流れの結果。測る値）、H（金型の寸法。事前�
 | W0 | **Cross-WLF と同じ変数**（T ＝ 設定温度） | γ̇, Tset | H を外す |
 | W1 | **Cross-WLF と同じ変数**（T ＝ 流動先端温度） | γ̇, ln Tff | H を外し、温度を、流れの中の樹脂温度にする |
 | W1T | 参考 | γ̇, ln Tff, Tset | H を外し、2 つの温度 |
+| W2 | **Cross-WLF と同じ変数**（T ＝ 設定温度、P ＝ P3_2） | γ̇, Tset, ln P3_2 | H を外し、圧力を入れる（ユーザーの依頼、10-14） |
+| W3 | **Cross-WLF と同じ変数**（T ＝ 流動先端温度、P ＝ P3_2） | γ̇, ln Tff, ln P3_2 | 同上 |
 
-データは、手順3d の 2 つの版（外れ値なし。5data 版：S_V・S_T、Alldata 版：CV）。圧力（Cross-WLF の D3 項）は、粘度の結果なので、入力にしない（CLAUDE.md §5）。''')
+データは、手順3d の 2 つの版（外れ値なし。5data 版：S_V・S_T、Alldata 版：CV）。P3_2・Tff は、条件平均を使う。
+
+**P3_2 について**（Cross-WLF の圧力 P として W2・W3 に入れる）
+- 算出式によるリークの確認は、手順3a で済んでいる（H を入れたモデルで）。P3_2 は算出式に入っておらず、線形回帰に足しても残差はほとんど下がらない（PP：0.346 → 0.333。P3_1 なら 0.021）。結論は「リークではないが、役に立たない」（3a・3b）。
+- ただし、流れの結果で、成形条件から予測するときには事前に分からない（P3_1・Tff と同じ）。
+- H を外すと、P3_2 が厚みの代わりの目印になるおそれがある（薄いほど圧力が高い）。3a の線形回帰でも、P3_2 を足すと ln H の係数が −0.24 → ＋0.49 に変わった。そこで 3 節で、H なしでのリークの確認と、P3_2 が厚みをどれだけ表すかを確かめる。
+- P3_2 は「センサ4の出力が最大になった時刻」のセンサ3の圧力で、粘度を測った区間（センサ3→4 の到達の間）の圧力ではない。Cross-WLF の P（その場の圧力）とは意味が違う。''')
 
 # ---------------------------------------------------------------- 1. 設定
 md(usage_md("3e", "results/step3e", "results/学習結果説明_手順3e.pdf", 20))
@@ -65,7 +73,7 @@ TEMP_HOLDOUT = 210            # S_T でテストにする設定温度 [℃]
 CV_K = 10                     # Alldata 版の交差検証の分割数（条件単位）
 N_RESTARTS_CV = 1             # 交差検証の各分割での最適化のやり直し回数
 N_JOBS = 6                    # 並列に計算する数（CPU の数に合わせる）
-KEYS = ["R3", "RFo", "W0", "W1", "W1T"]   # 比べるモデル（記号はノート冒頭の表）
+KEYS = ["R3", "RFo", "W0", "W1", "W1T", "W2", "W3"]   # 比べるモデル（記号はノート冒頭の表）
 REF_H = 2.0                   # 厚みの効果を比べる基準の厚み [mm]
 HR_ALL = True                 # すべての図を、高解像度でも results/step3e/highres/ に保存するか（Git の管理外）
 HR_ALL_DPI = 600              # その解像度
@@ -125,10 +133,13 @@ ln η を、算出式に入っている量で、線形回帰する（ショッ�
 | ln γ̇, ln H, Tset | 同上 |
 | ln Δt, ln H | ln γ̇ と同じ情報（γ̇ = 6L/(H·Δt)）。同じ結果になるはず |
 | ln γ̇, ln H, ln ΔP | **算出式そのもの**。係数は (−1, ＋1, ＋1) で、完全に再現できるはず（リーク） |
-| ln γ̇, ln ΔP | H なしでも、ΔP があれば大部分を再現できるか |''')
+| ln γ̇, ln ΔP | H なしでも、ΔP があれば大部分を再現できるか |
+| ln γ̇, ln P3_2 | **H なしで、圧力 P3_2 を入れる**（W2・W3 の線形版）。算出式に入っていないので、再現できないはず（リークではない） |
+| ln γ̇, ln H, ln P3_2 | 3a の L2。P3_2 を足すと、ln H の係数が変わるか（P3_2 が厚みの情報を持つ印） |''')
 code(r'''# セル3：算出式の量での線形回帰
 FORMS = {"ln γ̇ + ln H": ["ln_gd", "ln_H"], "ln γ̇ + ln H + Tset": ["ln_gd", "ln_H", "Tset"], "ln Δt + ln H": ["ln_dt", "ln_H"],
-         "ln γ̇ + ln H + ln ΔP（算出式）": ["ln_gd", "ln_H", "ln_dP"], "ln γ̇ + ln ΔP": ["ln_gd", "ln_dP"]}
+         "ln γ̇ + ln H + ln ΔP（算出式）": ["ln_gd", "ln_H", "ln_dP"], "ln γ̇ + ln ΔP": ["ln_gd", "ln_dP"],
+         "ln γ̇ + ln P3_2": ["ln_gd", "ln_P32"], "ln γ̇ + ln H + ln P3_2": ["ln_gd", "ln_H", "ln_P32"]}
 frows = []
 for mat in MATS:
     tr, te = split_V(mat, MAIN_DATA)
@@ -149,7 +160,58 @@ for mat in MATS:
     s = form_df[form_df["material"] == MATS[mat]].set_index("inputs")
     a, b = s.loc["ln γ̇ + ln H", "RMSE_over_pure"], s.loc["ln γ̇ + ln H + ln ΔP（算出式）", "RMSE_over_pure"]
     judge(a > 2, f"{MATS[mat]}：ln γ̇ と ln H だけの回帰の検証 RMSE は、純粋誤差の {a:.1f} 倍（2 倍を超えれば、H と γ̇ からは ln η を計算できない ＝ 式によるリークではない）。ln H の係数は {s.loc['ln γ̇ + ln H', 'coef_ln_H']:+.2f}（式の一部としてだけ効くなら ＋1）")
-    judge(b < 0.1, f"{MATS[mat]}：ΔP（P3_1 − 0.30 MPa）を足すと、検証 RMSE は純粋誤差の {b:.4f} 倍（ほぼ 0 ＝ ΔP はリーク。手順3a と同じ）")''')
+    judge(b < 0.1, f"{MATS[mat]}：ΔP（P3_1 − 0.30 MPa）を足すと、検証 RMSE は純粋誤差の {b:.4f} 倍（ほぼ 0 ＝ ΔP はリーク。手順3a と同じ）")
+    c = s.loc["ln γ̇ + ln P3_2", "RMSE_over_pure"]
+    judge(c > 2, f"{MATS[mat]}：H なしで ln γ̇ と ln P3_2 だけの回帰の検証 RMSE は、純粋誤差の {c:.1f} 倍（2 倍を超えれば、P3_2 からも ln η を計算できない ＝ 算出式によるリークではない。手順3a の確認と同じ結論）")
+    st = s.loc["ln γ̇ + ln H", "resid_sd_train"], s.loc["ln γ̇ + ln H + ln P3_2", "resid_sd_train"]
+    print(f"   {MATS[mat]}：P3_2 を足したときの ln H の係数 {s.loc['ln γ̇ + ln H', 'coef_ln_H']:+.2f} → {s.loc['ln γ̇ + ln H + ln P3_2', 'coef_ln_H']:+.2f}、学習の残差 sd {st[0]:.3f} → {st[1]:.3f}（P3_1 なら 0.021）")''')
+code(r'''# セル3.5：P3_2 が、厚みの代わりの目印になるか（条件平均。Alldata の外れ値なし）
+def r2_of(X, y):
+    A = np.column_stack([np.ones(len(X)), X])
+    beta, *_ = np.linalg.lstsq(A, y, rcond=None)
+    r = y - A @ beta
+    return float(1 - (r @ r) / ((y - y.mean()) @ (y - y.mean())))
+
+
+prows = []
+for mat in MATS:
+    d = D[(mat, "Alldata", MAIN_DATA)]
+    g = d.groupby("cond").agg(H=("H", "first"), Tset=("Tset", "first"), lg=("ln_gd", "mean"), lp=("ln_P32", "mean"), lt=("ln_Tff", "mean")).reset_index()
+    y = np.log(g["H"].to_numpy())
+    for base_name, base in [("γ̇, Tset", [g["lg"], g["Tset"]]), ("γ̇, Tff", [g["lg"], g["lt"]])]:
+        Xb = np.column_stack(base)
+        Xp = np.column_stack(base + [g["lp"]])
+        prows.append({"material": MATS[mat], "base": base_name, "R2_lnH_base": r2_of(Xb, y), "R2_lnH_with_P32": r2_of(Xp, y)})
+    pc = np.corrcoef(np.log(g["H"]), g["lp"])[0, 1]
+    prows[-1]["corr_lnH_lnP32"] = float(pc)
+    prows[-2]["corr_lnH_lnP32"] = float(pc)
+proxy_df = pd.DataFrame(prows)
+proxy_df["gain"] = proxy_df["R2_lnH_with_P32"] - proxy_df["R2_lnH_base"]
+proxy_df.to_csv(os.path.join(OUT_DIR, "p32_proxy.csv"), index=False, encoding="utf-8-sig")
+# P3_2 は、粘度 η の情報を持つのか、厚み H の情報を持つのか：ln P3_2 を、ln η・ln γ̇・ln H（条件平均）で線形回帰する
+qrows = []
+for mat in MATS:
+    d = D[(mat, "Alldata", MAIN_DATA)]
+    g = d.groupby("cond").agg(H=("H", "first"), Tset=("Tset", "first"), lg=("ln_gd", "mean"), le=("ln_eta", "mean"), lp=("ln_P32", "mean"), l1=("ln_P31", "mean")).reset_index()
+    g["lH"] = np.log(g["H"])
+    for name, cols, ycol in [("ln P3_2 ~ ln η, ln γ̇, ln H", ["le", "lg", "lH"], "lp"), ("ln P3_2 ~ ln γ̇, ln H", ["lg", "lH"], "lp"), ("ln P3_2 ~ ln H", ["lH"], "lp"),
+                             ("ln P3_1 ~ ln η, ln γ̇, ln H（比較：P3_1 は粘度の算出式に入っている）", ["le", "lg", "lH"], "l1")]:
+        A = np.column_stack([np.ones(len(g)), g[cols].to_numpy()])
+        beta, *_ = np.linalg.lstsq(A, g[ycol].to_numpy(), rcond=None)
+        res = g[ycol].to_numpy() - A @ beta
+        qrows.append({"material": MATS[mat], "regression": name, "R2": float(1 - res @ res / ((g[ycol] - g[ycol].mean()) ** 2).sum()), "resid_sd": float(np.sqrt(res @ res / (len(g) - A.shape[1]))),
+                      **{f"coef_{c}": float(b) for c, b in zip(cols, beta[1:])}})
+p32reg_df = pd.DataFrame(qrows)
+p32reg_df.to_csv(os.path.join(OUT_DIR, "p32_regression.csv"), index=False, encoding="utf-8-sig")
+print("\nln P3_2 を、条件平均の ln η・ln γ̇・ln H で回帰（P3_2 が何の情報を持つか）")
+print(p32reg_df.round(3).to_string(index=False))
+for mat in MATS:
+    s = p32reg_df[(p32reg_df["material"] == MATS[mat]) & (p32reg_df["regression"] == "ln P3_2 ~ ln η, ln γ̇, ln H")].iloc[0]
+    judge(abs(s["coef_le"]) < 0.2, f"{MATS[mat]}：ln P3_2 の回帰で、ln η の係数が {s['coef_le']:+.2f}（0 に近い ＝ P3_2 は、粘度そのものの情報をほとんど持たない。P3_1 は {p32reg_df[(p32reg_df['material'] == MATS[mat]) & p32reg_df['regression'].str.startswith('ln P3_1')].iloc[0]['coef_le']:+.2f}）。ln H の係数は {s['coef_lH']:+.2f}（厚みでほぼ決まる）")
+print("ln H を、条件平均の入力で線形回帰したときの R2（1 なら、入力から H が完全に分かる）")
+print(proxy_df.round(3).to_string(index=False))
+for _, r in proxy_df.iterrows():
+    judge(r["gain"] < 0.3, f"{r['material']}：入力（{r['base']}）に ln P3_2 を足したときの ln H の R2 が {r['R2_lnH_base']:.2f} → {r['R2_lnH_with_P32']:.2f}（増加 {r['gain']:.2f}。0.3 以上増えるなら、P3_2 が厚みの代わりの目印になりうる ＝ H を外して P3_2 を入れると、厚みの情報を P3_2 が運ぶ）")''')
 
 # ---------------------------------------------------------------- 4. 厚みの効果
 md(r'''## 4. 厚みの効果：同じ γ̇・同じ設定温度で、厚みによって粘度がどれだけ違うか
@@ -241,13 +303,16 @@ md(r'''## 5. GPR で、H を外す・替えると、どうなるか
 - **リークの目印**：リークがあると、検証の RMSE が、純粋誤差（約 0.04）より明らかに小さくなる（ショットごとのゆれまで当ててしまう）。H は、同じ条件のショットで同じ値なので、ショットごとのゆれの情報を持たない。
 - **H が要るか**：R3 と W0（H を外す）の差。W0 の誤差が、厚みごとに偏るか（厚みごとの残差の平均）。
 - **Tff で代わりになるか**：W1（γ̇, Tff）、W1T（γ̇, Tff, Tset）。
-- **Fo は H と同じ情報か**：RFo と R3 の差（構造 A・B の入力 ln Fo には、H が入っている）。''')
+- **Fo は H と同じ情報か**：RFo と R3 の差（構造 A・B の入力 ln Fo には、H が入っている）。
+- **圧力 P3_2 で、H の代わりになるか**：W0 → W2（Tset ＋ P3_2）、W1 → W3（Tff ＋ P3_2）の差。良くなったとしても、(1) P3_2 は、予測のときに事前に分からない流れの結果で、(2) 薄いほど圧力が高いので、厚みの代わりの目印として使われているだけかもしれない（3 節の `p32_proxy.csv`）。P3_2 のリークの確認（算出式による）は、手順3a と、3 節の回帰で行っている。''')
 code(r'''# セル5：学習（並列。15〜25 分）
-SPECS = {"R3": ["ln_gd_cm", "ln_H", "Tset"], "RFo": ["ln_gd_cm", "ln_Fo_cm", "Tset"], "W0": ["ln_gd_cm", "Tset"], "W1": ["ln_gd_cm", "ln_Tff_cm"], "W1T": ["ln_gd_cm", "ln_Tff_cm", "Tset"]}
+SPECS = {"R3": ["ln_gd_cm", "ln_H", "Tset"], "RFo": ["ln_gd_cm", "ln_Fo_cm", "Tset"], "W0": ["ln_gd_cm", "Tset"], "W1": ["ln_gd_cm", "ln_Tff_cm"], "W1T": ["ln_gd_cm", "ln_Tff_cm", "Tset"],
+         "W2": ["ln_gd_cm", "Tset", "ln_P32_cm"], "W3": ["ln_gd_cm", "ln_Tff_cm", "ln_P32_cm"]}
 for k in KEYS:
     MODELS[k] = {"kind": "gpr", "cols": SPECS[k], "linear": True}
 LABELS = {"R3": r"R3：［$\dot{\gamma}$, $H$, $T_{set}$］", "RFo": r"RFo：［$\dot{\gamma}$, Fo, $T_{set}$］", "W0": r"W0：［$\dot{\gamma}$, $T_{set}$］（Cross-WLF と同じ変数）",
-          "W1": r"W1：［$\dot{\gamma}$, $T_{ff}$］（Cross-WLF と同じ変数）", "W1T": r"W1T：［$\dot{\gamma}$, $T_{ff}$, $T_{set}$］"}
+          "W1": r"W1：［$\dot{\gamma}$, $T_{ff}$］（Cross-WLF と同じ変数）", "W1T": r"W1T：［$\dot{\gamma}$, $T_{ff}$, $T_{set}$］",
+          "W2": r"W2：［$\dot{\gamma}$, $T_{set}$, P3_2］（Cross-WLF と同じ変数）", "W3": r"W3：［$\dot{\gamma}$, $T_{ff}$, P3_2］（Cross-WLF と同じ変数）"}
 
 
 def job(mat, ver, name, tr, tests, key, restarts):
@@ -341,6 +406,17 @@ for mat in MATS:
         if "W1" in KEYS and "R3" in KEYS:
             r3, w1 = mv(mat, ver, sp, "R3"), mv(mat, ver, sp, "W1")
             judge(w1 < 1.5 * r3, f"{n}・{ver} 版 {sp}：H の代わりに Tff を使った W1 の RMSE {w1:.3f} が、R3 {r3:.3f} の 1.5 倍未満（流れの中の樹脂温度で、厚みの効果を説明できる）")
+    for key, nm in [("W2", "Tset と P3_2"), ("W3", "Tff と P3_2")]:
+        if key not in KEYS or "R3" not in KEYS:
+            continue
+        for ver, sp in CHECKS:
+            r3, wk, pure = mv(mat, ver, sp, "R3"), mv(mat, ver, sp, key), mv(mat, ver, sp, "R3", col="pure_sd")
+            judge(wk < 1.5 * r3, f"{n}・{ver} 版 {sp}：H を外して P3_2 を入れた {key}（{nm}）の RMSE {wk:.3f} が、R3 {r3:.3f} の 1.5 倍未満（H なしでも、圧力で足りる）。超えれば、圧力を入れても、H の代わりにならない")
+            judge(wk > 0.8 * pure, f"{n}・{ver} 版 {sp}：{key} の RMSE {wk:.3f} が、純粋誤差 {pure:.3f} の 0.8 倍より大きい（P3_2 によるリークの目印はない）")
+    if "W2" in KEYS and "W0" in KEYS:
+        for ver, sp in CHECKS:
+            w0, w2 = mv(mat, ver, sp, "W0"), mv(mat, ver, sp, "W2")
+            judge(w2 < 0.5 * w0, f"{n}・{ver} 版 {sp}：圧力 P3_2 を足すと（W0 {w0:.3f} → W2 {w2:.3f}）、RMSE が半分未満になる（P3_2 に、H の代わりになる情報がある）")
     if "RFo" in KEYS and "Alldata" in DATA_VERSIONS:
         r3, rf = mv(mat, "Alldata", "CV", "R3"), mv(mat, "Alldata", "CV", "RFo")
         judge(abs(rf / r3 - 1) < 0.05, f"{n}：Fo を使った RFo の CV の RMSE {rf:.3f} が、R3 {r3:.3f} とほぼ同じ（±5%。Fo は H と同じ情報を持つ ＝ 構造 A・B も、Fo を通して H を使っている）")
@@ -355,7 +431,7 @@ md(r'''## 6. 図
 - 図4：厚みごとの残差の平均（Alldata 版の CV）。0 に近いほど、厚みによる偏りがない。''')
 code(r'''# セル8：図3 RMSE、図4 厚みごとの残差の平均
 CATS = [(v, s, sub) for v, s, sub in [("5data", "S_V", "低速側"), ("5data", "S_V", "高速側"), ("5data", "S_T", "全体"), ("Alldata", "CV", "全体"), ("Alldata", "CV", "低速側"), ("Alldata", "CV", "高速側")] if v in DATA_VERSIONS]
-MCOL = {"R3": "k", "RFo": "tab:gray", "W0": "tab:red", "W1": "tab:orange", "W1T": "tab:purple"}
+MCOL = {"R3": "k", "RFo": "tab:gray", "W0": "tab:red", "W1": "tab:orange", "W1T": "tab:purple", "W2": "tab:blue", "W3": "tab:green"}
 fig, axes = plt.subplots(1, len(MATS), figsize=(7.5 * len(MATS), 4.8), squeeze=False)
 for i, mat in enumerate(MATS):
     ax = axes[0, i]
@@ -381,7 +457,7 @@ if "Alldata" in DATA_VERSIONS:
         b = bias_df[(bias_df["material"] == MATS[mat]) & (bias_df["version"] == "Alldata") & (bias_df["split"] == "CV")]
         for k, key in enumerate(KEYS):
             g = b[b["model"] == key].sort_values("H")
-            ax.errorbar(g["H"] + (k - 2) * 0.03, g["bias"], yerr=g["sd"] / np.sqrt(g["n"]), fmt="o-", color=MCOL[key], capsize=3, label=LABELS[key])
+            ax.errorbar(g["H"] + (k - (len(KEYS) - 1) / 2) * 0.03, g["bias"], yerr=g["sd"] / np.sqrt(g["n"]), fmt="o-", color=MCOL[key], capsize=3, label=LABELS[key])
         ax.axhline(0, color="k", lw=0.8)
         ax.set_xlabel("厚み H (mm)")
         ax.set_ylabel("残差の平均（実測 − 予測、ln η）")
@@ -395,7 +471,7 @@ if "Alldata" in DATA_VERSIONS:
 # ---------------------------------------------------------------- 7. 高解像度のグラフ
 md(HR_MD.replace("## 高解像度のグラフ", "## 7. 高解像度のグラフ") + "\n\nH を外したモデル（W0・W1）は、厚みが違っても同じ曲線になる（入力に H がないため）。設定温度ごとのレイアウトで、4 つの厚みの曲線が重なり、点が曲線から離れる様子が見える。")
 code(hr_cell("# セル9：高解像度のグラフ（せん断速度 ― 粘度。GPR6月ノートのセル9-2 にならう）",
-             '''HR_MODELS = ["R3", "W0", "W1"]     # 描くモデル（KEYS のどれでも）
+             '''HR_MODELS = ["R3", "W0", "W1", "W2", "W3"]     # 描くモデル（KEYS のどれでも）
 HR_VERSIONS = ["Alldata"]          # 描く版（"5data"：5data で学習〔3data は白抜き〕／"Alldata"：全条件で学習）''',
              r'''hr_saved = []
 for mat in HR_MATERIALS:
