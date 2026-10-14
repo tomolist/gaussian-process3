@@ -27,6 +27,7 @@ STEPS = {   # 手順 → (ノート生成スクリプト, ノート名, 説明�
     "3c": ("build_step3c_mcmc_nb.py", "手順3c_最終候補のMCMC.ipynb", "build_report_step3c.py"),
     "5a": ("build_step5a_nb.py", "手順5a_シフト構造の見直し.ipynb", "build_report_step5a.py"),
     "3d": ("build_step3d_nb.py", "手順3d_学習データの確認.ipynb", "build_report_step3d.py"),
+    "3e": ("build_step3e_nb.py", "手順3e_厚みHの扱い.ipynb", "build_report_step3e.py"),
 }
 ENV = {**os.environ, "PYTHONIOENCODING": "utf-8", "RUN_NB_TIMEOUT": os.environ.get("RUN_NB_TIMEOUT", "14400")}   # 1セルの上限 4 時間（3c の MCMC 用）
 
