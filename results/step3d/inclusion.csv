@@ -1,0 +1,13 @@
+﻿material,outlier,group,n_rows,n_in_alldata,n_not_in_alldata
+PP,あり,5data,465,465,0
+PP,あり,3data,96,96,0
+PP,あり,Alldata（5data・3data にない行）,1250,561,689
+PP,なし,5data,460,456,4
+PP,なし,3data,93,93,0
+PP,なし,Alldata（5data・3data にない行）,1234,549,685
+粉砕材混合PP,あり,5data,465,465,0
+粉砕材混合PP,あり,3data,107,107,0
+粉砕材混合PP,あり,Alldata（5data・3data にない行）,572,572,0
+粉砕材混合PP,なし,5data,459,459,0
+粉砕材混合PP,なし,3data,101,101,0
+粉砕材混合PP,なし,Alldata（5data・3data にない行）,560,560,0

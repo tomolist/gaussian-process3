@@ -88,8 +88,17 @@ def problem_mask(df, mat, grp, plist, kinds):
     return mask, [";".join(x) for x in ids]
 
 
+def first_shots(mat, grp):
+    """条件ごとの、最初のショットの番号（外れ値ありのファイル。ショットが除かれる前の番号）。ショットの順番 pos の基準に使う"""
+    ref = pd.read_csv(path_of(mat, grp, "あり"), encoding="utf-8-sig").rename(columns=COLS)
+    ref["shot0"] = ref["file"].str.extract(RE_SRC)[0].astype(int)
+    ref["Tset"] = ref["Tset"].astype(float)
+    return ref.groupby(["Tset", "H", "v"], as_index=False)["shot0"].min()
+
+
 def load(mat, grp, o, plist=None, exclude=None):
-    """結合ファイルを読み、形式を確かめ、問題データ一覧の「除外」を除く。列 sens には、「感度確認」の ID が入る（なければ空文字）"""
+    """結合ファイルを読み、形式を確かめ、問題データ一覧の「除外」を除く。列 sens には、「感度確認」の ID が入る（なければ空文字）。
+    列 shot は元ファイル名の先頭 3 桁（設定温度・厚みごとの通し番号で、同じ条件のショットは連続した番号）。列 pos は、その条件の中での順番（最初のショット = 1。外れ値で除かれたショットの番号は欠ける）"""
     exclude = USE_EXCLUSIONS if exclude is None else exclude
     df = pd.read_csv(path_of(mat, grp, o), encoding="utf-8-sig")
     assert list(df.columns) == list(COLS), f"列名が想定と違う: {list(df.columns)}"
@@ -101,6 +110,10 @@ def load(mat, grp, o, plist=None, exclude=None):
         and np.allclose(p[3].astype(float), df["H"]), "ファイル名と列の値が一致しない"
     df["shot"] = p[0].astype(int)
     df["Tset"] = df["Tset"].astype(float)
+    df = df.merge(first_shots(mat, grp), on=["Tset", "H", "v"], how="left")
+    assert df["shot0"].notna().all(), "外れ値ありのファイルにない条件がある"
+    df["pos"] = df["shot"] - df["shot0"].astype(int) + 1
+    df = df.drop(columns="shot0")
     plist = read_problem_list() if plist is None else plist
     n0 = len(df)
     if exclude:
@@ -130,11 +143,19 @@ def load_all(exclude=None):
 
 
 def legacy_check(D_):
-    """全条件のファイルから一覧で除いたデータが、1.5 mm・3 mm/s を除いてあるファイル（no1.5-3.0）と同じ行か（PP の 3data・Alldata）"""
+    """全条件のファイルから一覧で除いたデータが、1.5 mm・3 mm/s を除いてあるファイル（no1.5-3.0）と同じ行か（PP の 3data・Alldata）。
+    no1.5-3.0 のファイルにも、1.5 mm・3 mm/s 以外の一覧の「除外」（P03 など）を同じように適用してから比べる"""
     rows = []
+    plist = read_problem_list()
+    plist = plist[~((plist["厚み"] == "1.5") & (plist["射出速度"] == "3") & (plist["設定温度"] == ""))]      # no1.5-3.0 のファイルで、すでに除かれている分
     for (mat, grp), _ in LEGACY_FILES.items():
         for o in ["なし", "あり"]:
             old = pd.read_csv(path_of(mat, grp, o, LEGACY_FILES), encoding="utf-8-sig")
+            o2 = old.rename(columns=COLS)
+            o2["shot"] = o2["file"].str.extract(RE_SRC)[0].astype(int)
+            o2["Tset"] = o2["Tset"].astype(float)
+            drop, _ = problem_mask(o2, mat, grp, plist, ("除外",)) if USE_EXCLUSIONS else (np.zeros(len(o2), bool), None)
+            old = old[~drop]
             same = set(old["元ファイル"]) == set(D_[(mat, grp, o)]["file"])
             rows.append({"材料": MATS[mat], "組": grp, "外れ値": o, "一覧で除いた後の行数": len(D_[(mat, grp, o)]), "no1.5-3.0 の行数": len(old), "同じ行": same})
     return pd.DataFrame(rows)
@@ -149,8 +170,8 @@ def kernel_for(d, linear=False):
     return k + WhiteKernel(noise_level=0.1, noise_level_bounds=(NOISE_LB, 1e1))
 
 
-def make_gpr(d, linear=False):
-    return GaussianProcessRegressor(kernel=kernel_for(d, linear), n_restarts_optimizer=N_RESTARTS, random_state=SEED)
+def make_gpr(d, linear=False, restarts=None):
+    return GaussianProcessRegressor(kernel=kernel_for(d, linear), n_restarts_optimizer=N_RESTARTS if restarts is None else restarts, random_state=SEED)
 
 
 def fit_ols(X_tr, y_tr):
@@ -172,14 +193,14 @@ def predict_ols(model, X):
 MODELS = {}             # 記号 → {"kind": "ols" か "gpr", "cols": [入力の列], "linear": 線形カーネルを足すか}。ノートで決める
 
 
-def fit_model(key, tr):
+def fit_model(key, tr, restarts=None):
     spec = MODELS[key]
     X, y = tr[spec["cols"]].to_numpy(), tr["ln_eta"].to_numpy()
     if spec["kind"] == "ols":
         return {"kind": "ols", "model": fit_ols(X, y)}
     sc = StandardScaler().fit(X)              # 標準化と中心化は学習データだけで計算する
     y0 = y.mean()
-    gp = make_gpr(X.shape[1], spec.get("linear", False)).fit(sc.transform(X), y - y0)
+    gp = make_gpr(X.shape[1], spec.get("linear", False), restarts).fit(sc.transform(X), y - y0)
     return {"kind": "gpr", "gp": gp, "sc": sc, "y0": y0}
 
 
@@ -343,6 +364,79 @@ def loco_ols(key, pool):
     return mu, sd
 
 
+# ---------------------------------------------------------------- 外れ値の検知（規則 f）と、データの版（5data 版・Alldata 版）
+OUTLIER_Z = globals().get("OUTLIER_Z", 3.5)             # 規則 f：|z| がこれを超え、かつ |残差|（ln η）が次の値を超える条件を候補にする
+OUTLIER_RESID = globals().get("OUTLIER_RESID", 0.1)     # 0.1 は粘度で約 10%
+
+
+def cond_means(df):
+    """条件ごとの平均（ln η と ln γ̇ をショットで平均した点）"""
+    g = df.groupby("cond", sort=False)
+    t = g.agg(Tset=("Tset", "first"), H=("H", "first"), v=("v", "first"), ln_eta=("ln_eta", "mean"), ln_gd=("ln_gd", "mean"), n=("ln_eta", "size")).reset_index()
+    t["ln_H"] = np.log(t["H"])
+    return t
+
+
+def outlier_scan(df, z_thr=None, resid_thr=None):
+    """規則 f：条件平均が、ほかの条件から予測した値と大きく違う条件を拾う。
+    条件平均の GPR（入力 ln γ̇（条件平均）・ln H・Tset。R3 と同じ形）の、条件を 1 つずつ抜いた予測（閉じた式）との残差を、予測標準偏差で割って z とする。
+    返す表の列：cond, Tset, H, v, n（ショット数）, resid（ln η の実測 − 予測）, sd, z, flag（|z| と |resid| が両方しきい値を超えたか）"""
+    z_thr = OUTLIER_Z if z_thr is None else z_thr
+    resid_thr = OUTLIER_RESID if resid_thr is None else resid_thr
+    t = cond_means(df)
+    X, y = t[["ln_gd", "ln_H", "Tset"]].to_numpy(), t["ln_eta"].to_numpy()
+    Xs, yc = StandardScaler().fit_transform(X), y - y.mean()
+    gp = make_gpr(3, True).fit(Xs, yc)
+    Kinv = np.linalg.inv(gp.kernel_(Xs))
+    d = np.diag(Kinv)
+    t["resid"], t["sd"] = (Kinv @ yc) / d, np.sqrt(1.0 / d)           # 条件 i を抜いた予測：平均 = y_i − (K⁻¹y)_i / K⁻¹_ii、分散 = 1 / K⁻¹_ii
+    t["z"] = t["resid"] / t["sd"]
+    t["flag"] = (t["z"].abs() > z_thr) & (t["resid"].abs() > resid_thr)
+    return t[["cond", "Tset", "H", "v", "n", "resid", "sd", "z", "flag"]]
+
+
+DATA_VERSIONS = globals().get("DATA_VERSIONS", ["5data", "Alldata"])   # 検討するデータの版。"5data"：5data で学習し、3data で外挿を検証する版／"Alldata"：全条件で学習する版
+CV_K = globals().get("CV_K", 10)                                       # Alldata 版の交差検証の分割数（条件単位）
+
+
+def split_cv(pool, k=None):
+    """条件単位の k 分割交差検証。同じ条件のショットは同じ側に入れる（SEED で条件を並べ替える）。(学習, テスト) の組の一覧を返す"""
+    k = CV_K if k is None else k
+    conds = np.array(sorted(pool["cond"].unique()))
+    np.random.RandomState(SEED).shuffle(conds)
+    out = []
+    for i in range(k):
+        te_c = set(conds[i::k])
+        te = pool[pool["cond"].isin(te_c)].copy()
+        te["group"] = "全体"
+        out.append((pool[~pool["cond"].isin(te_c)].copy(), te))
+    return out
+
+
+def version_sets(mat, version, data="なし", t_test=210):
+    """データの版ごとの分割を返す。{"pool": 最終モデル（ALL）の学習データ, "splits": {分割の名前: (学習, {集計の名前: テスト})}}
+    5data 版：S_V（5data → 3data。低速側・高速側）、S_T（190・230 ℃ → 210 ℃。5data の 210 ℃ と 3data の 210 ℃ を別に集計）、CV（5data の中の条件単位の CV_K 分割）。最終モデルは 5data（3data は検証専用）。
+    Alldata 版：S_T（Alldata の 190・230 ℃ で学習。テストは 5data 版と同じ行：5data ファイルの 210 ℃ と 3data ファイルの 210 ℃。そのまま比べられる）、
+    S_Vall（Alldata のうち 5data の条件だけで学習 → 3data の条件を検証。PP のみ意味がある〔粉砕材混合 PP は 5data と同じ〕）、CV（Alldata の条件単位の CV_K 分割）。最終モデルは Alldata（全条件）"""
+    d5, d3 = D[(mat, "5data", data)], D[(mat, "3data", data)]
+    if version == "5data":
+        tr_v, te_v = split_V(mat, data)
+        tr_t, te_t, te_t3 = split_T(mat, data, t_test)
+        sp = {"S_V": (tr_v, {"S_V": te_v}), "S_T": (tr_t, {"S_T": te_t, "S_T3": te_t3})}
+        pool = d5
+    else:
+        assert version == "Alldata", version
+        pool = D[(mat, "Alldata", data)]
+        _, te_t, te_t3 = split_T(mat, data, t_test)
+        sp = {"S_T": (pool[pool["Tset"] != t_test].copy(), {"S_T": te_t, "S_T3": te_t3})}
+        te_v = d3.copy()
+        te_v["group"] = np.where(te_v["v"] <= 5, "低速側", np.where(te_v["v"] >= 280, "高速側", "その他"))
+        sp["S_Vall"] = (pool[pool["cond"].isin(set(d5["cond"]))].copy(), {"S_Vall": te_v})
+    for i, (tr_i, te_i) in enumerate(split_cv(pool), 1):
+        sp[f"CV{i}"] = (tr_i, {f"CV{i}": te_i})
+    return {"pool": pool, "splits": sp}
+
+
 # ---------------------------------------------------------------- 判定の表示（GPR6月ノートの「判定」にならう）
 def judge(ok, text):
     """結果の判定を1行で表示する。ok が True なら「OK」、False なら「要確認」"""
@@ -376,17 +470,34 @@ def hr_inputs(sub, lg, h, t):
                          "ln_P32": ip("p32"), "ln_P32_cm": ip("p32"), "ln_v": ip("lv")})
 
 
-def hr_flow(predict, mat, data, train_conds, title_model, stem, out_dir, **kw):
+HR_ALL = globals().get("HR_ALL", True)                 # すべての図を、高解像度でも保存するか（True：out_dir/highres/ に HR_ALL_DPI で保存。Git の管理外）
+HR_ALL_DPI = globals().get("HR_ALL_DPI", 600)
+
+
+def save_fig(fig, out_dir, stem):
+    """図を out_dir に PNG で保存する（解像度は FIG_DPI）。HR_ALL が True なら、同じ図を HR_ALL_DPI（既定 600 dpi）で out_dir/highres/ にも保存する。保存したファイルの一覧を返す"""
+    os.makedirs(out_dir, exist_ok=True)
+    paths = [os.path.join(out_dir, f"{stem}.png")]
+    fig.savefig(paths[0], dpi=globals().get("FIG_DPI", 200), bbox_inches="tight")
+    if HR_ALL:
+        os.makedirs(os.path.join(out_dir, "highres"), exist_ok=True)
+        paths.append(os.path.join(out_dir, "highres", f"{stem}.png"))
+        fig.savefig(paths[1], dpi=HR_ALL_DPI, bbox_inches="tight")
+    return paths
+
+
+def hr_flow(predict, mat, data, train_conds, title_model, stem, out_dir, pool=None, **kw):
     """せん断速度 ― 粘度の学習結果グラフを、高解像度で 1 枚ずつ保存する（6月のノートのセル9-2 と同じ見せ方）。
     predict(Xg) → (予測平均 ln η, 予測標準偏差（ノイズ込み）, 潜在関数の標準偏差)。Xg は hr_inputs の DataFrame。
-    train_conds：学習に使った条件の集合（それ以外は、検証の点として白抜きで重ねる）。設定は HR_DEFAULT を参照（kw で上書き）。保存したファイルの一覧を返す"""
+    train_conds：学習に使った条件の集合（それ以外は、検証の点として白抜きで重ねる）。pool：点と曲線の範囲に使うデータ（None なら 5data＋3data）。
+    設定は HR_DEFAULT を参照（kw で上書き）。保存したファイルの一覧を返す"""
     import matplotlib.pyplot as plt
     import matplotlib.ticker as ticker
     from matplotlib.lines import Line2D
     from matplotlib.patches import Patch
     cfg = {**HR_DEFAULT, **kw}
     os.makedirs(out_dir, exist_ok=True)
-    pool = pool_of(mat, data)
+    pool = pool_of(mat, data) if pool is None else pool
     curves = {}                                                         # (厚み, 設定温度) → (x, 予測平均, 帯の幅の標準偏差)。レイアウトが違っても同じ線なので、1 回だけ計算する
     for (h, t), sub in pool.groupby(["H", "Tset"]):
         lgc = sub.groupby("cond")["ln_gd"].mean()

@@ -2,7 +2,7 @@
 """データを取り直したとき・入れ替えたときに、全手順のノートと説明書を作り直す。
 
 使い方（リポジトリ直下から）:
-  uv run python 04_補助スクリプト/rerun_all.py --steps 3a 3b 3c 5a
+  uv run python 04_補助スクリプト/rerun_all.py --steps 3a 3b 3c 5a 3d
   オプション：--skip-check（データ確認を省く）、--no-report（説明書を作らない）、--only-build（ノートを作るだけで、実行しない）
 
 流れ：データ確認（check_data.py）→ 各手順で、
@@ -26,6 +26,7 @@ STEPS = {   # 手順 → (ノート生成スクリプト, ノート名, 説明�
     "3b": ("build_step3b_nb.py", "手順3b_新データ_設定温度の比較.ipynb", "build_report_step3b.py"),
     "3c": ("build_step3c_mcmc_nb.py", "手順3c_最終候補のMCMC.ipynb", "build_report_step3c.py"),
     "5a": ("build_step5a_nb.py", "手順5a_シフト構造の見直し.ipynb", "build_report_step5a.py"),
+    "3d": ("build_step3d_nb.py", "手順3d_学習データの確認.ipynb", "build_report_step3d.py"),
 }
 ENV = {**os.environ, "PYTHONIOENCODING": "utf-8", "RUN_NB_TIMEOUT": os.environ.get("RUN_NB_TIMEOUT", "14400")}   # 1セルの上限 4 時間（3c の MCMC 用）
 
