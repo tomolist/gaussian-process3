@@ -867,13 +867,29 @@ def flow_plot_common(fit, mat, pool, train_conds, out_dir, stem, tr=None, **kw):
             os.makedirs(os.path.join(out_dir, "highres"), exist_ok=True)
             fg.savefig(os.path.join(out_dir, "highres", f"{base}.png"), bbox_inches="tight", dpi=HR_ALL_DPI)
 
-    def finish(fig, ax, xs, ys, base, title, handles, separate_legend=False):
-        """軸・目盛り・凡例・タイトルを整えて保存する。separate_legend が True なら、グラフには凡例とタイトルを付けず、凡例だけを別の画像（base + "_凡例"）に保存する"""
+    def draw_curve(ax, t, tff_med, col, lw, xl):
+        """平均関数と 95% 区間を、グラフエリアの端（横軸の範囲 xl）まで描く（6月のセル9-2 と同じ。軸の範囲を変えても、常に端まで描く）"""
+        lg = np.linspace(np.log(xl[0]), np.log(xl[1]), max(cfg["n_grid"], 400))
+        mu, sd, sdf, _ = predict(fit, model_inputs(np.exp(lg), p_med, tff_med, float(t)))
+        s, x = (sd if cfg["band"] == "predict" else sdf), np.exp(lg)
+        ax.fill_between(x, np.exp(mu - 1.96 * s), np.exp(mu + 1.96 * s), color=col, alpha=0.25, zorder=15)
+        ax.plot(x, np.exp(mu - 1.96 * s), color=col, lw=0.5, alpha=0.6, zorder=16)
+        ax.plot(x, np.exp(mu + 1.96 * s), color=col, lw=0.5, alpha=0.6, zorder=16)
+        ax.plot(x, np.exp(mu), color=col, lw=lw, zorder=20)
+
+    def finish(fig, ax, xs, ys, base, title, handles, separate_legend=False, handles_en=None, draw=None):
+        """軸・目盛り・凡例・タイトルを整えて保存する。separate_legend が True なら、グラフには凡例とタイトルを付けず、凡例だけを別の画像（base + "_凡例"）に保存する。
+        draw：軸の範囲を決めた後で、曲線と帯をその範囲いっぱいに描く関数 draw(ax, 横軸の範囲)"""
         ax.tick_params(axis="both", which="both", direction="in", top=True, right=True, labelsize=ft["tick"], pad=8)
         ax.set_xscale("log")
         ax.set_yscale("log")
         ax.set_xlim(*decade_lim(xs, cfg["common_xlim"]))
         ax.set_ylim(*decade_lim(ys, cfg["common_ylim"]))
+        if draw is not None:
+            xl, yl = ax.get_xlim(), ax.get_ylim()
+            draw(ax, xl)
+            ax.set_xlim(*xl)
+            ax.set_ylim(*yl)
         for axis in (ax.xaxis, ax.yaxis):                        # 6月のセル9-2 と同じ：両軸とも 10 の累乗の目盛り
             axis.set_major_locator(ticker.LogLocator(base=10.0, subs=(1.0,)))
             axis.set_major_formatter(ticker.LogFormatterSciNotation())
@@ -898,31 +914,28 @@ def flow_plot_common(fit, mat, pool, train_conds, out_dir, stem, tr=None, **kw):
             lf.legend(handles=handles, loc="center", fontsize=ft["legend"], framealpha=1.0, edgecolor="black", ncol=cfg["legend_ncol"])
             save(lf, base + "_凡例")
             plt.close(lf)
+            if handles_en is not None:                            # 凡例の日本語を英語にした版（…_凡例_English）
+                lf = plt.figure(figsize=(6, 6))
+                lf.legend(handles=handles_en, loc="center", fontsize=ft["legend"], framealpha=1.0, edgecolor="black", ncol=cfg["legend_ncol"])
+                save(lf, base + "_凡例_English")
+                plt.close(lf)
 
     # ① 加熱シリンダ温度ごと（曲線は赤。6月のセル9-2 と同じ）
     for t, (x, mu, s, tff_med) in curves.items():
         fig, ax = plt.subplots(figsize=cfg["figsize"])
-        ax.fill_between(x, np.exp(mu - 1.96 * s), np.exp(mu + 1.96 * s), color="red", alpha=0.25, zorder=15)
-        ax.plot(x, np.exp(mu - 1.96 * s), color="red", lw=0.5, alpha=0.6, zorder=16)
-        ax.plot(x, np.exp(mu + 1.96 * s), color="red", lw=0.5, alpha=0.6, zorder=16)
-        ax.plot(x, np.exp(mu), color="red", lw=cfg["line"], zorder=20)
-        xs, ys = list(x), list(np.exp(mu))
+        xs, ys = list(x), list(np.exp(mu))                       # 軸の範囲を決めるための値（データの範囲の曲線と点）。曲線そのものは、finish が軸の端まで描く
         hs = thickness_points(ax, tr[tr["Tset"] == t], xs, ys)
         head = [Line2D([], [], color="red", lw=cfg["line"], label="予測平均値"), Patch(facecolor="red", alpha=0.25, label=band_name), Patch(color="none", label="キャビティ厚み")]
         ax.text(0.98, 0.97, f"固定した値\nP3_3：{p_med:.2f} MPa\nTff：{tff_med:.1f} ℃", transform=ax.transAxes, ha="right", va="top", fontsize=ft["legend"] * 0.75,
                 bbox=dict(boxstyle="round", facecolor="white", edgecolor="black"), zorder=30)
         finish(fig, ax, xs, ys, f"{stem}_全厚み共通_{int(t)}C",
-               f"{MAT_NAMES[mat]}　せん断速度と粘度の関係（設定温度 {int(t)} ℃）\n{model_title(fit['key'], fit.get('mode'))}", head + hs)
+               f"{MAT_NAMES[mat]}　せん断速度と粘度の関係（設定温度 {int(t)} ℃）\n{model_title(fit['key'], fit.get('mode'))}", head + hs,
+               draw=lambda a, xl, t=t, tm=tff_med: draw_curve(a, t, tm, "red", cfg["line"], xl))
 
     # ② 全温度を 1 枚に重ねた総合図（線・帯の色は温度、点の色・形は厚み）
     fig, ax = plt.subplots(figsize=cfg["figsize"])
     xs, ys = [], []
     for t, (x, mu, s, tff_med) in curves.items():
-        col = tcol[t]
-        ax.fill_between(x, np.exp(mu - 1.96 * s), np.exp(mu + 1.96 * s), color=col, alpha=0.25, zorder=15)
-        ax.plot(x, np.exp(mu - 1.96 * s), color=col, lw=0.5, alpha=0.6, zorder=16)
-        ax.plot(x, np.exp(mu + 1.96 * s), color=col, lw=0.5, alpha=0.6, zorder=16)
-        ax.plot(x, np.exp(mu), color=col, lw=cfg["line"], zorder=20)
         xs += list(x)
         ys += list(np.exp(mu))
     hs = thickness_points(ax, tr, xs, ys)
@@ -931,7 +944,14 @@ def flow_plot_common(fit, mat, pool, train_conds, out_dir, stem, tr=None, **kw):
     head += [Patch(color="none", label="キャビティ厚み")]
     note = [Patch(color="none", label="固定した値（学習データの中央値）"), Patch(color="none", label=f"　P3_3：{p_med:.2f} MPa")]
     note += [Patch(color="none", label=f"　Tff（{int(t)} ℃）：{v[3]:.1f} ℃") for t, v in curves.items()]
-    finish(fig, ax, xs, ys, f"{stem}_全厚み共通_全温度", None, head + hs + note, separate_legend=True)
+    band_en = "95% prediction interval" if cfg["band"] == "predict" else "95% confidence interval"           # 凡例の英語版（hs の「0.5 mm」などは、そのまま）
+    head_en = [Line2D([], [], color=tcol[t], lw=cfg["line"], label=f"Predicted mean_{int(t)} °C") for t in curves]
+    head_en += [Patch(facecolor=tcol[t], alpha=0.25, label=f"{band_en}_{int(t)} °C") for t in curves]
+    head_en += [Patch(color="none", label="Cavity thickness")]
+    note_en = [Patch(color="none", label="Fixed values (median of training data)"), Patch(color="none", label=f"  P3_3: {p_med:.2f} MPa")]
+    note_en += [Patch(color="none", label=f"  Tff ({int(t)} °C): {v[3]:.1f} °C") for t, v in curves.items()]
+    finish(fig, ax, xs, ys, f"{stem}_全厚み共通_全温度", None, head + hs + note, separate_legend=True, handles_en=head_en + hs + note_en,
+           draw=lambda a, xl: [draw_curve(a, t, v[3], tcol[t], cfg["line"], xl) for t, v in curves.items()])
     return saved
 
 
@@ -961,15 +981,13 @@ def flow_plot(fit, mat, pool, train_conds, out_dir, stem, **kw):
         by_h = layout_ == "thickness"
         for gv in sorted({k[0] if by_h else k[1] for k in curves}):
             fig, ax = plt.subplots(figsize=cfg["figsize"])
-            series, any_test, any_sens, xs, ys = [], False, False, [], []
+            series, any_test, any_sens, xs, ys, pend = [], False, False, [], [], []
             for sv in sorted({(k[1] if by_h else k[0]) for k in curves if (k[0] if by_h else k[1]) == gv}):
                 h, t = (gv, sv) if by_h else (sv, gv)
                 col, mk = ts[t] if by_h else (H_COLORS.get(h, "gray"), H_MARKS.get(h, "x"))
-                x, mu, s = curves[(float(h), float(t))]
-                if cfg["band"] in ("predict", "latent"):
-                    ax.fill_between(x, np.exp(mu - 1.96 * s), np.exp(mu + 1.96 * s), color=col, alpha=0.22, zorder=15)
-                ax.plot(x, np.exp(mu), color=col, lw=cfg["line"], zorder=20)
+                x, mu, s = curves[(float(h), float(t))]             # データの範囲の曲線。軸の範囲を決めるのに使う（曲線そのものは、軸の範囲が決まってから、端まで描く）
                 sub = pool[np.isclose(pool["H"], h) & (pool["Tset"] == t)]
+                pend.append((h, t, col, sub))
                 if cfg["points"] == "cond":
                     a = sub.groupby("cond").agg(lg=("ln_gd", "mean"), le=("ln_eta", "mean"), sens=("is_sens", "max")).reset_index()
                     px, py, sens, ms = np.exp(a["lg"].to_numpy()), np.exp(a["le"].to_numpy()), a["sens"].to_numpy().astype(bool), cfg["marker"]
@@ -1005,6 +1023,16 @@ def flow_plot(fit, mat, pool, train_conds, out_dir, stem, **kw):
             yl = cfg["ylim"][layout_] if isinstance(cfg["ylim"], dict) else cfg["ylim"]
             ax.set_xlim(*((min(xs) / 1.4, max(xs) * 1.4) if xl is None else xl))
             ax.set_ylim(*((min(ys) / 1.5, max(ys) * 1.5) if yl is None else yl))
+            xlim_now, ylim_now = ax.get_xlim(), ax.get_ylim()
+            lg_full = np.linspace(np.log(xlim_now[0]), np.log(xlim_now[1]), max(cfg["n_grid"], 400))       # 平均関数と 95% 区間を、グラフエリアの端まで描く（軸の範囲を変えても追従）
+            for h, t, col, sub in pend:
+                mu_f, sd_f, sdf_f, _ = predict(fit, flow_inputs(sub, lg_full, h, t))
+                s_f, x_f = (sd_f if cfg["band"] == "predict" else sdf_f), np.exp(lg_full)
+                if cfg["band"] in ("predict", "latent"):
+                    ax.fill_between(x_f, np.exp(mu_f - 1.96 * s_f), np.exp(mu_f + 1.96 * s_f), color=col, alpha=0.22, zorder=15)
+                ax.plot(x_f, np.exp(mu_f), color=col, lw=cfg["line"], zorder=20)
+            ax.set_xlim(*xlim_now)
+            ax.set_ylim(*ylim_now)
             for axis, auto in ((ax.xaxis, xl is None), (ax.yaxis, yl is None)):
                 if auto:
                     axis.set_major_locator(ticker.LogLocator(base=10.0, subs=(1.0, 2.0, 5.0)))
