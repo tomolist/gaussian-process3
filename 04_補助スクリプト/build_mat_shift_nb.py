@@ -770,8 +770,8 @@ FLOW_MODELS = KEYS                  # 描くモデル（例：["B_Tset"]）
 FLOW_MATERIALS = MATERIALS          # 描く材料
 FLOW_LAYOUTS = ["temperature", "thickness"]   # "temperature"：設定温度ごとに 1 枚（厚みごとの線）／"thickness"：厚みごとに 1 枚（設定温度ごとの線）
 FLOW_COMMON = True                  # True：全厚み共通の図も作る。加熱シリンダ温度ごとに 1 枚（…_全厚み共通_<温度>C.png）と、全温度を 1 枚に重ねた総合図（…_全厚み共通_全温度.png。温度ごとに色分け）。検証（3data）の点は描かない
-FLOW_COMMON_XLIM = None             # 全厚み共通の図の横軸（せん断速度 [1/s]）の範囲。(下限, 上限)＝固定／None＝データを含む 10 の累乗の範囲（目盛りは、6月のセル9-2 と同じ 10 の累乗）
-FLOW_COMMON_YLIM = None             # 同じ、縦軸（粘度 [Pa·s]）の範囲。例：(0.1, 10000)
+FLOW_COMMON_XLIM = None                  # 全厚み共通の図の横軸（せん断速度 [1/s]）の範囲。(下限, 上限)＝固定／None＝データを含む 10 の累乗の範囲（目盛りは、6月のセル9-2 と同じ 10 の累乗）
+FLOW_COMMON_YLIM = None                    # 同じ、縦軸（粘度 [Pa·s]）の範囲。例：(0.1, 10000)
 FLOW_COMMON_NCOL = 1                # 総合図の凡例の列数（凡例が大きくて点に重なるときは 2 にする）
 FLOW_BAND = "predict"               # 帯："predict"＝95% 予測区間（ショット間のばらつき込み）／"latent"＝95% 信頼区間（平均の不確かさだけ）／None＝帯なし
 FLOW_POINTS = "cond"                # 点："cond"＝条件平均／"shot"＝ショットごと
@@ -792,6 +792,9 @@ FLOW_SHOW_XLABEL = False            # 軸名を付けるか（6月のノート�
 FLOW_SHOW_YLABEL = False
 FLOW_FORMATS = ["png"]              # 保存形式。"png"・"pdf"・"svg" から選ぶ
 FLOW_SHOW_MODELS = [MAIN_KEY]       # 画面にも表示するモデル（全部表示すると重い）
+FLOW_EXTENDED = True                # True：軸の範囲を広げた拡張版（せん断速度_粘度_拡張版/ フォルダ。ここまでの設定はそのまま使う）も作る
+FLOW_EXT_XLIM = (1.0, 1.0e5)          # 拡張版の横軸（せん断速度 [1/s]）の範囲。予測線と帯は、この範囲いっぱいに描く
+FLOW_EXT_YLIM = (0.5, 3000.0)         # 拡張版の縦軸（粘度 [Pa·s]）の範囲
 # ==========================================
 n_saved = 0
 for mat in FLOW_MATERIALS:
@@ -810,7 +813,18 @@ for mat in FLOW_MATERIALS:
                                      font=FLOW_FONT, marker=FLOW_MARKER, marker_shot=FLOW_MARKER_SHOT, line=FLOW_LINE, show_title=FLOW_SHOW_TITLE,
                                      show_xlabel=FLOW_SHOW_XLABEL, show_ylabel=FLOW_SHOW_YLABEL, formats=FLOW_FORMATS, show=SHOW_FIGS and key in FLOW_SHOW_MODELS)
             n_saved += len(saved)
-print(f"保存した図：{n_saved} 枚（各モデルの せん断速度_粘度/ フォルダ）")''')
+        if FLOW_EXTENDED:      # 拡張版：軸の範囲だけを変えて、同じ図（厚みごと・設定温度ごと・全厚み共通・総合）を別フォルダに保存する
+            ext_dir = os.path.join(result_dir(mat, key), "せん断速度_粘度_拡張版")
+            ext_kw = dict(band=FLOW_BAND, points=FLOW_POINTS, x_range=FLOW_X_RANGE, extend=FLOW_EXTEND, figsize=FLOW_FIGSIZE, dpi=FLOW_DPI, font=FLOW_FONT, marker=FLOW_MARKER,
+                          marker_shot=FLOW_MARKER_SHOT, line=FLOW_LINE, show_title=FLOW_SHOW_TITLE, show_xlabel=FLOW_SHOW_XLABEL, show_ylabel=FLOW_SHOW_YLABEL, formats=FLOW_FORMATS, show=False)
+            saved = flow_plot(FITS[(mat, key)], mat, pool, train_c, ext_dir, "せん断速度_粘度_拡張版", layouts=FLOW_LAYOUTS, show_test=FLOW_SHOW_TEST, mark_sens=FLOW_MARK_SENS,
+                              xlim={"thickness": FLOW_EXT_XLIM, "temperature": FLOW_EXT_XLIM}, ylim={"thickness": FLOW_EXT_YLIM, "temperature": FLOW_EXT_YLIM}, **ext_kw)
+            n_saved += len(saved)
+            if FLOW_COMMON:
+                saved = flow_plot_common(FITS[(mat, key)], mat, pool, train_c, ext_dir, "せん断速度_粘度_拡張版", tr=TRAIN[mat], common_xlim=FLOW_EXT_XLIM, common_ylim=FLOW_EXT_YLIM,
+                                         legend_ncol=FLOW_COMMON_NCOL, **ext_kw)
+                n_saved += len(saved)
+print(f"保存した図：{n_saved} 枚（各モデルの せん断速度_粘度/ と せん断速度_粘度_拡張版/ フォルダ）")''')
 
 md(r'''### 10.2 6月のセル9-2 と全く同じ図（目的変数に対する各説明変数の依存性）
 
