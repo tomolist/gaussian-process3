@@ -1,0 +1,139 @@
+% 学習結果説明（材料別の温度シフト GPR：厚みごとの比較。05 フォルダのデータ。用語集と図の見方）
+% 05_材料ごとの機械学習データと予測検証データ フォルダで「lualatex 学習結果説明_厚みごとの温度シフト.tex」を2回実行すると PDF を作り直せる（TeX Live の LuaLaTeX を使用）。
+% 図は、各材料フォルダの <材料フォルダ>_学習結果/条件平均の入力/厚みごとの比較/ の PNG を相対パスで読み込む。
+\documentclass[paper=a4paper,fontsize=10.5pt,line_length=44zw,number_of_lines=38]{jlreq}
+\usepackage[haranoaji]{luatexja-preset}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{enumitem}
+\usepackage{float}
+\usepackage{xcolor}
+\usepackage[hidelinks,bookmarksnumbered]{hyperref}
+
+\newcommand{\file}[1]{\texttt{\detokenize{#1}}}
+\newcommand{\gd}{\dot{\gamma}}
+\newcommand{\Tff}{T_{\mathrm{ff}}}
+\newcommand{\Tset}{T_{\mathrm{set}}}
+\newcommand{\Eh}{E_{h}}
+\newcommand{\Ev}{E_{v}}
+\newcommand{\PIII}{P3\_3}
+\newenvironment{termlist}{\begin{itemize}[label=・,leftmargin=1\zw,labelwidth=1\zw,labelsep=0pt,itemsep=0.4ex,topsep=0.6ex,parsep=0pt]}{\end{itemize}}
+\newcommand{\term}[1]{\item \textbf{#1}：}
+\newenvironment{points}{\begin{itemize}[label=$\triangleright$,leftmargin=1.5\zw,itemsep=0.3ex,topsep=0.5ex,parsep=0pt]}{\end{itemize}}
+\newcommand{\pt}[1]{\item \textbf{#1}：}
+\renewcommand{\arraystretch}{1.25}
+
+\title{厚みごとに見た温度シフトの説明\\[0.6ex]{\large 材料別の温度シフト GPR（05 のデータ）：厚みごとの確認、シフトに使う温度、厚みごとに学習するか総合データで学習するか（機械学習・統計を初めて学ぶ人向け）}}
+\author{}
+\date{@@DATE@@}
+
+\begin{document}
+\maketitle
+{\small\tableofcontents}
+
+% =====================================================================
+\section{この文書について}
+
+この文書は、材料別の温度シフト GPR（説明書 \file{学習結果説明_材料別温度シフトGPR.pdf}）の学習結果を、\textbf{キャビティ厚みごと}に調べ直した結果を、機械学習や統計を初めて学ぶ人でも読めるように説明したものです。調べたのは、次の 3 つの問いです（ユーザーの依頼）。
+
+\begin{enumerate}[itemsep=0.3ex,topsep=0.5ex]
+\item 厚みごとの「せん断速度 ― 粘度」の学習結果で、\textbf{温度シフトファクターが効いているか}。
+\item 厚みごとに見たとき、シフトに使う温度は、\textbf{流動中樹脂温度 $\Tff$ と加熱シリンダ温度 $\Tset$ のどちらが適しているか}。
+\item 学習用 5data・検証用 3data はそのままで、\textbf{厚みごとに学習するのと、全厚みを含めた総合データで学習するのと、どちらがよいか}。
+\end{enumerate}
+
+\begin{points}
+\pt{対象の結果}材料ごとに \file{<材料フォルダ>_学習結果/条件平均の入力/厚みごとの比較/}（例：\file{01_バージンPP再々実験/01_バージンPP再々実験_学習結果/条件平均の入力/厚みごとの比較/}）。図 @@N_FIG@@ 枚、CSV @@N_CSV@@ 個（3 材料の合計）。図は、同じフォルダの \file{highres/} にも 600 dpi で保存されます。4章の図のファイル名は、このフォルダの中の名前です。
+\pt{読み方}2章で何をしたかをつかみ、分からない言葉は3章の用語集で調べてください。4章で図の見方、5章で表の見方、6章で結論を説明します。\textbf{結論だけを知りたいときは、6章から読んでください}。
+\pt{ノート}\file{01_機械学習コードフォルダ} の \file{材料別_温度シフトGPR_ARD対応Matern52＋線形＋ホワイトノイズ_厚みごとの比較.ipynb} です（元のノートとは別のノート）。元のノートで学習済みのモデル（\file{学習済みモデル_<モデル>.joblib}）と予測値の CSV を読むので、\textbf{先に元のノートを実行しておく必要があります}。実行は約 @@RUN_MIN@@ 分です（大部分は、厚みごとのプロファイル尤度と、厚みごとのモデルの学習）。
+\pt{実行のしかた}ノートを \file{_tmp/} にコピーし（設定を変えるなら、そのコピーの設定エリアで）、リポジトリ直下で \file{uv run python 04_補助スクリプト/run_nb.py _tmp/<コピー>.ipynb} を実行します。元のノートと同じく、成果物のノートは実行結果ごと上書きしません。
+\pt{発表資料}同じ結果を、発表資料 \file{学習結果報告書作成_261015/パワーポイント/報告書B_5章以降_発表資料.pptx} の 6 章（厚みごとの確認、シフトに使う温度）・7 章（厚みごとに学習したモデルとの比較）・最後の 1 枚（結論）にまとめました。発表資料では、流動中樹脂温度 $\Tff$ を「金型内樹脂最高温度 $T$」と呼んでいます（同じもの）。
+\pt{記号表}記号・モデル名・列名の一覧は、\file{results/学習結果説明_記号表.pdf} の「材料別 GPR」の章にあります。
+\pt{作り直し方}\file{05_材料ごとの機械学習データと予測検証データ} フォルダで \texttt{lualatex 学習結果説明\_厚みごとの温度シフト.tex} を2回実行すると、この PDF を作り直せます（数値を CSV から入れ直すときは \file{uv run python 04_補助スクリプト/build_report_mat_thick.py}）。
+\pt{ノートの判定}ノートの各節の最後に、\file{>> 判定：OK}（想定どおり）か \file{>> 判定：★要確認}（想定と違う、または注意が要る点）が出ます。今回は、OK が @@N_OK@@ 個、★ が @@N_STAR@@ 個でした（一覧は \file{判定の一覧.csv}）。6章に、★ の意味を書きました。
+\end{points}
+
+% =====================================================================
+\section{何をしたか（概要）}
+
+\subsection{2 つのシフトのモデル}
+元のノートで学習した、次の 3 つのモデル（条件平均の入力）を使います。どちらのシフトのモデルも\textbf{両方の温度を使っています}。違うのは、\textbf{シフトに使う温度}だけです。
+\begin{table}[H]
+\caption{比べたモデル。$f$ はガウス過程、$a_h$・$a_v$ は横・縦のシフトファクター}\label{tab:model}
+\small
+\begin{tabularx}{\linewidth}{@{}l>{\raggedright\arraybackslash}X@{}}
+\toprule
+モデル & 式と考え方 \\
+\midrule
+B\_Tset & $\ln\eta=\ln a_v(\Tset)+f(\ln\gd+\ln a_h(\Tset),\ \ln\PIII,\ \ln\Tff)$。加熱シリンダ温度でシフトし、流動中樹脂温度は GP の入力に入れる \\
+B\_Tff & $\ln\eta=\ln a_v(\Tff)+f(\ln\gd+\ln a_h(\Tff),\ \ln\PIII,\ \Tset)$。流動中樹脂温度でシフトし、加熱シリンダ温度は GP の入力に入れる。発表資料で使ったモデル \\
+C（基準） & $\ln\eta=f(\ln\gd,\ \ln\PIII,\ \ln\Tff,\ \Tset)$。シフトなし \\
+\bottomrule
+\end{tabularx}
+\end{table}
+全厚みの 5data で学習した係数（\textbf{全厚み共通の係数}）は次のとおりです：@@SHIFT_TEXT@@。
+
+\subsection{3 つの問いの調べ方}
+\begin{table}[H]
+\caption{調べ方の一覧（ノートの節の番号）}\label{tab:method}
+\small
+\begin{tabularx}{\linewidth}{@{}l>{\raggedright\arraybackslash}X@{}}
+\toprule
+問い & 調べ方 \\
+\midrule
+1 シフトが効いているか（4 節） & 全厚み共通の係数のまま、厚みごとに、①温度の順序（同じ $\gd$ で低温ほど高粘度か）、②温度による粘度の比 $R$ の実測と予測、③換算前後の重ね合わせのずれ、の 3 つを見る。3 つとも満たせば ○、予測の順序が逆なら ×、それ以外は △ \\
+2 シフトに使う温度（5〜8 節） & (a) \textbf{重ね合わせ}：厚みごとに係数を決め直したときの、最小のずれ（データだけで決まる）。(b) \textbf{対数周辺尤度}：厚みごとの 5data だけで B\_Tset・B\_Tff を学習し、最大の LML の差 $\Delta L$ を比べる。(c) \textbf{検証データの予測誤差}：元のノートの 3data の予測を、厚みごとに集計する。3 つの多数決で、厚みごとに「$\Tff$／$\Tset$／差なし」を決める \\
+3 厚みごとか総合か（9 節） & 厚みごとの 5data だけで B\_Tset・B\_Tff・C を学習し直し（係数は (b) で決めたもの）、同じ厚みの 3data を予測する。総合データ（全厚みの 5data）で学習した元のモデルの予測と、同じ 3data で比べる \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{判定の基準}
+\begin{points}
+\pt{比の大きさが一致}$|\ln R_{\text{予測}}-\ln R_{\text{実測}}|$ が、モデルのノイズの標準偏差（約 0.04〜0.05。粘度で約 4〜5\%）以内。
+\pt{(a) の差}ずれの差が @@A_CLEAR@@ ポイント以上なら、小さいほうの温度が適している（それ未満は差なし）。
+\pt{(b) の差}$|\Delta L|\ge$ @@DL_CLEAR@@ なら、LML の大きいほうの温度が適している（尤度比検定の 5\% 基準と同じ目安）。
+\pt{(c) の差}予測誤差の差が @@ERR_CLEAR@@ ポイント以上なら、小さいほうが適している。
+\pt{厚みごとか総合か}予測誤差が、どちらかの方式で、多くの厚みで 1 ポイント以上小さければ、その方式を勧める。差が小さければ、データの量と使いやすさから総合データを勧める。
+\end{points}
+基準の値は、ノートの設定エリア（\file{A_CLEAR}・\file{DL_CLEAR}・\file{ERR_CLEAR}）で変えられます。
+
+% =====================================================================
+\section{用語集}
+\begin{termlist}
+\term{キャビティ厚み $H$}金型の流路（平板）の厚み。PP・粉砕材混合 PP は 0.5・1.0・1.5・2.0 mm、GPPS は 1.0・1.5・2.0 mm。モデルの入力には入れていない（厚みの違いは \PIII\ を通して入る）。
+\term{温度シフトファクター}温度による粘度曲線のずれ。横（$a_h$、せん断速度の向き）と縦（$a_v$、粘度の向き）がある。
+\term{全厚み共通の係数・厚みごとの係数}全厚みのデータで 1 組だけ決めた係数（元のモデル）と、厚みごとに決め直した係数。
+\term{温度による粘度の比 $R$}同じせん断速度で、最低温度の粘度を最高温度の粘度で割った値。1 より大きければ低温ほど高粘度。温度の違う点のせん断速度はそろっていないので、成形条件ごとの平均を、$\ln\gd$ の重なる範囲の共通の格子（50 点）で内挿し、$R=\exp(\text{平均}[\ln\eta_{\text{low}}-\ln\eta_{\text{high}}])$ とする。予測の $R$ は、各条件でのモデルの予測平均から、同じ手順で出す。
+\term{重ね合わせのずれ}温度ごとの点を係数で換算したとき、1 本の曲線にどれだけ重なるか。厚みごとに、換算した $\ln\gd$ に対する 3 次式を当てはめ、その残差の標準偏差を、粘度の \% に直した値（$(e^{s}-1)\times100$）。小さいほどよく重なる。
+\term{換算前・換算後}換算前は、係数 0（シフトなし）。換算後は、係数でずらした後。
+\term{対数周辺尤度（LML）・$\Delta L$}モデルがデータにどれだけ合うかを表す数（大きいほど合う）。$\Delta L=\mathrm{LML}(\text{B\_Tff})-\mathrm{LML}(\text{B\_Tset})$。同じデータで学習した 2 つのモデルの比較なので、差が大きければ、そのデータでは一方がよく合う。
+\term{係数 0 との差}シフトの係数を入れたモデルと、係数 0 のモデルの LML の差。3.0 以上なら、シフトを入れた効果が認められる目安。
+\term{プロファイル尤度・取り直し}係数を格子で振り、各点で GP を学習して LML を求め、最大の点を採る方法。最良の点の近くを細かい格子で計算し直し、最良の点が動いたら、もう一度取り直す（\file{MAX_REFINE} 回まで）。取り直しが収束しないのは、尤度の面が平らで、係数が決まりにくいとき。
+\term{多数決}(a)(b)(c) の 3 つの判定のうち、2 つ以上が同じ温度なら、その温度。そうでなければ「差なし」。
+\term{厚みごとのモデル・総合データのモデル}1 つの厚みの 5data だけで学習したモデルと、全厚みの 5data で学習したモデル（元のノートのモデル）。
+\term{低速側・高速側・外挿}3data の射出速度 3・5 mm/s（厚い板だけ）と 280・320 mm/s。どちらも、5data の範囲（10〜240 mm/s）の外への予測（外挿）。
+\term{予測誤差（\%）}3data の $\ln\eta$ の RMSE を、粘度の \% に直した値（$(e^{\mathrm{RMSE}}-1)\times100$）。
+\term{95\% 予測区間に入った割合}3data の点が、予測の 95\% 区間に入った割合。0.95 に近いほど、ばらつきの見積もりが正しい。
+\end{termlist}
+
+% =====================================================================
+\section{図の見方}
+
+図は材料ごとのフォルダにあります。ここでは主に PP の図で見方を説明し、ほかの材料の結果は文中と5章の表で示します。
+
+@@FIGURES@@
+
+% =====================================================================
+\section{表の見方}
+
+@@TABLES@@
+
+% =====================================================================
+\section{結論と、これからの選択肢}
+
+@@CONCLUSION@@
+
+\end{document}
