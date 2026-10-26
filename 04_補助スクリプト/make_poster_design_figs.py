@@ -75,7 +75,7 @@ def log_axes(ax, xlim, ylim):
 
 
 def load():
-    mc.INPUT_MODE = "cond"
+    mc.INPUT_MODE = mp.MODE
     mc.SHOW_FIGS = False
     mc.D = mc.load_all(MATS)
     out = {}
@@ -83,7 +83,7 @@ def load():
         tr = mc.D[(mat, "5data")]
         te = mc.add_groups(tr, mc.D[(mat, "3data")])
         fit = joblib.load(os.path.join(mp.model_dir(mat), f"学習済みモデル_{mp.KEY}.joblib"))["fit"]
-        assert fit.get("mode") == "cond", "条件平均の入力のモデルのはず"
+        assert fit.get("mode") == mp.MODE, f"{mc.MODE_JA[mp.MODE]}のモデルのはず"
         pred = pd.read_csv(os.path.join(mp.model_dir(mat), "予測検証_3data_予測値.csv"), encoding="utf-8-sig")
         out[mat] = {"tr": tr, "te": te, "pool": pd.concat([tr, te], ignore_index=True), "fit": fit, "pred": pred}
     return out

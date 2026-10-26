@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """発表資料（05_…/学習結果報告書作成_261015/パワーポイント/報告書B_5章以降_発表資料.pptx）の図を作る（日本語。学習はやり直さない）。
 
-内容は、ポスター「報告書Bから作成」の 5 章（機械学習）以降。使うモデルは、報告書B・ポスターと同じ B_Tff・条件平均の入力
-（保存済みの 学習済みモデル_B_Tff.joblib と、予測検証の表）。build_slides.py が、この図を貼って発表資料を組み立てる。
+内容は、ポスター「報告書Bから作成」の 5 章（機械学習）以降。使うモデルは B_Tset（加熱シリンダ温度でシフト）・ショットごとの入力（ユーザー決定、2026-10-23。
+報告書B・ポスターは B_Tff・条件平均の入力のまま）。保存済みの 学習済みモデル_B_Tset.joblib と、予測検証の表を読む。build_slides.py が、この図を貼って発表資料を組み立てる。
 図は、スライドに貼る大きさ（mm）で作り、文字はすべて 18pt 以上にする（スライドの文字の最小の大きさに合わせる）。
   説明の図（人工のデータ・曲線）：GPR概念図、ベイズ_例、ベイズ_事前、ベイズ_事後、周辺尤度_比較、平均関数_線形項なし、平均関数_線形項あり、
                                  カーネル_距離、カーネル例_<名前>、Matern_サンプル、ARD_サンプル、線形_サンプル、ノイズ_サンプル、合計_サンプル、
@@ -20,6 +20,12 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__))))
 import make_poster_figs as mp  # noqa: E402  （図の書式〔IPAexGothic など〕と、共通の部品を使う）
 import make_poster_design_figs as mpd  # noqa: E402
+
+mp.MODE = "shot"                                   # 発表資料は、ショットごとの入力のモデルで作る（ユーザー決定、2026-10-23。報告書B・ポスターは条件平均のまま）
+mp.KEY = "B_Tset"                                  # 主のモデル：加熱シリンダ温度でシフト（ショットごとの入力では、金型内樹脂最高温度のシフトはデータで支持されず、
+                                                   # 加熱シリンダ温度のシフトが支持されたため。ユーザー決定、2026-10-23）
+SHIFT_T, SHIFT_JA = "Tset", "加熱シリンダ温度"       # シフトに使う温度（列名と呼び名）
+LS_COLS = [("換算せん断速度", "ls_ln γ̇ + ln a_h(Tset)"), ("樹脂圧力差", "ls_ln P3_3"), ("金型内樹脂最高温度", "ls_ln Tff")]   # 長さスケール（スライドの呼び名、ハイパーパラメータの表の列）
 
 import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
@@ -83,7 +89,7 @@ def posterior(kernel, noise, xd, yd, xs):
 
 # ---------------------------------------------------------------- 数式
 FORMULAS = {
-    "式_平均関数": (r"$m(\mathbf{x}) \;=\; \overline{\ln\eta} \;+\; \ln a_v(T)$", 28),
+    "式_平均関数": (r"$m(\mathbf{x}) \;=\; \overline{\ln\eta} \;+\; \ln a_v(T_{\mathrm{set}})$", 28),
     "式_事前分布": (r"$f(\mathbf{x}) \;\sim\; \mathcal{GP}\,\left(\,m(\mathbf{x}),\; k(\mathbf{x},\mathbf{x}')\,\right)$", 28),
     "式_観測": (r"$\ln\eta \;=\; f(\mathbf{x}) \;+\; \varepsilon, \qquad \varepsilon \sim \mathcal{N}\,(0,\ \sigma_n^2)$", 28),
     "式_カーネル": (r"$k(\mathbf{x}_i,\mathbf{x}_j) \;=\; \sigma_f^2\,k_{\mathrm{M52}}(\mathbf{x}_i,\mathbf{x}_j) \;+\; "
@@ -94,7 +100,7 @@ FORMULAS = {
     "式_ノイズ": (r"$k_{\mathrm{noise}}(\mathbf{x}_i,\mathbf{x}_j) = \sigma_n^2\,\delta_{ij}$", 24),
     "式_アレニウス": (r"$\ln a(T) = \dfrac{E}{R}\left(\dfrac{1}{T} - \dfrac{1}{T_{\mathrm{ref}}}\right)$", 26),
     "式_WLF": (r"$\ln a(T) = -A_1\left(\dfrac{T - T_g}{A_2 + T - T_g} - \dfrac{T_{\mathrm{ref}} - T_g}{A_2 + T_{\mathrm{ref}} - T_g}\right)$", 26),
-    "式_モデル": (r"$\ln\eta \;=\; \ln a_v(T) \;+\; f\left(\ln\dot{\gamma} + \ln a_h(T),\ \ln\Delta P_2,\ T_{\mathrm{set}}\right) \;+\; \varepsilon$", 28),
+    "式_モデル": (r"$\ln\eta \;=\; \ln a_v(T_{\mathrm{set}}) \;+\; f\left(\ln\dot{\gamma} + \ln a_h(T_{\mathrm{set}}),\ \ln\Delta P_2,\ \ln T\right) \;+\; \varepsilon$", 28),
     "式_周辺尤度": (r"$\ln p(\mathbf{y}\mid\theta) = -\frac{1}{2}\,\mathbf{y}^{\top}K_{\theta}^{-1}\mathbf{y} \;-\; \frac{1}{2}\ln\left|K_{\theta}\right| "
                r"\;-\; \frac{n}{2}\ln 2\pi$", 24),
     "式_ベイズ_GP": (r"$p(f\mid D) = \dfrac{p(D\mid f)\;p(f)}{p(D)}$", 28),
@@ -107,9 +113,9 @@ FORMULAS = {
     "式_共分散": (r"$\mathrm{cov}\left[\,f(\mathbf{x}),\ f(\mathbf{x}')\,\right] = k(\mathbf{x},\mathbf{x}'), \qquad \rho = k(\mathbf{x},\mathbf{x}')\,/\,\sigma_f^2$", 26),
     "式_標準化": (r"$\tilde{x}_m = \dfrac{x_m - \bar{x}_m}{s_m}$", 26),
     "式_条件平均": (r"$\overline{\ln\dot{\gamma}}_c = \dfrac{1}{n_c}\sum_{k=1}^{n_c} \ln\dot{\gamma}_{c,k}$", 26),
-    "式_入力": (r"$\mathbf{x} = \left(\,\ln\dot{\gamma} + \ln a_h(T),\ \ \ln\Delta P_2,\ \ T_{\mathrm{set}}\,\right)$", 26),
+    "式_入力": (r"$\mathbf{x} = \left(\,\ln\dot{\gamma} + \ln a_h(T_{\mathrm{set}}),\ \ \ln\Delta P_2,\ \ \ln T\,\right)$", 26),
     "式_TTS": (r"$\eta(\dot{\gamma},\,T) \;=\; a_v(T)\;\eta_M\!\left(a_h(T)\,\dot{\gamma}\right)$", 30),
-    "式_換算": (r"$\dot{\gamma}_r = a_h(T)\,\dot{\gamma}, \qquad \eta_r = \eta\,/\,a_v(T)$", 28),
+    "式_換算": (r"$\dot{\gamma}_r = a_h(T_{\mathrm{set}})\,\dot{\gamma}, \qquad \eta_r = \eta\,/\,a_v(T_{\mathrm{set}})$", 28),
     "式_CrossWLF": (r"Cross-WLF モデル：$\ a_h(T) = a_v(T) = a_T(T)$", 24),
     "式_プロファイル": (r"$(\hat{E}_h,\ \hat{E}_v) = \mathrm{arg\,max}_{E_h,\,E_v}\ \ln p(\mathbf{y}\mid E_h,\,E_v)$", 26),
     "式_尤度差": (r"$\Delta L = \ln p(\mathbf{y}\mid \hat{E}_h,\,\hat{E}_v) - \ln p(\mathbf{y}\mid 0,\,0) \;>\; 3.0$", 26),
@@ -527,7 +533,7 @@ def fig_shift_concept(w=180.0, h=114.0, margins=(11, 4, 11, 4)):
 
 
 def fig_shift_factors(d, w=310.0, h=100.0, margins=(24, 4, 20, 25), gap=14.0):
-    """推定したシフトファクター a_h・a_v と、金型内樹脂最高温度の関係（学習データの温度の範囲）"""
+    """推定したシフトファクター a_h・a_v と、シフトに使う温度（SHIFT_T）の関係（学習データの温度の範囲）"""
     with rc():
         fig = plt.figure(figsize=mp.mm(w, h))
         l0, r0_, b0, t0 = margins
@@ -536,7 +542,7 @@ def fig_shift_factors(d, w=310.0, h=100.0, margins=(24, 4, 20, 25), gap=14.0):
             fit, tr = d[mat]["fit"], d[mat]["tr"]
             cfg = fit["cfg"]
             ax = fig.add_axes([(l0 + k * (pw + gap)) / w, b0 / h, pw / w, (h - b0 - t0) / h])
-            T = np.linspace(tr["Tff"].min(), tr["Tff"].max(), 200)
+            T = np.linspace(tr[SHIFT_T].min(), tr[SHIFT_T].max(), 200)
             ax.axhline(1.0, color="0.6", lw=1.0, zorder=0)
             ax.axvline(cfg["Tref"], color="0.6", lw=1.0, ls=":", zorder=0)
             ax.plot(T, np.exp(mc.shift_ln(T, fit["tv"], cfg)), color=PAL["main"], lw=2.8, label="縦のシフトファクター $a_v$（粘度方向）")
@@ -551,7 +557,7 @@ def fig_shift_factors(d, w=310.0, h=100.0, margins=(24, 4, 20, 25), gap=14.0):
             ax.set_title(f"{mp.MAT_JA[mat]}（基準 {cfg['Tref']:.0f} ℃）", pad=5, fontsize=FS)
             if k == 0:
                 ax.set_ylabel("シフトファクター", labelpad=2)
-            ax.set_xlabel("金型内樹脂最高温度 (℃)", labelpad=2, fontsize=FS)
+            ax.set_xlabel(f"{SHIFT_JA} (℃)", labelpad=2, fontsize=FS)
         hdl, lab = ax.get_legend_handles_labels()
         fig.legend(hdl, lab, loc="upper center", ncol=2, frameon=False, bbox_to_anchor=(0.5, 1.0), borderaxespad=0.2, columnspacing=2.0)
         save(fig, "シフトファクター_推定値.png")
@@ -594,7 +600,7 @@ def fig_profile(mat="PP", w=168.0, h=124.0, margins=(26, 32, 20, 4)):
 # ---------------------------------------------------------------- 学習結果
 def fig_flow(d, mat, w=150.0, h=110.0, margins=(27, 5, 19, 3)):
     """全厚み共通の曲線（加熱シリンダ温度ごと。ΔP2 は学習データの中央値、金型内樹脂最高温度は、その温度の学習データの中央値に固定。
-    報告書B の図5・ポスターと同じ固定値）と、学習データの成形条件ごとの平均（色＝温度、形＝厚み）"""
+    報告書B の図5・ポスターと同じ固定値）と、学習データのショットごとの値（学習に使った値。色＝温度、形＝厚み）"""
     tr, fit = d["tr"], d["fit"]
     xl, yl = (1.0, 1e5), (0.5, 3000.0)
     p_med = float(np.exp(tr["ln_P33"].median()) / 1e6)
@@ -610,9 +616,9 @@ def fig_flow(d, mat, w=150.0, h=110.0, margins=(27, 5, 19, 3)):
             ax.fill_between(np.exp(lg), np.exp(mu - 1.96 * sd), np.exp(mu + 1.96 * sd), color=c, alpha=0.18, lw=0, zorder=2)
             ax.plot(np.exp(lg), np.exp(mu), color=c, lw=2.4, zorder=4)
             for hh in sorted(sub["H"].unique()):
-                a = sub[np.isclose(sub["H"], hh)].groupby("cond").agg(lg=("ln_gd", "mean"), le=("ln_eta", "mean"))
-                ax.scatter(np.exp(a["lg"]), np.exp(a["le"]), s=55, color=c, marker=mc.H_MARKS[float(hh)], edgecolors="k", linewidths=0.5,
-                           alpha=0.9, zorder=5)
+                a = sub[np.isclose(sub["H"], hh)]
+                ax.scatter(np.exp(a["ln_gd"]), np.exp(a["ln_eta"]), s=30, color=c, marker=mc.H_MARKS[float(hh)], edgecolors="k", linewidths=0.4,
+                           alpha=0.85, zorder=5)
             info.append((int(t), tff))
         ax.set_xlabel(r"せん断速度 $\dot{\gamma}$ (1/s)", labelpad=2)
         ax.set_ylabel(r"樹脂粘度 $\eta$ (Pa·s)", labelpad=2)
@@ -753,8 +759,8 @@ def thick_csv(mat, name):
 
 
 def fig_flow_thick(d, mat, H, w=150.0, h=86.0, margins=(27, 5, 19, 3)):
-    """1 つの厚みの学習結果（B_Tff）：加熱シリンダ温度ごとの曲線と 95% 予測区間（入力は、同じ厚み・温度の条件平均をせん断速度で内挿。
-    ノートの「厚みごと」の図と同じ）。点＝成形条件ごとの平均（色・形＝温度、塗り＝学習、白抜き＝検証）"""
+    """1 つの厚みの学習結果（主のモデル mp.KEY）：加熱シリンダ温度ごとの曲線と 95% 予測区間（入力は、同じ厚み・温度の条件平均をせん断速度で内挿。
+    ノートの「厚みごと」の図と同じ）。点＝ショットごとの値（学習に使った値。色・形＝温度、塗り＝学習、白抜き＝検証）"""
     fit, pool, train_c = d["fit"], d["pool"], set(d["tr"]["cond"])
     ph = pool[np.isclose(pool["H"], H)]
     xs, ys = [], []
@@ -762,17 +768,17 @@ def fig_flow_thick(d, mat, H, w=150.0, h=86.0, margins=(27, 5, 19, 3)):
         fig, ax = mpd.new_fig(w, h, *margins)
         for i, t in enumerate(sorted(ph["Tset"].unique())):
             sub = ph[ph["Tset"] == t]
-            a = sub.groupby("cond").agg(lg=("ln_gd", "mean"), le=("ln_eta", "mean")).reset_index()
-            lg = np.linspace(a["lg"].min() - np.log(1.3), a["lg"].max() + np.log(1.3), 300)
+            lg = np.linspace(sub["ln_gd"].min() - np.log(1.3), sub["ln_gd"].max() + np.log(1.3), 300)
             mu, sd, _, _ = mc.predict(fit, mc.flow_inputs(sub, lg, H, t))
             c, mk = T_COLS[i], mpd.T_MARKS[i]
             ax.fill_between(np.exp(lg), np.exp(mu - 1.96 * sd), np.exp(mu + 1.96 * sd), color=c, alpha=0.16, lw=0, zorder=2)
             ax.plot(np.exp(lg), np.exp(mu), color=c, lw=2.4, zorder=4)
-            trm = a["cond"].isin(train_c).to_numpy()
-            ax.scatter(np.exp(a["lg"][trm]), np.exp(a["le"][trm]), s=60, color=c, marker=mk, edgecolors="k", linewidths=0.5, zorder=6)
-            ax.scatter(np.exp(a["lg"][~trm]), np.exp(a["le"][~trm]), s=60, facecolors="white", edgecolors=c, marker=mk, linewidths=2.0, zorder=6)
+            trm = sub["cond"].isin(train_c).to_numpy()
+            ax.scatter(np.exp(sub["ln_gd"][trm]), np.exp(sub["ln_eta"][trm]), s=32, color=c, marker=mk, edgecolors="k", linewidths=0.4, zorder=6)
+            ax.scatter(np.exp(sub["ln_gd"][~trm]), np.exp(sub["ln_eta"][~trm]), s=32, facecolors="white", edgecolors=c, marker=mk, linewidths=1.6,
+                       zorder=6)
             xs += [lg.min(), lg.max()]
-            ys += list(a["le"])
+            ys += list(sub["ln_eta"])
         ax.set_xscale("log")
         ax.set_yscale("log")
         ax.set_xlim(np.exp(min(xs)), np.exp(max(xs)))
@@ -854,7 +860,7 @@ def fig_thick_criteria(mat, w=150.0, h=108.0, margins=(24, 4, 19, 26)):
 THICK_MODELS = ["C", "B_Tset", "B_Tff"]
 
 
-def fig_thick_total(w=310.0, h=88.0, margins=(24, 4, 11, 21), gap=12.0):
+def fig_thick_total(w=310.0, h=80.0, margins=(24, 4, 11, 21), gap=12.0):
     """厚みごとに学習したモデルと、総合データ（全厚み）で学習したモデルの、検証データ全体の予測誤差。材料ごとに 1 枠、モデルごとに 2 本"""
     p = {}
     for mat in mp.MATS:
@@ -934,25 +940,32 @@ def main():
         r_before, _ = mpd.shift_resid(dm, False)
         r_after, _ = mpd.shift_resid(dm, True)
         noise_sd = float(np.sqrt(fit["gp"].kernel_.k2.noise_level))
+        g = dm["pool"].groupby("cond")["ln_eta"]
+        shot_sd = float(np.sqrt((g.var(ddof=1) * (g.count() - 1)).sum() / (g.count() - 1).sum()))     # 同じ成形条件のショット間の標準偏差（純粋誤差）
+        hp = pd.read_csv(os.path.join(mp.compare_dir(mat), "ハイパーパラメータ.csv"), encoding="utf-8-sig").set_index("model").loc[mp.KEY]
+        ls = {k: float(hp[c]) for k, c in LS_COLS}
         cm = dm["tr"].groupby("cond")["ln_gd"].mean()
-        T = dm["tr"]["Tff"]
+        T = dm["tr"][SHIFT_T]
         rows.append({"mat": mat, "材料": mp.MAT_JA[mat], "シフトの型": fit["cfg"]["type"], "基準温度": fit["cfg"]["Tref"], "横の係数": fit["th"],
-                     "縦の係数": fit["tv"], "LML の差（Tff）": dl(mp.KEY), "LML の差（Tset）": dl("B_Tset"),
+                     "縦の係数": fit["tv"], "LML の差（主）": dl(mp.KEY), "LML の差（B_Tset）": dl("B_Tset"), "LML の差（B_Tff）": dl("B_Tff"),
                      "残差（換算前）": float(np.sqrt(np.mean(r_before["r"] ** 2))), "残差（換算後）": float(np.sqrt(np.mean(r_after["r"] ** 2))),
                      "RMSE 全体": rmse, "RMSE 低速側": get(mp.KEY, "低速側"), "RMSE 高速側": get(mp.KEY, "高速側"), "被覆率": cover, "検証の行数": n,
-                     "Cross-WLF RMSE 全体": get("Cross-WLF", "全体"), "ノイズの標準偏差": noise_sd, "ln η の平均": fit["y0"],
+                     "Cross-WLF RMSE 全体": get("Cross-WLF", "全体"), "ノイズの標準偏差": noise_sd, "ショット間の標準偏差": shot_sd,
+                     **{f"長さスケール（{k}）": v for k, v in ls.items()}, "振幅の 2 乗": float(hp["amplitude"]) ** 2,
+                     "線形項の大きさ": float(hp["lin_amplitude"]) ** 2, "線形項の切片": float(hp["lin_sigma0"]), "ノイズの分散": float(hp["noise_var"]),
+                     "ln η の平均": fit["y0"],
                      "学習の行数": len(dm["tr"]), "学習の条件数": dm["tr"]["cond"].nunique(), "γ̇ 最小": float(np.exp(cm.min())), "γ̇ 最大": float(np.exp(cm.max())),
-                     "Tff 最小": float(T.min()), "Tff 最大": float(T.max()),
-                     "a_v（Tff 最小）": float(np.exp(mc.shift_ln(T.min(), fit["tv"], fit["cfg"]))),
-                     "a_v（Tff 最大）": float(np.exp(mc.shift_ln(T.max(), fit["tv"], fit["cfg"]))),
-                     "a_h（Tff 最小）": float(np.exp(mc.shift_ln(T.min(), fit["th"], fit["cfg"]))),
-                     "a_h（Tff 最大）": float(np.exp(mc.shift_ln(T.max(), fit["th"], fit["cfg"]))),
+                     "シフト温度 最小": float(T.min()), "シフト温度 最大": float(T.max()),
+                     "a_v（最小の温度）": float(np.exp(mc.shift_ln(T.min(), fit["tv"], fit["cfg"]))),
+                     "a_v（最大の温度）": float(np.exp(mc.shift_ln(T.max(), fit["tv"], fit["cfg"]))),
+                     "a_h（最小の温度）": float(np.exp(mc.shift_ln(T.min(), fit["th"], fit["cfg"]))),
+                     "a_h（最大の温度）": float(np.exp(mc.shift_ln(T.max(), fit["th"], fit["cfg"]))),
                      "ΔP2 の中央値 [MPa]": p_med, "Tff の中央値 [℃]": "・".join(f"{t}:{v:.1f}" for t, v in info)})
     fig_shift_effect(rows)
     fig_error_compare(rows)
     thick_figs(d)
     tab = pd.DataFrame(rows)
-    for c in ["RMSE 全体", "RMSE 低速側", "RMSE 高速側", "Cross-WLF RMSE 全体", "残差（換算前）", "残差（換算後）", "ノイズの標準偏差"]:
+    for c in ["RMSE 全体", "RMSE 低速側", "RMSE 高速側", "Cross-WLF RMSE 全体", "残差（換算前）", "残差（換算後）", "ノイズの標準偏差", "ショット間の標準偏差"]:
         tab[f"{c} [%]"] = [mp.pct(v) for v in tab[c]]
     tab.drop(columns="mat").to_csv(os.path.join(OUT, "スライドの数値.csv"), index=False, encoding="utf-8-sig")
     with pd.option_context("display.width", 250, "display.max_columns", 60):

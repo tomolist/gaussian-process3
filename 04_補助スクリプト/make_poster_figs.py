@@ -38,7 +38,7 @@ import mat_common as mc  # noqa: E402
 MATS = ["PP", "MIX", "GPPS"]
 MAT_JA = {"PP": "PP", "MIX": "粉砕材混合PP", "GPPS": "GPPS"}
 KEY = "B_Tff"
-MODE_DIR = "条件平均の入力"
+MODE = "cond"            # 読むモデルの入力の取り方（報告書B・ポスターは条件平均の入力で作った。発表資料の make_slide_figs.py は "shot" に変えて使う）
 POSTER = os.path.join(mc.DATA_ROOT, "学習結果報告書作成_261015", "ポスター")
 OUT = os.path.join(POSTER, "図")
 SAMPLE_PDF = os.path.join(POSTER, "報告書Aから作成2.pdf")
@@ -199,12 +199,12 @@ def fig_shift_concept():
 # ---------------------------------------------------------------- 学習結果の図
 def model_dir(mat):
     folder = mc.MAT_FOLDERS[mat]
-    return os.path.join(mc.DATA_ROOT, folder, f"{folder}_学習結果", MODE_DIR, KEY)
+    return os.path.join(mc.DATA_ROOT, folder, f"{folder}_学習結果", mc.MODE_JA[MODE], KEY)
 
 
 def compare_dir(mat):
     folder = mc.MAT_FOLDERS[mat]
-    return os.path.join(mc.DATA_ROOT, folder, f"{folder}_学習結果", MODE_DIR, "比較")
+    return os.path.join(mc.DATA_ROOT, folder, f"{folder}_学習結果", mc.MODE_JA[MODE], "比較")
 
 
 def log_axes(ax, xlim, ylim):
@@ -346,7 +346,7 @@ def main():
     fig_formula()
     fig_gpr_concept()
     fig_shift_concept()
-    mc.INPUT_MODE = "cond"
+    mc.INPUT_MODE = MODE
     mc.SHOW_FIGS = False
     mc.D = mc.load_all(MATS)
     rows = []
@@ -357,7 +357,7 @@ def main():
         pool = pd.concat([tr, te], ignore_index=True)
         obj = joblib.load(os.path.join(model_dir(mat), f"学習済みモデル_{KEY}.joblib"))
         fit = obj["fit"]
-        assert fit.get("mode") == "cond", "条件平均の入力のモデルのはず"
+        assert fit.get("mode") == MODE, f"{mc.MODE_JA[MODE]}のモデルのはず"
         cfg, th, tv = fit["cfg"], fit["th"], fit["tv"]
         r_before = mc.superpose_rmse(mc.shifted_cond_means(pool, None, cfg, 0.0, 0.0))
         r_after = mc.superpose_rmse(mc.shifted_cond_means(pool, KEY, cfg, th, tv))
