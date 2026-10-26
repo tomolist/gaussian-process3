@@ -4,7 +4,7 @@
 使い方: uv run python 04_補助スクリプト/build_mat_shift_nb_commented.py [--force]
 既存ファイルがある場合は、--force を付けない限り上書きしない。
 
-- 元のノート（01_機械学習コードフォルダ/材料別_温度シフトGPR_….ipynb）を読み、各コードセルの各行の上に、
+- 元のノート（01_機械学習コードフォルダ/材料別_温度シフトファクター検討/材料別_温度シフトGPR_….ipynb）を読み、各コードセルの各行の上に、
   解説の行（「# ▶ 」で始まるコメント）を差し込む。コードそのものは変えない。
 - 解説は 04_補助スクリプト/mat_shift_nb_解説/codeNN.txt（NN はコードセルの順番。長いセルは codeNN_a.txt・codeNN_b.txt … に分けてある）に、
   「行番号 ⇒ 解説」の形で 1 行ずつ書いてある。行番号は、元のセルの中の行の番号（1 から）。
@@ -25,8 +25,9 @@ import tokenize
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
 NAME = "材料別_温度シフトGPR_ARD対応Matern52＋線形＋ホワイトノイズ.ipynb"
-SRC = os.path.join(REPO, "01_機械学習コードフォルダ", NAME)
-OUT = os.path.join(REPO, "01_機械学習コードフォルダ", "解説付き_" + NAME)
+NB_DIR = os.path.join(REPO, "01_機械学習コードフォルダ", "材料別_温度シフトファクター検討")     # ユーザーがノートを移したフォルダ（2026-10-23）
+SRC = os.path.join(NB_DIR, NAME)
+OUT = os.path.join(NB_DIR, "解説付き_" + NAME)
 CDIR = os.path.join(HERE, "mat_shift_nb_解説")
 MARK = "# ▶ "
 

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """材料別の温度シフト GPR の「厚みごとの比較」の部品。
 
-ノート（01_機械学習コードフォルダ/材料別_温度シフトGPR_ARD対応Matern52＋線形＋ホワイトノイズ_厚みごとの比較.ipynb）の
+ノート（01_機械学習コードフォルダ/材料別_温度シフトファクター検討/材料別_温度シフトGPR_ARD対応Matern52＋線形＋ホワイトノイズ_厚みごとの比較.ipynb）の
 「厚みごとの比較の部品」のセルに、この中身（下の import の行を除く）がそのまま入る。直すときは、このファイルを直して、
 ノートを作り直す（04_補助スクリプト/build_mat_thick_nb.py）。ノートでは、この前のセルに mat_common の中身がある。
 モジュールとして import しても使える（mat_common の部品を、下の import で読み込む）。
@@ -33,6 +33,14 @@ def thicknesses(df):
 
 def sub_h(df, h):
     return df[np.isclose(df["H"], h)].reset_index(drop=True)
+
+
+def shot_sd(df):
+    """同じ成形条件のショット間の ln η の標準偏差（純粋誤差。条件ごとの分散を、自由度で重み付けしてまとめたもの）。
+    比 R の「大きさが一致」の許容差に使う（入力の取り方によらない。ショットごとの入力では GP のノイズが小さく出るため、ノイズは使わない）"""
+    g = df.groupby("cond")["ln_eta"]
+    dof = g.count() - 1
+    return float(np.sqrt((g.var(ddof=1) * dof).sum() / dof.sum()))
 
 
 # ---------------------------------------------------------------- 重ね合わせのずれ（厚みごと）
@@ -76,7 +84,7 @@ def best_superpose(pool_h, key, cfg, fine=None, max_refine=None):
 
 # ---------------------------------------------------------------- 1. 温度シフトの確認（学習済みのモデル）
 def cond_pred_table(fit, pool_h):
-    """1 つの厚みの、成形条件ごとの平均（実測の ln η、ln γ̇）と、モデルの予測平均（条件平均の入力なので、条件の中では同じ値）"""
+    """1 つの厚みの、成形条件ごとの平均（実測の ln η、ln γ̇）と、モデルの予測平均の条件ごとの平均（ショットごとの入力なら、ショットの予測の平均）"""
     mu, _, _, _ = predict(fit, pool_h)
     t = pool_h.assign(lp=mu).groupby("cond").agg(Tset=("Tset", "first"), H=("H", "first"), lg=("ln_gd", "mean"), ly=("ln_eta", "mean"),
                                                  lp=("lp", "mean"), grp=("grp", "first")).reset_index()
@@ -99,9 +107,10 @@ def temp_ratio(cm, col):
 
 def thick_check(fit, pool):
     """1 の表：厚みごとに、温度による粘度の比 R（実測・予測）、温度の順序、学習済みの係数で換算する前後のずれ、判定（○・△・×）。
-    ○：順序が一致し、|ln R_予測 − ln R_実測| がノイズの標準偏差以内で、換算後のずれ < 換算前。×：予測の順序が実測と逆。△：それ以外"""
+    ○：順序が一致し、|ln R_予測 − ln R_実測| がショット間の標準偏差（純粋誤差、shot_sd）以内で、換算後のずれ < 換算前。×：予測の順序が実測と逆。△：それ以外"""
     key, cfg = fit["key"], fit["cfg"]
     noise_sd = float(np.sqrt(fit["gp"].kernel_.k2.noise_level))
+    tol = shot_sd(pool)
     before = superpose_by_h(shifted_cond_means(pool, None, cfg, 0.0, 0.0))
     after = superpose_by_h(shifted_cond_means(pool, key, cfg, fit["th"], fit["tv"]))
     rows = []
@@ -110,24 +119,25 @@ def thick_check(fit, pool):
         r_obs, g0, g1 = temp_ratio(cm, "ly")
         r_pred, _, _ = temp_ratio(cm, "lp")
         order_ok = bool(np.isfinite(r_obs) and np.isfinite(r_pred) and (r_obs > 1) == (r_pred > 1))
-        size_ok = bool(np.isfinite(r_obs) and np.isfinite(r_pred) and abs(np.log(r_pred) - np.log(r_obs)) <= noise_sd)
+        size_ok = bool(np.isfinite(r_obs) and np.isfinite(r_pred) and abs(np.log(r_pred) - np.log(r_obs)) <= tol)
         shift_ok = bool(after[h][0] < before[h][0])
         mark = "○" if (order_ok and size_ok and shift_ok) else ("×" if not order_ok else "△")
         rows.append({"材料": None, "モデル": key, "厚み": h, "条件数": len(cm), "R_実測": r_obs, "R_予測": r_pred,
-                     "lnR の差": (np.log(r_pred) - np.log(r_obs)) if np.isfinite(r_obs) and np.isfinite(r_pred) else np.nan, "ノイズの標準偏差": noise_sd,
+                     "lnR の差": (np.log(r_pred) - np.log(r_obs)) if np.isfinite(r_obs) and np.isfinite(r_pred) else np.nan, "許容差（ショット間の標準偏差）": tol,
+                     "ノイズの標準偏差": noise_sd,
                      "比べた γ̇ の範囲": f"{g0:.0f}〜{g1:.0f}" if np.isfinite(g0) else "なし", "順序が一致": order_ok, "比の大きさが一致": size_ok,
                      "ずれ_換算前": before[h][0], "ずれ_換算後": after[h][0], "換算でずれが減る": shift_ok, "判定": mark})
     return pd.DataFrame(rows)
 
 
 # ---------------------------------------------------------------- 2(b)・3：厚みごとに学習した GPR
-def thick_profile(key, tr, cfg, h, n_jobs=None, restarts=None, mode="cond"):
+def thick_profile(key, tr, cfg, h, n_jobs=None, restarts=None, mode="shot"):
     """(b) 1 つの厚みの 5data だけで、モデル key の係数をプロファイル尤度で決める（元のノートと同じ run_profile）。返り値：(格子の表, profile_best の辞書)"""
     pts, conv = run_profile(key, sub_h(tr, h), cfg, n_jobs=n_jobs, restarts=restarts, mode=mode)
     return pts, profile_best(pts, key, cfg, conv)
 
 
-def thick_model(key, tr, te, cfg, h, best=None, restarts=None, mode="cond"):
+def thick_model(key, tr, te, cfg, h, best=None, restarts=None, mode="shot"):
     """3：1 つの厚みの 5data で最終モデルを学習し（B は best の係数。C はシフトなし）、同じ厚みの 3data を予測する。返り値：(fit, 予測の表)"""
     trh, teh = sub_h(tr, h), sub_h(te, h)
     th, tv, theta0 = (best["th_best"], best["tv_best"], best.get("theta_best")) if best else (0.0, 0.0, None)
@@ -166,8 +176,9 @@ def majority(votes):
 
 
 # ---------------------------------------------------------------- 図
-def _flow_axes(ax, fit, pool_h, train_conds, h, extend=1.3, n=200):
-    """1 つの厚みの学習結果（設定温度ごとの曲線と 95% 予測区間。入力は flow_inputs で内挿）を ax に描く"""
+def _flow_axes(ax, fit, pool_h, train_conds, h, points="shot", extend=1.3, n=200):
+    """1 つの厚みの学習結果（設定温度ごとの曲線と 95% 予測区間。入力は flow_inputs で内挿）を ax に描く。
+    points："shot"＝ショットごとの計測値の点（既定）／"cond"＝成形条件ごとの平均の点。曲線の範囲は、どちらも条件平均の ln γ̇ の範囲を extend 倍に延ばしたもの"""
     ts = t_style(pool_h["Tset"].unique())
     xs, ys = [], []
     for t, sub in pool_h.groupby("Tset"):
@@ -177,11 +188,14 @@ def _flow_axes(ax, fit, pool_h, train_conds, h, extend=1.3, n=200):
         mu, sd, _, _ = predict(fit, flow_inputs(sub, lg, h, t))
         ax.fill_between(np.exp(lg), np.exp(mu - 1.96 * sd), np.exp(mu + 1.96 * sd), color=col, alpha=0.18, lw=0, zorder=2)
         ax.plot(np.exp(lg), np.exp(mu), color=col, lw=2.0, zorder=4, label=f"{int(t)} ℃")
-        trm = a["cond"].isin(train_conds).to_numpy()
-        ax.scatter(np.exp(a["lg"][trm]), np.exp(a["le"][trm]), s=55, color=col, marker=mk, edgecolors="k", linewidths=0.5, zorder=6)
-        ax.scatter(np.exp(a["lg"][~trm]), np.exp(a["le"][~trm]), s=55, facecolors="white", edgecolors=col, marker=mk, linewidths=1.8, zorder=6)
-        xs += list(np.exp(lg))
-        ys += list(np.exp(a["le"])) + list(np.exp(mu))
+        if points == "cond":
+            px, py, trm, ms, lw = np.exp(a["lg"].to_numpy()), np.exp(a["le"].to_numpy()), a["cond"].isin(train_conds).to_numpy(), 55, (0.5, 1.8)
+        else:
+            px, py, trm, ms, lw = sub["gd"].to_numpy(), sub["eta"].to_numpy(), sub["cond"].isin(train_conds).to_numpy(), 20, (0.4, 1.2)
+        ax.scatter(px[trm], py[trm], s=ms, color=col, marker=mk, edgecolors="k", linewidths=lw[0], zorder=6)
+        ax.scatter(px[~trm], py[~trm], s=ms, facecolors="white", edgecolors=col, marker=mk, linewidths=lw[1], zorder=6)
+        xs += list(np.exp(lg)) + list(px)
+        ys += list(py) + list(np.exp(mu))
     ax.set_xscale("log")
     ax.set_yscale("log")
     ax.set_xlim(min(xs), max(xs))
@@ -191,18 +205,20 @@ def _flow_axes(ax, fit, pool_h, train_conds, h, extend=1.3, n=200):
     ax.set_xlabel(r"せん断速度 $\dot{\gamma}$ (1/s)")
 
 
-def thick_flow_pair(fits, mat, pool, train_conds, h, out_dir):
-    """厚みごとの学習結果を、モデルごと（B_Tset・B_Tff）に左右に並べる。塗り＝学習（5data）、白抜き＝検証（3data）"""
+def thick_flow_pair(fits, mat, pool, train_conds, h, out_dir, points="shot"):
+    """厚みごとの学習結果を、モデルごと（B_Tset・B_Tff）に左右に並べる。塗り＝学習（5data）、白抜き＝検証（3data）。
+    points："shot"＝ショットごとの計測値の点（既定）／"cond"＝成形条件ごとの平均の点"""
     import matplotlib.pyplot as plt
     keys = [k for k in THICK_KEYS if k in fits]
     fig, axes = plt.subplots(1, len(keys), figsize=(7.2 * len(keys), 6.2), sharey=True)
     axes = np.atleast_1d(axes)
     for ax, k in zip(axes, keys):
-        _flow_axes(ax, fits[k], sub_h(pool, h), train_conds, h)
+        _flow_axes(ax, fits[k], sub_h(pool, h), train_conds, h, points=points)
         ax.set_title(f"{k}（{TEMP_JA[k]} でシフト）", fontsize=14)
     axes[0].set_ylabel(r"樹脂粘度 $\eta$ (Pa·s)")
     axes[-1].legend(title="加熱シリンダ温度", loc="upper right", fontsize=11, title_fontsize=11)
-    fig.suptitle(f"{MAT_NAMES[mat]}　厚み {h:g} mm の学習結果（点：成形条件ごとの平均。塗り＝学習、白抜き＝検証）", fontsize=14)
+    ptxt = "成形条件ごとの平均" if points == "cond" else "ショットごとの計測値"
+    fig.suptitle(f"{MAT_NAMES[mat]}　厚み {h:g} mm の学習結果（点：{ptxt}。塗り＝学習、白抜き＝検証）", fontsize=14)
     fig.tight_layout()
     return save_fig(fig, out_dir, f"学習結果_厚み{h:g}mm")
 

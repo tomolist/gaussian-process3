@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """材料別の温度シフト GPR（05_材料ごとの機械学習データと予測検証データ）のノートで共通に使う部品。
 
-ノート（01_機械学習コードフォルダ/材料別_温度シフトGPR_ARD対応Matern52＋線形＋ホワイトノイズ.ipynb）の「共通の部品」のセルに、
+ノート（01_機械学習コードフォルダ/材料別_温度シフトファクター検討/材料別_温度シフトGPR_ARD対応Matern52＋線形＋ホワイトノイズ.ipynb）の「共通の部品」のセルに、
 この中身がそのまま入る（ノートは単独で動く）。直すときは、このファイルを直して、ノートを作り直す（04_補助スクリプト/build_mat_shift_nb.py）。
 本体の検討（nb_common.py・step5_core.py）とは別のプロジェクト。部品の多くは、それらを写して、このデータ
 （説明変数 γ̇・P3_3・Tff・Tset。H は入れない）に合わせて直したもの。モジュールとして import しても使える。
@@ -34,7 +34,7 @@ FIG_DPI = globals().get("FIG_DPI", 200)
 HR_ALL = globals().get("HR_ALL", True)                      # すべての図を、600 dpi でも highres/ に保存するか
 HR_ALL_DPI = globals().get("HR_ALL_DPI", 600)
 SHOW_FIGS = globals().get("SHOW_FIGS", True)                # 図をノートに表示するか（False なら保存だけ）
-INPUT_MODE = globals().get("INPUT_MODE", "cond")            # "cond"：γ̇・P3_3・Tff を条件（設定温度・厚み・射出速度）ごとの平均で入れる（本体の手順3b の R3 と同じ考え方）／"shot"：ショットごとの値で入れる（6月のノートと同じ）
+INPUT_MODE = globals().get("INPUT_MODE", "shot")            # "shot"：γ̇・P3_3・Tff をショットごとの値で入れる（6月のノートと同じ。既定）／"cond"：条件（設定温度・厚み・射出速度）ごとの平均で入れる（参考）
 MAX_REFINE = globals().get("MAX_REFINE", 4)                 # プロファイル尤度で、最良の点が細かい格子の端に当たったとき、その点を中心に細かい格子を取り直す回数の上限
 FINE_B = globals().get("FINE_B", (4.0, 1.0))               # 構造 B の細かい格子：最良の点の ±4 を 1 刻み
 FINE_A = globals().get("FINE_A", (2.5, 0.5))                # 構造 A の細かい格子：最良の点の ±2.5 を 0.5 刻み
@@ -688,6 +688,19 @@ def log_ticks(ax, axis="xy"):
         a.set_minor_formatter(ticker.NullFormatter())
 
 
+def tick_labels_overlap(fig, axis, gap=0.4):
+    """軸 axis の大きい目盛りの数字のうち、グラフの範囲の中のものが、隣どうしで重なるか（間が、数字の高さの gap 倍より狭いか）。図を一度描いて確かめる"""
+    fig.canvas.draw()
+    x = axis.axis_name == "x"
+    ab = axis.axes.get_window_extent()
+    lo, hi = (ab.x0, ab.x1) if x else (ab.y0, ab.y1)
+    boxes = [t.get_window_extent() for t in axis.get_majorticklabels() if t.get_text()]
+    spans = sorted((b.x0, b.x1) if x else (b.y0, b.y1) for b in boxes)
+    spans = [s for s in spans if lo - 1 <= (s[0] + s[1]) / 2 <= hi + 1]
+    pad = gap * max((b.height for b in boxes), default=0.0)
+    return any(a[1] + pad > b[0] for a, b in zip(spans, spans[1:]))
+
+
 def save_fig(fig, out_dir, stem, show=None):
     """図を out_dir に PNG で保存する（FIG_DPI）。HR_ALL が True なら、同じ図を HR_ALL_DPI（既定 600 dpi）で out_dir/highres/ にも保存する。
     show（既定 SHOW_FIGS）なら表示し、閉じる"""
@@ -1034,10 +1047,13 @@ def flow_plot(fit, mat, pool, train_conds, out_dir, stem, **kw):
             ax.set_xlim(*xlim_now)
             ax.set_ylim(*ylim_now)
             for axis, auto in ((ax.xaxis, xl is None), (ax.yaxis, yl is None)):
-                if auto:
+                lo_, hi_ = axis.get_view_interval()
+                fine = auto and np.log10(hi_ / lo_) <= 2.5                 # 範囲を自動で決めた軸で、2.5 桁以下なら 1・2・5 × 10ⁿ の目盛り（log_ticks と同じ基準）
+                if fine:
                     axis.set_major_locator(ticker.LogLocator(base=10.0, subs=(1.0, 2.0, 5.0)))
                     axis.set_major_formatter(ticker.FuncFormatter(lambda v, _: f"{v:g}"))
-                else:
+                    fine = not tick_labels_overlap(fig, axis)            # それでも目盛りの数字が重なるなら、10ⁿ だけにする
+                if not fine:
                     axis.set_major_locator(ticker.LogLocator(base=10.0, subs=(1.0,)))
                     axis.set_major_formatter(ticker.LogFormatterSciNotation())
                 axis.set_minor_formatter(ticker.NullFormatter())
