@@ -1,0 +1,574 @@
+% 説明書：材料別の温度シフト GPR のノート（01_機械学習コードフォルダ/材料別_温度シフトファクター検討/ の下の 5 つ）
+% 生成：uv run python 04_補助スクリプト/build_mat_nb_manual.py（このひな形の @@項目@@ に、mat_common の設定と 05 フォルダのデータの概要を入れる）。
+% 01_機械学習コードフォルダ/材料別_温度シフトファクター検討 フォルダで「lualatex 説明書_材料別温度シフトGPRのノート.tex」を2回実行しても PDF を作り直せる（TeX Live の LuaLaTeX）。
+\documentclass[paper=a4paper,fontsize=10.5pt,line_length=44zw,number_of_lines=38]{jlreq}
+\usepackage[haranoaji]{luatexja-preset}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{longtable}
+\usepackage{enumitem}
+\usepackage{float}
+\usepackage{xcolor}
+\usepackage{fancyvrb}
+\usepackage{dirtree}
+\usepackage{tikz}
+\usetikzlibrary{positioning,arrows.meta}
+\usepackage[most]{tcolorbox}
+\usepackage[hidelinks,bookmarksnumbered]{hyperref}
+
+\newcommand{\file}[1]{\texttt{\detokenize{#1}}}
+\newcommand{\gd}{\dot{\gamma}}
+\newcommand{\Tff}{T_{\mathrm{ff}}}
+\newcommand{\Tset}{T_{\mathrm{set}}}
+\newcommand{\Eh}{E_{h}}
+\newcommand{\Ev}{E_{v}}
+\newcommand{\PIII}{P3\_3}
+\newenvironment{termlist}{\begin{itemize}[label=・,leftmargin=1\zw,labelwidth=1\zw,labelsep=0pt,itemsep=0.4ex,topsep=0.6ex,parsep=0pt]}{\end{itemize}}
+\newcommand{\term}[1]{\item \textbf{#1}：}
+\newenvironment{points}{\begin{itemize}[label=$\triangleright$,leftmargin=1.5\zw,itemsep=0.3ex,topsep=0.5ex,parsep=0pt]}{\end{itemize}}
+\newcommand{\pt}[1]{\item \textbf{#1}：}
+\newtcolorbox{keybox}[1]{breakable,colback=blue!3,colframe=blue!45!black,boxrule=0.6pt,arc=2pt,left=4pt,right=4pt,top=3pt,bottom=3pt,fonttitle=\bfseries,title={#1}}
+\renewcommand{\arraystretch}{1.25}
+\renewcommand{\topfraction}{0.9}          % 表や図を、本文のページに入れやすくする（表だけのページを減らす）
+\renewcommand{\bottomfraction}{0.8}
+\renewcommand{\textfraction}{0.07}
+\renewcommand{\floatpagefraction}{0.8}
+\makeatletter\setlength{\@fptop}{0pt}\makeatother   % 表だけのページでは、表を上に詰める
+\renewcommand*\DTstylecomment{\rmfamily\small}
+\DTsetlength{0.2em}{1.4em}{0.2em}{0.4pt}{1.6pt}
+
+\title{材料別の温度シフト GPR のノートの説明書\\[0.6ex]{\large このフォルダを初めて開いた人のために：目的・調べること・使えるデータ・使い方}}
+\author{}
+\date{2026年10月28日}
+
+\begin{document}
+\maketitle
+{\small\tableofcontents}
+
+% =====================================================================
+\section{この文書について}
+
+この文書は、フォルダ \file{01_機械学習コードフォルダ/材料別_温度シフトファクター検討/} の中にある 5 つのノートブック（以下「ノート」）の説明書です。このフォルダを初めて開いた人が、\textbf{何を目的に、何を調べるコードなのか}、\textbf{どんなデータに使えるのか}、\textbf{どう実行し、結果をどこで見るのか}を、この 1 冊で分かるように書きました。機械学習や統計を初めて学ぶ人でも読めるように、専門の言葉は 9 章の用語集で説明しています。
+
+\begin{table}[!htbp]
+\caption{このフォルダのノート。時間は、3 材料をまとめて実行したときの目安（全ショット版／条件ごとの平均版）}\label{tab:nbs}
+\small
+\begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}p{0.33\linewidth}>{\raggedright\arraybackslash}X r@{}}
+\toprule
+ノート（フォルダ） & 役割 & 時間 \\
+\midrule
+\textbf{① シフトファクター検討用}\newline \file{材料別_温度シフトファクターの検討_ARD対応Matern52＋線形＋ホワイトノイズ.ipynb}\newline（\file{材料別_温度シフトファクター検討用コード/}） & 温度の列（加熱シリンダ温度・流動中樹脂温度）ごとに温度のシフトファクターを推定して、シフトのないモデルと比べ、\textbf{どの列をシフトに使うのがよいか}を調べる。②で使う列の候補を出す & 約 40／80 分 \\
+\textbf{② 学習用}\newline \file{材料別_温度シフトGPR_ARD対応Matern52＋線形＋ホワイトノイズ.ipynb}\newline（\file{材料別_温度シフト機械学習コード/}） & 設定で決めた 1 つの列でシフトする\textbf{モデルを学習して}、データの確認・図・表・学習済みモデルを一式作る（報告書・発表資料用の図を含む） & 約 25／45 分 \\
+\textbf{③ 厚みごとの比較}\newline \file{材料別_温度シフトGPR_ARD対応Matern52＋線形＋ホワイトノイズ_厚みごとの比較.ipynb}\newline（\file{材料別_温度シフトファクター検討用コード/}） & ①のモデルを\textbf{キャビティ厚みごとに}見直す。厚みごとにシフトが効いているか、どちらの温度が適するか、厚みごとに学習したモデルと全厚みのモデルのどちらがよいか & 約 10 分 \\
+\textbf{解説付きの版}（2 つ）\newline \file{解説付き_…ipynb}\newline（①・②と同じフォルダ） & ①・②と同じコードの各行に、Python 初心者向けの解説のコメントを付けたもの。実行すると①・②と同じ結果になる & ①・②と同じ \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\begin{points}
+\pt{読み方}2章で目的とモデルの考え方、3章でノートの関係と実行の順番をつかんでください。\textbf{自分のデータに使えるかは 4 章}、実行のしかたは 5 章、ノートごとの詳しい中身は 6 章です。困ったときは 8 章を見てください。
+\pt{関係する文書}結果の図と表の見方は、\file{05_材料ごとの機械学習データと予測検証データ/} の 2 つの説明書（\file{学習結果説明_材料別温度シフトGPR.pdf}・\file{学習結果説明_厚みごとの温度シフト.pdf}）にあります（2026 年 10 月 26 日までの結果で書いたもので、結果のフォルダの名前は当時の構成です）。記号・モデル名・列名の一覧は \file{results/学習結果説明_記号表.pdf} の「材料別 GPR」の章です。
+\pt{作り直し方}この PDF は、リポジトリ直下で \texttt{uv run python 04\_補助スクリプト/build\_mat\_nb\_manual.py} を実行すると作り直せます。学習データの列・結果のフォルダの名前・材料の表は、コード（\file{04_補助スクリプト/mat_common.py}）から取って入れています。
+\end{points}
+
+% =====================================================================
+\section{何のためのコードか}
+
+\subsection{目的}
+射出成形では、溶けた樹脂を金型の中に流し込みます。金型の中での流れやすさ（粘度）は、流れの速さと温度で大きく変わります。このフォルダのノートは、\textbf{金型の中を流れる樹脂の見かけの粘度 $\eta$ を、計測データから予測する機械学習のモデル}を、材料ごとに作って確かめるためのものです。手法は\textbf{ガウス過程回帰（GPR）}で、予測の値と一緒に、予測のばらつき（どれだけ確かか）も出せます。
+
+粘度の式としてよく使われる Cross-WLF 式では、「温度が変わると、粘度とせん断速度の関係の曲線が、形を保ったまま横や縦にずれる」と考えます。このずれを\textbf{温度のシフトファクター}と呼びます。このフォルダのノートは、\textbf{温度のシフトファクターの考え方を GPR の中に入れたモデル}を作り、次のことを調べます。
+
+\begin{enumerate}[itemsep=0.3ex,topsep=0.5ex]
+\item 温度のシフトファクターは、データで支持されるか（入れたほうが、データによく合うか）。
+\item シフトに使う温度は、\textbf{加熱シリンダ温度 $\Tset$}（設定値）と、\textbf{流動中樹脂温度 $\Tff$}（流れている樹脂の先端の温度の実測値。結果のフォルダ名では「型内樹脂温度」、発表資料では「金型内樹脂最高温度」）のどちらが適しているか。
+\item そのモデルで、学習に使っていない成形条件（射出速度の両端）の粘度を、どれだけ当てられるか。
+\item キャビティの厚みごとに見ても、1〜3 が成り立つか（③のノート）。
+\end{enumerate}
+
+\subsection{データと変数}
+\begin{points}
+\pt{目的変数}見かけの樹脂粘度 $\eta$（η34。Pa·s。自然対数 $\ln$ をとって学習する）。
+\pt{説明変数}せん断速度 $\gd$（γ34。1/s。$\ln$ をとる）、流動中樹脂圧力 \PIII（MPa。Pa に直して $\ln$）、流動中樹脂温度 $\Tff$（℃。K に直して $\ln$）、加熱シリンダ温度 $\Tset$（℃）。\textbf{キャビティ厚み $H$ は説明変数に入れません}（ユーザーの指定）。
+\pt{学習と検証}材料ごとに、\textbf{学習データ（5data）だけで学習し、検証データ（3data）だけで予測を確かめます}。検証データの成形条件は、学習データと重ならず、射出速度の範囲の外（遅い側＝低速側、速い側＝高速側）にあります。つまり、検証は「学習の範囲の外への予測（外挿）」の確かめです。
+\pt{材料}PP（バージン PP）、粉砕材混合 PP（PP に粉砕材を 25 wt\% 混ぜたもの）、GPPS。データは \file{05_材料ごとの機械学習データと予測検証データ/} の材料フォルダにあります（4.8 節）。
+\end{points}
+
+\subsection{モデル}
+\begin{table}[!htbp]
+\caption{比べるモデル。$f$ はガウス過程（GP）。どのモデルも両方の温度を使い、違うのは\textbf{シフトに使う温度}だけ}\label{tab:models}
+\small
+\begin{tabularx}{\linewidth}{@{}l>{\raggedright\arraybackslash}X@{}}
+\toprule
+モデル & 式と考え方 \\
+\midrule
+B\_Tset & $\ln\eta=\ln a_v(\Tset)+f(\ln\gd+\ln a_h(\Tset),\ \ln\PIII,\ \ln\Tff)$。加熱シリンダ温度で横・縦にずらす \\
+B\_Tff & $\ln\eta=\ln a_v(\Tff)+f(\ln\gd+\ln a_h(\Tff),\ \ln\PIII,\ \Tset)$。流動中樹脂温度で横・縦にずらす \\
+C（基準） & $\ln\eta=f(\ln\gd,\ \ln\PIII,\ \ln\Tff,\ \Tset)$。シフトの構造なし。4 つを並べただけの通常の GPR \\
+A\_Tset・A\_Tff & 縦だけずらす対案（$a_h=1$）。設定で選んだときだけ作る \\
+\midrule
+カーネル & 6月のノート（\file{01_機械学習コードフォルダ/原案_6月/GPR6月_ARD対応Matern52カーネル ＋ ホワイトノイズ.ipynb}）と同じ ARD Matern 5/2 ＋ ホワイトノイズに、線形項を足したもの（外挿で平均に戻らないように） \\
+シフトの式 & $a_h$（横）は「温度が変わると、同じ粘度になるせん断速度が $a_h$ 倍ずれる」、$a_v$（縦）は「同じせん断速度で、粘度が $a_v$ 倍になる」。基準温度 $T_{\mathrm{ref}}$ で 1。PP・粉砕材混合 PP はアレニウス型、GPPS は WLF 型（表 \ref{tab:mats}） \\
+係数の決め方 & シフトの係数（横と縦の 2 つ）を格子の上で動かし、各点で GPR を学習して、データへの合い具合（対数周辺尤度 LML）が最大の点を採る（プロファイル尤度） \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\begin{keybox}{読むときの注意：これは「成形条件だけから粘度を予測するモデル」ではありません}
+\PIII\ と $\Tff$ は、流れの結果として測られる量で、成形の前には分かりません。このモデルは「\textbf{測った流れの状態（$\gd$・\PIII・$\Tff$）と設定温度 → 粘度}」のモデルです。検証データの予測にも、検証データで測った \PIII\ と $\Tff$ を使います。また、$\Tff$ はせん断発熱で射出速度とともに変わるので、$\Tff$ でのシフトは、温度の効果だけでなく、曲線の形の調整も兼ねることがあります。
+\end{keybox}
+
+\subsection{ほかの検討との関係}
+\begin{points}
+\pt{本体の検討とは別}同じリポジトリの \file{01_機械学習コードフォルダ/検討お任せ/} の手順2〜5b のノートは、圧力と流動中樹脂温度を説明変数に\textbf{使わない}方針の、別の検討です（データも \file{02_検討お任せ用機械学習データ/} の別のファイル）。このフォルダのノートは、ユーザーの指定で、圧力 \PIII\ と $\Tff$ を説明変数に使います。2 つのモデルの記号（このフォルダの B\_Tset と、本体の B\_1 など）は別物です。
+\pt{基準}ノートの組み立て（設定エリア・図の見せ方・セルの番号の付け方）は、6月のノートにならっています。
+\end{points}
+
+% =====================================================================
+\section{ノートの関係と実行の順番}
+
+\begin{figure}[!htbp]
+\centering
+\begin{tikzpicture}[font=\small,
+  nb/.style={draw, rounded corners=3pt, align=center, minimum width=50mm, minimum height=17mm, fill=#1},
+  data/.style={draw, align=center, minimum width=32mm, minimum height=17mm, fill=gray!10},
+  arr/.style={-{Stealth[length=2.4mm]}, thick},
+  lab/.style={font=\footnotesize, align=center, inner sep=1.5pt}]
+\node[data] (csv) {材料ごとの CSV\\学習データ（5data）\\検証データ（3data）};
+\node[nb=blue!8, right=10mm of csv] (study) {\textbf{① シフトファクター検討用}\\温度の列ごとのシフトと\\基準の C を比べる};
+\node[nb=orange!12, right=15mm of study] (thick) {\textbf{③ 厚みごとの比較}\\①のモデルを\\厚みごとに見直す};
+\node[nb=green!10, below=22mm of study] (train) {\textbf{② 学習用}\\設定 \texttt{SHIFT\_COL} の\\1 つのモデルを学習};
+\node[nb=gray!10, below=22mm of thick] (res) {\textbf{学習結果フォルダ}（材料ごと）\\3 つのノートが、それぞれの\\場所に結果を書く（5.4 節）};
+\draw[arr] (csv) -- (study);
+\draw[arr] (csv) |- (train);
+\draw[arr] (study) -- node[lab, above=1pt] {学習済み} node[lab, below=1pt] {モデル} (thick);
+\draw[arr, dashed] (study) -- node[lab, left=2pt] {まとめの \texttt{SHIFT\_COL} の\\候補を見て人が決め、\\②の設定に書く} (train);
+\draw[arr, gray] (train) -- (res);
+\draw[arr, gray] (thick) -- (res);
+\draw[arr, gray] (study.south east) -- (res.north west);
+\end{tikzpicture}
+\caption{3 つのノートの関係。実線はノートが読むもの、破線は人が決めること}\label{fig:flow}
+\end{figure}
+
+\begin{enumerate}[itemsep=0.4ex,topsep=0.5ex]
+\item \textbf{①シフトファクター検討用を実行する}。最後の「まとめ」に、材料ごとに「学習用のノートの \file{SHIFT_COL} の候補」が出ます（温度のシフトがデータで最も強く支持された列。どれも支持されなければ、シフトなしの \file{None} も候補）。
+\item \textbf{②学習用の設定 \file{SHIFT_COL} を決めて、実行する}。候補を参考に、3data の誤差なども見て、人が決めます。決まっていれば、①を飛ばして②だけを実行してもかまいません（2026 年 10 月 23 日の結果では、全ショット版で B\_Tset が支持され、既定の \file{SHIFT_COL} は加熱シリンダ温度です）。
+\item \textbf{③厚みごとの比較は、①の後で実行する}（②とは独立）。①と同じ入力の取り方（\file{INPUT_MODE}）にし、①の比べる列（\file{SHIFT_COLS}）は既定のままにしておきます（③は B\_Tset・B\_Tff・C の 3 つのモデルを読むため）。
+\end{enumerate}
+解説付きの版は、元のノートと同じ動きをするので、どちらか一方を実行すれば十分です（同じ学習結果フォルダを選ぶと、結果は上書きされます）。
+
+% =====================================================================
+\section{使えるデータ（学習ファイルの条件）}
+
+\begin{keybox}{このノートが使えるのは、次をすべて満たすデータです}
+\begin{enumerate}[leftmargin=1.8\zw,itemsep=0.2ex,topsep=0.2ex]
+\item 射出成形の流動の計測（矩形平板のキャビティ、圧力センサ 3・4 の間）から求めた、見かけの粘度とせん断速度のデータで、\textbf{1 行が 1 ショット}の CSV。
+\item 材料ごとに、\textbf{学習用と検証用の 2 つのファイル}があり、2 つで成形条件（設定温度・厚み・射出速度の組）が重ならない（4.1 節）。
+\item 文字コードが \textbf{UTF-8}（4.2 節）。
+\item \textbf{列名が表 \ref{tab:cols} のとおり}（列名は今後も変えない、というユーザーの決定に合わせて作ってある）。\PIII\ と流動中樹脂温度の列が必須（4.3 節）。
+\item 「元ファイル」の列が、決まった形式のファイル名で、厚み・射出速度・設定温度の列と食い違わない（4.4 節）。
+\item 材料が \textbf{PP・粉砕材混合 PP・GPPS のどれか}。設定温度が 3 水準あり、基準温度がその範囲の中にある（4.5 節）。
+\end{enumerate}
+ファイルの名前と置き場所は自由です（実行のときにダイアログで選びます）。
+\end{keybox}
+
+\subsection{ファイルの組}
+\begin{points}
+\pt{2 つのファイル}材料ごとに、学習データ（5data）の CSV と、検証データ（3data）の CSV を 1 つずつ選びます。どちらも、全条件・全ショットを 1 つにまとめた「結合ファイル」です。
+\pt{条件が重ならないこと}学習と検証で、同じ成形条件（設定温度・厚み・射出速度の組）があると、読み込みで止まります（例：同じファイルを 2 回選んだとき）。
+\pt{検証は外挿を想定}検証データの各行は、学習データの射出速度の範囲より遅いと「低速側」、速いと「高速側」、範囲の中なら「範囲内」に分けて集計されます。検証データがすべて「範囲内」だと、学習と検証のファイルを逆に選んだおそれがあるので、判定が ★ になります（止まりはしません）。
+\pt{ショット数}1 条件あたりのショット数は決まっていません（今のデータは 4.8 節の表）。条件ごとの平均版（5.6 節）は、条件ごとに平均します。
+\end{points}
+
+\subsection{文字コード}
+CSV は \textbf{UTF-8}（BOM 付きでも、なしでもよい）で保存してください。Excel の「CSV（コンマ区切り）」で保存すると Shift-JIS になり、読み込みで \file{UnicodeDecodeError} になって止まります。Excel では「CSV UTF-8（コンマ区切り）」を選びます。
+
+\subsection{列}
+\begin{table}[!htbp]
+\caption{学習ファイルの列（1 行目の列名は、この表のとおりに書く。列の順番は自由）}\label{tab:cols}
+\small
+\begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}p{0.30\linewidth}>{\raggedright\arraybackslash}p{0.11\linewidth}l>{\raggedright\arraybackslash}X@{}}
+\toprule
+列名 & 必須か & 単位 & 意味と使い道 \\
+\midrule
+\file{元ファイル} & 必須 & ― & 1 ショットの計測ファイルの名前（形式は 4.4 節） \\
+\file{キャビ厚} & 必須 & mm & キャビティ厚み $H$（モデルの入力には使わない。条件の区別・外れ値の検知・厚みごとの比較に使う） \\
+\file{射出速度[mm/s]} & 必須 & mm/s & 射出速度（条件の区別、検証の低速側・高速側の分け方に使う） \\
+\file{樹脂粘度η34(Pa・s)} & 必須 & Pa·s & 見かけの樹脂粘度 $\eta$（\textbf{目的変数}） \\
+\file{せん断速度γ34(1/s)} & 必須 & 1/s & 見かけのせん断速度 $\gd$（説明変数） \\
+\file{流動中樹脂圧力P3_1(MPa)} & 任意 & MPa & 流動中樹脂圧力 P3\_1（モデルには使わない。P3\_3 との相関を見るだけ） \\
+\file{流動中樹脂圧力P3_2(MPa)} & 任意 & MPa & 流動中樹脂圧力 P3\_2（同上） \\
+\file{流動中樹脂圧力P3_3(MPa)} & 必須 & MPa & 流動中樹脂圧力 \PIII（説明変数） \\
+\file{加熱シリンダ温度[℃]} & どちらか（なくても可） & ℃ & 加熱シリンダ温度 $\Tset$（説明変数）。2 通りの書き方のどちらか。列がなければ元ファイル名から取る \\
+\file{加熱シリンダ温度(℃)} & どちらか（なくても可） & ℃ & 加熱シリンダ温度 $\Tset$（説明変数）。2 通りの書き方のどちらか。列がなければ元ファイル名から取る \\
+\file{流動中樹脂温度(℃)} & 必須 & ℃ & 流動中樹脂温度 $\Tff$（説明変数。型内樹脂温度） \\
+\bottomrule
+\end{tabularx}
+\end{table}
+\begin{points}
+\pt{表にない列}1 つでもあると、\file{想定にない列がある} で止まります（列の名前の書き間違いに気づくため）。メモなどの列は、消してから選んでください。
+\pt{空欄}必須の列に空欄があると、\file{欠損がある} で止まります。
+\pt{0 以下の値}$\eta$・$\gd$・\PIII\ が 0 以下の行は、対数がとれないので、自動で除いて判定を ★ にします。問題データ一覧（4.6 節）に「除外」で登録すると、★ は消えます。
+\pt{加熱シリンダ温度}列名は \file{加熱シリンダ温度[℃]}（PP・粉砕材混合 PP のファイル）と \file{加熱シリンダ温度(℃)}（GPPS のファイル）のどちらでもかまいません。列がないファイル（今の PP の検証データ）は、元ファイル名から設定温度を取ります。
+\end{points}
+
+\subsection{元ファイル名の形式}
+「元ファイル」の列は、次の正規表現に合うファイル名でなければなりません（合わない行が 1 つでもあると止まります）。
+\begin{Verbatim}[frame=single,fontsize=\small,xleftmargin=1em]
+^(\d{3})_(\d+)℃_(\d{3})_([\d.]+)mm[A-Za-z]*\.csv$
+\end{Verbatim}
+例：\file{001_190℃_020_0.5mm.csv}（ショット番号 3 桁 \_ 設定温度 ℃ \_ 射出速度 3 桁 \_ 厚み mm）、GPPS は末尾に英字が付く \file{001_200℃_010_1.0mmNR.csv}。ファイル名の厚み・射出速度・設定温度は、列の値と一致していなければなりません（食い違うと止まります）。ショット番号は、問題データ一覧で 1 ショットだけを除くときに使います。
+
+\subsection{材料と温度}
+\begin{table}[!htbp]
+\caption{ノートが扱える材料。設定 \file{MATERIALS} には、左の記号を書く}\label{tab:mats}
+\small
+\begin{tabularx}{\linewidth}{@{}ll>{\raggedright\arraybackslash}p{0.25\linewidth}>{\raggedright\arraybackslash}X r@{}}
+\toprule
+記号 & 名前 & 05 フォルダの材料フォルダ & シフトファクターの式 & $T_{\mathrm{ref}}$ \\
+\midrule
+\file{PP} & PP & \file{01_バージンPP再々実験} & アレニウス型（係数 $\Eh$・$\Ev$、kJ/mol） & 210 ℃ \\
+\file{MIX} & 粉砕材混合PP & \file{02_粉砕材混合PP実験} & アレニウス型（係数 $\Eh$・$\Ev$、kJ/mol） & 210 ℃ \\
+\file{GPPS} & GPPS & \file{03_GPPS実験} & WLF 型（係数 $A_{1,h}$・$A_{1,v}$。$A_2=51.6$ K、$D_2=T_g$〔仮置き 100 ℃〕を固定） & 220 ℃ \\
+\bottomrule
+\end{tabularx}
+\end{table}
+\begin{points}
+\pt{ほかの材料}この 3 つ以外の材料は、そのままでは使えません（設定 \file{MATERIALS} に書くと \file{KeyError} で止まります）。使うには、\file{04_補助スクリプト/mat_common.py} の \file{MAT_NAMES}・\file{MAT_FOLDERS} と、各ノートの設定 \file{SHIFT_CFG}（シフトの式・基準温度・係数の格子）に足して、ノートを作り直す必要があります（7 章）。
+\pt{設定温度}学習・検証とも 3 水準あることを想定しています（足りなければ判定が ★）。基準温度 $T_{\mathrm{ref}}$ は、学習データの設定温度の範囲の中にある必要があります（外なら ★。材料とファイルの組み合わせを確かめる）。
+\pt{GPPS のガラス転移温度}WLF 型の $T_g$ は仮置き（100 ℃）です。分かれば、設定 \file{SHIFT_CFG} の \file{"Tg"} を直します。
+\end{points}
+
+\subsection{問題データ一覧}
+計測の失敗などで除きたい条件やショットは、\file{05_材料ごとの機械学習データと予測検証データ/問題データ一覧.csv}（Excel で開ける）に 1 行ずつ書きます。\textbf{どこにあるファイルを選んでも、この一覧が使われます}。「区分」が「除外」の行（「再測定」が「済み」でないもの）を、ノートが読み込みのときに除きます。「材料」の列には表 \ref{tab:mats} の名前、「ショット」の列にはショット番号（空欄なら条件全体。\file{2;3} のように複数書ける）を書きます。設定 \file{USE_EXCLUSIONS = False} にすると、一覧を使わずに全部の行で学習します。
+
+\subsection{使えない例}
+表 \ref{tab:ng} は、実際にノートの読み込みの部品で試した結果です（2026 年 10 月 28 日）。
+\begin{table}[!htbp]
+\caption{使えないファイルと、止まるときのメッセージ}\label{tab:ng}
+\small
+\begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}p{0.38\linewidth}>{\raggedright\arraybackslash}X@{}}
+\toprule
+ファイル & どうなるか \\
+\midrule
+本体の検討のデータ（\file{02_検討お任せ用機械学習データ/} の結合ファイル） & \PIII\ の列がないので、\file{必要な列がない: ['P33']} で止まる \\
+旧データ（6月の発表のときの \file{学習データ6月発表時.csv}） & 列名が違う（\file{キャビティ厚み}・\file{射出率} など）ので、\file{想定にない列がある} で止まる \\
+表 \ref{tab:cols} にない列を足したファイル & \file{想定にない列がある} で止まる \\
+必須の列に空欄があるファイル & \file{欠損がある} で止まる \\
+元ファイル名の形式が違う（例：\file{℃} が \file{C}） & \file{元ファイル名の形式に合わない行がある} で止まる \\
+元ファイル名と厚みの列が食い違う & \file{元ファイル名と、厚み・射出速度の列が一致しない} で止まる \\
+Shift-JIS で保存した CSV & \file{UnicodeDecodeError} で止まる \\
+学習と検証に同じファイル & \file{学習と検証で条件が重なっている} で止まる \\
+表 \ref{tab:mats} にない材料（例：\file{"ABS"}） & \file{KeyError} で止まる \\
+\midrule
+$\eta$ が 0 以下の行があるファイル & 止まらない。その行を除いて読み、判定が ★ \\
+BOM なしの UTF-8 & そのまま読める \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{今のデータ}
+05 フォルダにある今のデータ（問題データ一覧の「除外」を除いた後）は、表 \ref{tab:data} のとおりです。ノートの既定の設定と、2 つの結果の説明書は、このデータで作りました。
+\begin{table}[!htbp]
+\caption{05 フォルダの今のデータ。行は使う行の数（括弧の中は条件の数）}\label{tab:data}
+\small
+\begin{tabularx}{\linewidth}{@{}llrc>{\raggedright\arraybackslash}p{0.12\linewidth}>{\raggedright\arraybackslash}p{0.13\linewidth}>{\raggedright\arraybackslash}X@{}}
+\toprule
+材料 & 組 & 行（条件） & ショット/条件 & 設定温度 [℃] & 厚み [mm] & 射出速度 [mm/s] \\
+\midrule
+PP & 学習（5data） & 460（93） & 4〜5 & 190・210・230 & 0.5・1・1.5・2 & 10・20・40・80・120・160・200・240 \\
+PP & 検証（3data） & 93（32） & 2〜3 & 190・210・230 & 0.5・1・1.5・2 & 3・5・280・320 \\
+粉砕材混合PP & 学習（5data） & 459（93） & 4〜5 & 190・210・230 & 0.5・1・1.5・2 & 10・20・40・80・120・160・200・240 \\
+粉砕材混合PP & 検証（3data） & 101（36） & 1〜3 & 190・210・230 & 0.5・1・1.5・2 & 3・5・280・320 \\
+GPPS & 学習（5data） & 342（72） & 3〜5 & 200・220・240 & 1・1.5・2 & 10・20・40・80・120・160・200・240 \\
+GPPS & 検証（3data） & 80（30） & 1〜3 & 200・220・240 & 1・1.5・2 & 3・5・280・320 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+% =====================================================================
+\section{共通の使い方}
+
+\subsection{準備}
+\begin{points}
+\pt{開き方}VS Code で、リポジトリ直下のフォルダ（\file{04_補助スクリプト} があるフォルダ）を開き、ノートを開きます。ノートは、自分の場所から上へたどって \file{04_補助スクリプト} を探すので、フォルダの中のどこに置いても動きます。
+\pt{カーネル}右上の「カーネルの選択」で、このプロジェクトの \file{.venv}（Python の仮想環境。\texttt{uv sync} で作る）を選びます。
+\pt{フォント}図の日本語に IPAexGothic を使います。入っていないと、2 つ目のセルで止まります。
+\pt{実行}メニューの「すべて実行」で、上から順に実行します。ノートは、結果を消した状態（未実行）で置いてあります。
+\end{points}
+
+\subsection{設定エリア}
+各ノートの最初のコードのセル（「セル1：設定エリア」）だけを直して、最初から実行し直します。ほかのセルは直しません。主な共通の設定は表 \ref{tab:settings} のとおりです。
+\begin{table}[!htbp]
+\caption{3 つのノートに共通する主な設定}\label{tab:settings}
+\small
+\begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}p{0.25\linewidth}>{\raggedright\arraybackslash}X@{}}
+\toprule
+設定 & 意味（既定） \\
+\midrule
+\file{MATERIALS} & 実行する材料（\file{["PP", "MIX", "GPPS"]}。1 つだけにすると速い） \\
+\file{INPUT_MODE} & 入力の取り方（\file{"shot"}：ショットごとの値＝全ショット版。既定／\file{"cond"}：条件ごとの平均＝条件ごとの平均版。5.6 節） \\
+\file{FILES} & ダイアログを使わずにファイルとフォルダを決めるとき（5.3 節。既定は空で、ダイアログで選ぶ） \\
+\file{SEED} & 乱数シード（42）。同じ値なら同じ結果になる \\
+\file{N_RESTARTS} & 最終モデルの最適化のやり直し回数（20） \\
+\file{PROFILE_RESTARTS} & プロファイル尤度の格子の各点でのやり直し回数（1。0 にすると時間が約半分） \\
+\file{USE_EXCLUSIONS} & 問題データ一覧の「除外」を除くか（\file{True}） \\
+\file{SHIFT_CFG} & 材料ごとのシフトの式・基準温度・係数を調べる範囲（①・②） \\
+\file{FIG_DPI}、\file{SHOW_FIGS} & 保存する図の解像度（600 dpi）、図をノートにも表示するか \\
+\file{N_JOBS} & 並列に計算する数（8。CPU の数に合わせる） \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{ファイルとフォルダを選ぶ（ダイアログ）}
+実行の始め（①②は「2. ファイルを選んで、データを読み込む」のセル、③は「2. 学習済みモデルとデータの読み込み」のセル）で、材料ごとにダイアログが開きます。
+\begin{points}
+\pt{①・②}材料ごとに 3 回：学習データ（5data）の CSV → 検証データ（3data）の CSV → 学習結果フォルダ。3 材料なら 9 回です。全部選ぶと、あとは最後まで自動で進みます。
+\pt{③}材料ごとに 1 回：①で選んだ学習結果フォルダ。データの場所は、①の学習済みモデルに記録されたものを使います（見つからないときだけ、ダイアログで選びます）。
+\pt{学習結果フォルダ}結果を保存するフォルダです。\textbf{材料ごとに別のフォルダ}を選びます（同じフォルダを 2 つの材料で選ぶと止まります）。新しく作るときは、ダイアログの「新しいフォルダー」で作ります。①②③で同じフォルダを選ぶと、結果が 1 か所にそろいます（ノートごとに別の場所に書くので、互いに上書きはしません）。場所が深すぎると、中のファイルの場所が Windows の上限（260 文字）を超えるおそれがあり、注意が出ます。
+\pt{見当たらないとき}ダイアログが VS Code の後ろに隠れていることがあります。タスクバーで探してください。キャンセルすると、そこで止まります（そのセルから実行し直します）。
+\pt{\file{FILES}}毎回同じファイルを使うときは、設定 \file{FILES} に書くと、ダイアログは出ません（相対パスは、リポジトリ直下から）。プロジェクトの外のファイルは、ここに書かずにダイアログで選んでください。
+\end{points}
+\begin{Verbatim}[frame=single,fontsize=\small,xleftmargin=1em]
+FILES = {"PP": {
+    "学習": r"05_材料ごとの機械学習データと予測検証データ\01_バージンPP再々実験"
+            r"\学習データ_pp_max_5data\結合_03_pp_max_5data_外れ値なし.csv",
+    "検証": r"…\結合_05_pp_max_3data(no1.5-3.0)_外れ値なし.csv",
+    "結果": r"…\PPの学習結果"}}
+\end{Verbatim}
+
+\subsection{結果の構成}
+3 つのノートは、選んだ学習結果フォルダの中に、図 \ref{fig:tree} の形で結果を書きます。モデルのフォルダの名前は表 \ref{tab:dirs} のとおりです。同じフォルダを選んで実行し直すと、上書きされます。
+\begin{figure}[!htbp]
+\small
+\dirtree{%
+.1 <学習結果フォルダ>/\DTcomment{材料ごとにダイアログで選ぶ}.
+.2 データ確認/\DTcomment{データの概要・一覧で除いた行（①②）、外れ値の検知・\PIII\ の性質（②）}.
+.2 全ショット版/\DTcomment{\file{INPUT_MODE = "shot"}（既定）}.
+.3 全厚み総合/\DTcomment{全厚みの 5data で 1 つのモデルを学習した結果}.
+.4 \file{B_Tset_温度シフトに加熱シリンダ温度採用}/\DTcomment{②学習用（\file{SHIFT_COL} で選んだモデルの名前）}.
+.4 シフトファクターの検討/\DTcomment{①検討用：モデルを比べる表と図}.
+.5 \file{B_Tset_温度シフトに加熱シリンダ温度採用}/\DTcomment{①の各モデル}.
+.5 \file{B_Tff_温度シフトに型内樹脂温度採用}/.
+.5 \file{C_温度シフトなし}/.
+.3 厚みごと/\DTcomment{③厚みごとの比較}.
+.4 学習結果グラフ/.
+.4 温度シフトの確認/.
+.4 シフトに使う温度/.
+.4 厚みごとのモデルと総合の比較/.
+.4 {判定の一覧.csv}.
+.2 条件ごとの平均版/\DTcomment{\file{INPUT_MODE = "cond"}（同じ構成）}.
+}
+\caption{学習結果フォルダの中の構成}\label{fig:tree}
+\end{figure}
+\begin{table}[!htbp]
+\caption{モデルのフォルダの名前（記号\_学習方法の短い説明。型内樹脂温度＝流動中樹脂温度 $\Tff$）}\label{tab:dirs}
+\small
+\begin{tabularx}{\linewidth}{@{}l>{\raggedright\arraybackslash}p{0.47\linewidth}>{\raggedright\arraybackslash}X@{}}
+\toprule
+記号 & フォルダの名前 & 意味 \\
+\midrule
+B\_Tset & \file{B_Tset_温度シフトに加熱シリンダ温度採用} & 設定温度 Tset で横・縦にシフト \\
+B\_Tff & \file{B_Tff_温度シフトに型内樹脂温度採用} & 流動中樹脂温度 Tff で横・縦にシフト \\
+A\_Tset & \file{A_Tset_縦だけの温度シフトに加熱シリンダ温度採用} & Tset で縦だけシフト \\
+A\_Tff & \file{A_Tff_縦だけの温度シフトに型内樹脂温度採用} & Tff で縦だけシフト \\
+C & \file{C_温度シフトなし} & シフト構造なし。4 変数を並べた通常の GPR \\
+\bottomrule
+\end{tabularx}
+\end{table}
+\begin{points}
+\pt{図}すべて 600 dpi の PNG 1 枚だけを保存します（報告書・発表資料にそのまま使える大きさ）。
+\pt{Git}学習結果フォルダをリポジトリの中に置いた場合、この構成の PNG と学習済みモデル（\file{.joblib}）は Git の管理外です（\file{.gitignore}）。CSV は管理されます。
+\pt{前の結果}2026 年 10 月 26 日までの結果は、\file{05_…/<材料フォルダ>/<材料フォルダ>_学習結果/} の \file{ショットごとの入力/}・\file{条件平均の入力/} に、当時の構成のまま残してあります（2 つの結果の説明書と発表資料が読むため）。
+\end{points}
+
+\subsection{判定}
+各節の最後に、\file{>> 判定：OK}（想定どおり）か \file{>> 判定：★要確認}（想定と違う、または結果を読むときに注意が要る点）が出ます。基準は判定の文の中に書いてあります。\textbf{★ はエラーではありません}。結果を読むときの目印です。最後の節に、判定の一覧が表で出ます（\file{判定の一覧.csv} にも保存）。
+
+\subsection{全ショット版と条件ごとの平均版}
+設定 \file{INPUT_MODE} で、$\gd$・\PIII・$\Tff$ をどう入れるかを選びます。
+\begin{points}
+\pt{全ショット版（\file{"shot"}。既定）}1 ショットを 1 つのデータとして、ショットごとの値で学習します（6月のノートと同じ入れ方。ユーザーの決定、2026 年 10 月 23 日）。GP が同じ条件の中のショットのゆれに合わせるので、曲線が波打ち、検証データの低速側が外れやすいことが分かっています。
+\pt{条件ごとの平均版（\file{"cond"}）}同じ成形条件のショットの値を平均して入れます（参考）。曲線が滑らかになり、検証の誤差は小さめです。
+\end{points}
+どちらの温度でシフトするのがよいかは、この選び方にも左右されます（全ショット版では B\_Tset、条件ごとの平均版では B\_Tff が支持された）。
+
+% =====================================================================
+\section{ノートごとの説明}
+
+\subsection{① シフトファクター検討用}
+\begin{points}
+\pt{ファイル}\file{材料別_温度シフトファクター検討用コード/材料別_温度シフトファクターの検討_ARD対応Matern52＋線形＋ホワイトノイズ.ipynb}
+\pt{目的}温度のデータ列ごとに、シフトファクターを推定して、シフトのない基準のモデル C と比べ、\textbf{どの列をシフトに使うのが適しているか}を調べます。②で使う列（\file{SHIFT_COL}）を決める材料にします。
+\pt{主な設定}\file{SHIFT_COLS}：比べる列（既定 \file{["加熱シリンダ温度[℃]", "流動中樹脂温度(℃)"]}。B\_Tset・B\_Tff ができる。C はいつも学習する）。\file{STRUCTS}：シフトの形（\file{["B"]}。\file{["B", "A"]} で対案 A も）。\file{MAIN_KEY}：図をノートに表示するモデル。
+\pt{時間}3 材料で、全ショット版 約 40 分、条件ごとの平均版 約 80 分（大部分はプロファイル尤度）。
+\end{points}
+\begin{table}[!htbp]
+\caption{①の節の流れ}\label{tab:study}
+\small
+\begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}p{0.27\linewidth}>{\raggedright\arraybackslash}X@{}}
+\toprule
+節 & すること（主な判定） \\
+\midrule
+2. データの読み込み & ファイルを選んで読む（設定温度が 3 水準・0 以下の値の行・基準温度の範囲・検証が範囲の外にあるか） \\
+3. 係数の推定 & モデルごとに、シフトの係数をプロファイル尤度で決める。最良の点と係数 0（シフトなし）の 2 点を念入りに最適化し、LML の差 $\Delta$LML を出す（係数が格子の端でないか、\textbf{$\Delta$LML が 3.0 以上か}） \\
+4. 基準の C & シフトのないモデルを学習し、ハイパーパラメータの表を作る（LML、ノイズが下限に張り付いていないか） \\
+5. シフトファクター & 温度ごとの倍率の図と、マスターカーブ（シフトで温度ごとの曲線が重なるか。\textbf{低温ほど粘い向きか}） \\
+6. 3data の予測 & 誤差（RMSE）と 95\% 予測区間に入る割合（\textbf{C の 1.1 倍以内か}、入る割合が 0.8 以上か）、RMSE の比較の図 \\
+7. 保存 & 学習済みモデル（③が読む） \\
+8. まとめ & 判定の一覧と、材料ごとの「\file{SHIFT_COL} の候補」（$\Delta$LML が 3.0 以上で最大の列） \\
+\bottomrule
+\end{tabularx}
+\end{table}
+\textbf{出力}：\file{<版>/全厚み総合/シフトファクターの検討/} の直下に、比べる表と図（\file{シフトファクターの推定.csv}〔係数と $\Delta$LML〕、\file{シフトファクター.png}、\file{流動曲線_シフト前.png}、\file{シフトファクターの倍率.csv}、\file{ハイパーパラメータ.csv}、\file{予測検証_3data_指標.csv}、\file{予測検証_RMSEの比較.png}、\file{判定の一覧.csv}、\file{まとめ.csv}）。その下のモデルのフォルダに、プロファイル尤度・マスターカーブ・パリティ図・3data の予測値・学習済みモデル（\file{学習済みモデル_<モデル>.joblib}）。
+
+\subsection{② 学習用}
+\begin{points}
+\pt{ファイル}\file{材料別_温度シフト機械学習コード/材料別_温度シフトGPR_ARD対応Matern52＋線形＋ホワイトノイズ.ipynb}
+\pt{目的}シフトに使う列を 1 つ決めて、\textbf{そのモデルを学習し、データの確認から報告書用の図まで一式を作ります}。6月のノートの図（損失関数の推移・特徴スケール・カーネル行列・依存性グラフ・せん断速度 ― 粘度・3次元グラフ）を、同じ見せ方で作ります。
+\pt{主な設定}\file{SHIFT_COL}：シフトに使う列（学習ファイルの列名で書く）。\file{"加熱シリンダ温度[℃]"}（既定。B\_Tset）、\file{"流動中樹脂温度(℃)"}（B\_Tff）、\file{None}（シフトなし。C）。GPPS の書き方 \file{"加熱シリンダ温度(℃)"}、短い名前 \file{"Tset"}・\file{"Tff"} も使えます。温度でない列を書くと止まります。\file{SHIFT_STRUCT}：\file{"B"}（横・縦）か \file{"A"}（縦だけ）。そのほか、外れ値を一覧に登録する材料（\file{OUTLIER_REGISTER}）、参考の Cross-WLF の設定（\file{CWLF_*}）。
+\pt{時間}3 材料で、全ショット版 約 25 分、条件ごとの平均版 約 45 分（C なら約 10 分）。
+\end{points}
+\begin{table}[!htbp]
+\caption{②の節の流れ（括弧の中は 6月のノートの対応するセル）}\label{tab:train}
+\small
+\begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}p{0.27\linewidth}>{\raggedright\arraybackslash}X@{}}
+\toprule
+節 & すること（主な判定） \\
+\midrule
+2. データの読み込み & ①と同じ \\
+3. 外れ値の検知 & 条件の平均が、ほかの条件からの予測と大きく違う条件を拾う（規則 f）。PP・粉砕材混合 PP は、拾った条件が問題データ一覧に登録済みか。見直しの候補（問題の候補）の表も作る \\
+4. \PIII\ の性質 & \PIII\ が粘度の算出式の圧力でないか（リークの目安） \\
+5. 学習 & シフトの係数のプロファイル尤度と念入りな最適化（①と同じ）、最終モデル、損失関数の推移・特徴スケール・カーネル行列（セル5〜8） \\
+6. シフトファクター & 倍率の図とマスターカーブ（①と同じ） \\
+7. 依存性グラフ & 各説明変数を動かしたときの粘度（せん断速度を上げると粘度が下がるか、温度を上げると下がるか。セル9） \\
+8. 3data の予測 & 誤差と予測区間（セル10） \\
+9. Cross-WLF との比較 & 参考に、6月と同じ Cross-WLF 式を当てはめて比べる（セル10.5・11） \\
+10. せん断速度 ― 粘度 & 学習結果グラフ（厚みごと・設定温度ごと・全厚み共通・拡張版）と、6月のセル9-2 と同じ依存性グラフ（セル16・16-2） \\
+11. 3次元グラフ & 2 つの説明変数に対する粘度の面（セル12〜15） \\
+12. 保存・13. まとめ & 学習済みモデル、判定の一覧とまとめの表 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+\begin{points}
+\pt{図だけを描き直す}セル16・16-2・17（せん断速度 ― 粘度、依存性グラフ、3次元グラフ）は、セルの先頭に専用の設定エリアがあり、全体を一度実行した後で、\textbf{そのセルだけを直して実行し直せます}（学習はやり直しません）。軸の範囲・図の大きさ・文字の大きさ・タイトルなどを変えられます。
+\pt{出力}\file{<版>/全厚み総合/<モデルのフォルダ>/}（例：\file{B_Tset_温度シフトに加熱シリンダ温度採用/}）に、すべての図・表・判定の一覧・まとめ・学習済みモデル。中に \file{せん断速度_粘度/}・\file{せん断速度_粘度_拡張版/}・\file{依存性グラフ_セル9-2/}・\file{3次元グラフ/}。外れ値の検知と \PIII\ の性質は \file{データ確認/}。
+\end{points}
+
+\subsection{③ 厚みごとの比較}
+\begin{points}
+\pt{ファイル}\file{材料別_温度シフトファクター検討用コード/材料別_温度シフトGPR_ARD対応Matern52＋線形＋ホワイトノイズ_厚みごとの比較.ipynb}
+\pt{目的}①で全厚みのデータから学習したモデルを、\textbf{キャビティ厚みごとに}見直します。調べることは 3 つです：厚みごとに温度シフトが効いているか（4 節）、厚みごとにシフトに使う温度は $\Tff$ と $\Tset$ のどちらが適しているか（5〜8 節）、厚みごとに学習したモデルと全厚みのモデルのどちらがよいか（9 節）。
+\pt{前提}①を、同じ \file{INPUT_MODE} で、\file{SHIFT_COLS} を既定のままにして実行しておくこと。厚みが 2 水準以上あるデータを想定しています。
+\pt{主な設定}\file{THICK_PROFILE}（厚みごとのプロファイル尤度と 9 節を行うか。\file{False} で速くなる）、\file{THICK_MODELS}（9 節）、差ありとする基準 \file{A_CLEAR}（0.5 ポイント）・\file{DL_CLEAR}（3.0）・\file{ERR_CLEAR}（1.0 ポイント）、学習結果グラフの点 \file{FLOW_POINTS}。
+\pt{時間}3 材料で約 10 分。
+\end{points}
+\begin{table}[!htbp]
+\caption{③の節の流れ}\label{tab:thick}
+\small
+\begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}p{0.27\linewidth}>{\raggedright\arraybackslash}X@{}}
+\toprule
+節 & すること（主な判定） \\
+\midrule
+2. 読み込み & ①の学習済みモデルと 3data の予測値を読み、予測し直して一致するか（データとモデルの組み合わせが正しいか） \\
+3. 学習結果グラフ & 厚みごとのせん断速度 ― 粘度の図（B\_Tset と B\_Tff） \\
+4. シフトの確認 & 厚みごとに、温度の順序・温度による粘度の比・換算でずれが減るか。○・△・× で判定 \\
+5〜7. (a)(b)(c) & 厚みごとに、(a) 係数を決め直した重ね合わせのずれ、(b) 厚みごとの LML の差、(c) 3data の誤差で、$\Tff$ と $\Tset$ を比べる \\
+8. まとめ & (a)(b)(c) の多数決で、厚みごとに適した温度（$\Tff$・$\Tset$・差なし） \\
+9. 厚みごとと総合 & 厚みごとの 5data で学習したモデルと、全厚みのモデルの 3data の誤差の比較 \\
+10. 判定の一覧 & すべての判定の表 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+\textbf{出力}：\file{<版>/厚みごと/} の \file{学習結果グラフ/}（3 節）、\file{温度シフトの確認/}（4 節）、\file{シフトに使う温度/}（5〜8 節）、\file{厚みごとのモデルと総合の比較/}（9 節）と、直下の \file{判定の一覧.csv}。
+
+\subsection{解説付きの版}
+\begin{points}
+\pt{ファイル}\file{材料別_温度シフト機械学習コード/解説付き_材料別_温度シフトGPR_ARD対応Matern52＋線形＋ホワイトノイズ.ipynb} と \file{材料別_温度シフトファクター検討用コード/解説付き_材料別_温度シフトファクターの検討_ARD対応Matern52＋線形＋ホワイトノイズ.ipynb}
+\pt{何か}①・②と同じコードの各行の上に、Python 初心者向けの解説の行（\texttt{\#} ▶ で始まるコメント）を差し込んだものです。最初のセルに、Python の書き方の基本の表があります。コメントは実行に影響しないので、\textbf{実行すると元のノートと同じ結果が、同じ場所に保存されます}。
+\pt{使い方}コードを読んで学ぶときに使います。実行は、元のノートと解説付きの版のどちらか一方で十分です。③には解説付きの版はありません。
+\end{points}
+
+% =====================================================================
+\section{補助のスクリプトと、ノートの直し方}
+
+\subsection{乱数シードの確認（mat\_seed\_check.py）}
+最適化の出発点（乱数シード）を変えて最終モデルを学習し直し、LML と 3data の誤差がどれだけばらつくかを調べます。モデルの優劣が、最適化の運に左右されていないかの確認です。①を実行した後で、リポジトリ直下から次のように実行します（材料ごとに、①で選んだ学習結果フォルダをダイアログで選びます。\texttt{PP=<フォルダ>} のように書くと、その材料だけをダイアログなしで調べます）。結果は \file{シフトファクターの検討/} の \file{乱数シードの確認*.csv}・\file{.png} です。
+\begin{Verbatim}[frame=single,fontsize=\small,xleftmargin=1em]
+uv run python 04_補助スクリプト/mat_seed_check.py shot 5 20
+\end{Verbatim}
+
+\subsection{ノートの直し方}
+ノートは、\file{04_補助スクリプト/} の生成スクリプトで作っています。\textbf{ノートを直接直すと、次に作り直したときに消えます}。直すときは、元のスクリプトを直して、作り直してください。
+\begin{table}[!htbp]
+\caption{ノートと、それを作るスクリプト（\file{04_補助スクリプト/} の中）}\label{tab:build}
+\small
+\begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}p{0.28\linewidth}>{\raggedright\arraybackslash}X@{}}
+\toprule
+ノート & 作るスクリプトと部品 \\
+\midrule
+① シフトファクター検討用 & \file{build_mat_shiftfactor_nb.py}。①②で同じセルの中身は \file{mat_nb_cells.py}、共通の部品は \file{mat_common.py} \\
+② 学習用 & \file{build_mat_shift_nb.py}（部品は①と同じ） \\
+③ 厚みごとの比較 & \file{build_mat_thick_nb.py}。厚みごとの部品は \file{mat_thickness.py} \\
+解説付きの版 & \file{build_mat_shift_nb_commented.py [学習|検討]}。解説は \file{mat_shift_nb_解説/}・\file{mat_shiftfactor_nb_解説/}（元のノートのセルが変わるとエラーで知らせるので、解説を直す） \\
+この説明書 & \file{build_mat_nb_manual.py}（ひな形 \file{report_mat_nb_manual_template.tex}） \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+例（リポジトリ直下から。\file{<ノートのパス>} には、作るノートの場所〔このフォルダの中のノートの場所〕を、リポジトリ直下からのパスで書く。\file{--force} で上書き）：
+\begin{Verbatim}[frame=single,fontsize=\small,xleftmargin=1em]
+uv run python 04_補助スクリプト/build_mat_shift_nb.py "<ノートのパス>" --force
+uv run python 04_補助スクリプト/build_mat_shift_nb_commented.py --force
+uv run python 04_補助スクリプト/build_mat_nb_manual.py
+\end{Verbatim}
+共通の部品 \file{mat_common.py} を直したときは、3 つのノートと解説付きの版、この説明書を作り直します。
+
+% =====================================================================
+\section{困ったとき}
+よくある症状と、その原因・対処を表 \ref{tab:faq} にまとめました。止まったときは、ノートに出たメッセージの最後の行を見て、表の左の列と比べてください。
+
+\begin{table}[H]
+\caption{よくある症状と対処}\label{tab:faq}
+\small
+\begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}p{0.34\linewidth}>{\raggedright\arraybackslash}X@{}}
+\toprule
+症状 & 原因と対処 \\
+\midrule
+ダイアログが出ない & VS Code の後ろに隠れている。タスクバーで探す \\
+\file{選ばれなかったので止めました} & ダイアログでキャンセルした。そのセルから実行し直す \\
+\file{IPAexGothic が見つかりません} & 日本語フォントを入れて、カーネルを再起動する \\
+\file{必要な列がない}・\file{想定にない列がある}・\file{欠損がある} & ファイルの列が表 \ref{tab:cols} と合わない（4.3 節・表 \ref{tab:ng}） \\
+\file{元ファイル名の形式に合わない行がある}・\file{…一致しない} & 「元ファイル」の列を確かめる（4.4 節） \\
+\file{UnicodeDecodeError} & CSV を UTF-8 で保存し直す（4.2 節） \\
+\file{学習と検証で条件が重なっている} & 同じファイルを 2 回選んだか、ファイルの組が違う \\
+\file{KeyError}（材料の記号） & \file{MATERIALS} に表 \ref{tab:mats} にない記号を書いた \\
+\file{同じ学習結果フォルダが選ばれました} & 材料ごとに別のフォルダを選ぶ \\
+③で学習済みモデルが見つからない・材料が違う & 先に①を同じ \file{INPUT_MODE} で実行したか、①と同じ学習結果フォルダを選んだかを確かめる \\
+時間がかかりすぎる & \file{MATERIALS} を 1 つにする、\file{PROFILE_RESTARTS = 0} にする（③は \file{THICK_PROFILE = False}） \\
+判定に ★ がたくさん出る & エラーではない。判定の文の基準を読み、結果の説明書（1 章）で意味を確かめる \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+% =====================================================================
+\section{用語集}
+\begin{termlist}
+\term{ガウス過程回帰（GPR）}入力と出力の関係を、決まった式の形を仮定せずに、データから滑らかな関数として学ぶ方法。予測の平均と一緒に、予測のばらつき（不確かさ）も出せる。
+\term{カーネル}「入力が近い点どうしは、出力も似ている」という度合いを決める関数。ARD Matern 5/2 は、入力ごとに「どれだけ離れると似なくなるか」（長さスケール）を別々に学ぶ。線形項は、学習の範囲の外を一次式で延ばす役目。ホワイトノイズは、同じ条件でもショットごとにばらつく分。
+\term{見かけの粘度・せん断速度}2 つの圧力センサの間を樹脂が流れる時間と圧力の差から、簡単な式（スリット近似）で求めた粘度とせん断速度。せん断発熱や冷却の影響も含んだ「見かけ」の値。
+\term{シフトファクター $a(T)$}温度による粘度の曲線のずれの大きさ。横（$a_h$）と縦（$a_v$）がある。基準温度 $T_{\mathrm{ref}}$ で 1。
+\term{アレニウス型・WLF 型}シフトファクターの温度の式。結晶性の樹脂（PP）はアレニウス型、非晶性の樹脂（GPPS）は WLF 型がよく使われる。
+\term{対数周辺尤度（LML）}モデルがデータにどれだけ合うかを表す数（大きいほど合う）。複雑すぎるモデルには自動で罰がかかる。
+\term{$\Delta$LML}シフトの係数を最良にしたときと、係数 0（シフトなし）のときの LML の差。3.0 以上なら、シフトがデータで支持されたと判断する（尤度比検定の 5\% の基準）。
+\term{プロファイル尤度}係数を格子の上で動かし、各点でほかのパラメータを最適にしたときの LML。最大の点を係数の推定値にする。
+\term{外挿}学習データの範囲の外への予測。ここでは、検証データ（射出速度の両端）の予測。
+\term{5data・3data}学習データと検証データの呼び名（もとは 1 条件あたりのショット数）。
+\term{RMSE・95\% 予測区間}RMSE は予測の誤差の大きさ（$\ln\eta$ で計算。0.1 で粘度の約 10\%）。95\% 予測区間は「この範囲に 95\% の確率で入る」という予測の幅で、実測が入る割合（被覆率）で確かめる。
+\term{マスターカーブ}シフトファクターで温度ごとのデータを換算すると、1 本の曲線に重なる。その曲線。重なりがよいほど、シフトの考え方が合っている。
+\term{全ショット版・条件ごとの平均版}入力の取り方（\file{INPUT_MODE}）の違い。5.6 節。
+\term{判定（OK・★）}ノートの各節の最後に出る、結果が想定どおりかの目印。★ はエラーではない。
+\end{termlist}
+
+\end{document}
