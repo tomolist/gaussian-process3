@@ -2,11 +2,13 @@
 """材料別の温度シフト GPR の「厚みごとの比較」のノートブック (未実行) を生成する。
 
 使い方: python build_mat_thick_nb.py <出力する .ipynb のパス> [<もう 1 つの出力パス> ...] [--force]
-（成果物は 01_機械学習コードフォルダ/材料別_温度シフトファクター検討/ に置く。ノートは、置いた場所から上へたどってリポジトリ直下を探すので、どこに置いても動く）
+（成果物は 01_機械学習コードフォルダ/材料別_温度シフトファクター検討/材料別_温度シフトファクター検討用コード/ に置く〔シフトファクター検討用のノートと同じフォルダ。2026-10-28 のユーザー依頼〕。ノートは、置いた場所から上へたどってリポジトリ直下を探すので、どこに置いても動く）
 既存ファイルがある場合は、--force を付けない限り上書きしない。
-元のノート（材料別_温度シフトGPR_ARD対応Matern52＋線形＋ホワイトノイズ.ipynb）が保存した学習済みモデル（B_Tset・B_Tff・C）と予測値を読み、
-厚みごとに、温度シフトファクターが効いているか、シフトに使う温度は流動中樹脂温度 Tff と加熱シリンダ温度 Tset のどちらが適しているか、
+シフトファクター検討用のノート（材料別_温度シフトファクターの検討_ARD対応Matern52＋線形＋ホワイトノイズ.ipynb）が保存した学習済みモデル（B_Tset・B_Tff・C）と
+予測値を読み、厚みごとに、温度シフトファクターが効いているか、シフトに使う温度は流動中樹脂温度 Tff と加熱シリンダ温度 Tset のどちらが適しているか、
 厚みごとに学習したモデルと全厚みの総合データのモデルのどちらがよいかを調べる（ユーザー依頼、2026-10-22。学習 5data・検証 3data のまま）。
+2026-10-27：読む場所と保存先を新しい結果の構成（<学習結果フォルダ>/<版>/全厚み総合/シフトファクターの検討/ → <版>/厚みごと/）にし、
+学習結果フォルダをダイアログで選ぶ形にした。図は 600 dpi だけを保存する。
 """
 import json
 import os
@@ -30,19 +32,19 @@ COMMON_CELL = "# セル：共通の部品（読み込み・シフトファクタ
 _thick = open(os.path.join(HERE, "mat_thickness.py"), encoding="utf-8").read().split('"""', 2)[2].lstrip("\n")
 _thick = "\n".join(l for l in _thick.split("\n") if not l.startswith("from mat_common import"))
 THICK_CELL = "# セル：厚みごとの比較の部品。04_補助スクリプト/mat_thickness.py の中身（import の行を除く）。直すときは、そのファイルを直して、ノートを作り直す\n" + _thick.lstrip("\n")
-MAIN_NB = "材料別_温度シフトGPR_ARD対応Matern52＋線形＋ホワイトノイズ.ipynb"
+MAIN_NB = "材料別_温度シフトファクターの検討_ARD対応Matern52＋線形＋ホワイトノイズ.ipynb"     # このノートが読むモデルを学習するノート（シフトファクター検討用。このノートと同じフォルダ）
 PDF = "05_材料ごとの機械学習データと予測検証データ/学習結果説明_厚みごとの温度シフト.pdf"
 
 # ---------------------------------------------------------------- 0. タイトル
 md(rf'''# 材料別の温度シフト GPR：厚みごとの比較
 
-元のノート（`{MAIN_NB}`）で学習したモデルを、**キャビティ厚みごと**に見直す。学習は 5data、検証は 3data のまま変えない。調べることは 3 つ（ユーザー依頼、2026-10-22）。
+シフトファクター検討用のノート（同じフォルダの `{MAIN_NB}`）で学習したモデルを、**キャビティ厚みごと**に見直す。学習は 5data、検証は 3data のまま変えない。調べることは 3 つ（ユーザー依頼、2026-10-22）。
 
 1. **厚みごとに、温度シフトファクターが効いているか**（学習済みのモデル。4 節）
 2. **厚みごとに、シフトに使う温度は、流動中樹脂温度 Tff と加熱シリンダ温度 Tset のどちらが適しているか**（5〜8 節）
 3. **厚みごとに学習したモデルと、全厚みの総合データで学習したモデルの、どちらがよいか**（9 節）
 
-**比べるモデル**（元のノートと同じ。どちらも両方の温度を使っていて、違うのは**シフトに使う温度**だけ）
+**比べるモデル**（シフトファクター検討用のノートと同じ。どちらも両方の温度を使っていて、違うのは**シフトに使う温度**だけ）
 
 | モデル | 式 | シフトに使う温度 | GP の入力に入る温度 |
 |---|---|---|---|
@@ -55,7 +57,7 @@ md(rf'''# 材料別の温度シフト GPR：厚みごとの比較
 **1 の見方（4 節）**：厚みごとに、次の 3 つを見る。
 - 温度の順序：同じせん断速度で、低温ほど粘度が高いか（実測と予測）
 - 温度による粘度の比 $R = \exp\left(\frac{{1}}{{G}}\sum_g [\ln\eta_{{低温}}(\dot\gamma_g) - \ln\eta_{{高温}}(\dot\gamma_g)]\right)$：最低と最高の加熱シリンダ温度の、成形条件ごとの平均を、せん断速度 γ̇ の重なる範囲の共通の格子（G = 50 点）で比べる。実測の比 R_実測 と、モデルの予測平均から同じ手順で求めた比 R_予測 を比べる
-- 換算前後のずれ：学習済みの係数で換算した後に、温度の違うデータが 1 本の曲線（厚みごとの 3 次式）に重なるか（元のノートの「重ね合わせの目安」を厚みごとに分けたもの。粘度の % で表す）
+- 換算前後のずれ：学習済みの係数で換算した後に、温度の違うデータが 1 本の曲線（厚みごとの 3 次式）に重なるか（シフトファクター検討用のノートの「重ね合わせの残差」を厚みごとに分けたもの。粘度の % で表す）
 
 判定：○＝順序が一致し、|ln R_予測 − ln R_実測| が同じ成形条件のショット間の ln η の標準偏差（純粋誤差。約 0.04）以内で、換算後のずれが換算前より小さい。×＝予測の順序が実測と逆。△＝それ以外。（許容差は、10-23 までモデルのノイズの標準偏差だったが、ショットごとの入力ではノイズが約 0.006 と小さく出るので、入力の取り方によらない純粋誤差に変えた。条件平均の入力では、両者はほぼ同じ値）
 
@@ -64,35 +66,38 @@ md(rf'''# 材料別の温度シフト GPR：厚みごとの比較
 - (b) 対数周辺尤度：厚みごとの 5data だけで B_Tset・B_Tff を学習し、係数をプロファイル尤度で決めたときの、最大の対数周辺尤度の差 ΔL = LML(B_Tff) − LML(B_Tset)。|ΔL| が `DL_CLEAR`（既定 3.0）以上なら差あり
 - (c) 検証データの誤差：保存済みの 3data の予測を、厚みごとに集計した予測誤差（粘度の %）。差が `ERR_CLEAR`（既定 1.0 ポイント）以上なら差あり
 
-**3 の比べ方（9 節）**：厚みごとの 5data だけで B_Tset・B_Tff・C を学習し（B の係数は 6 節で決めたもの）、同じ厚みの 3data を予測する。総合データのモデル（元のノートのモデル）の予測と、厚みごと・全厚みで比べる。
+**3 の比べ方（9 節）**：厚みごとの 5data だけで B_Tset・B_Tff・C を学習し（B の係数は 6 節で決めたもの）、同じ厚みの 3data を予測する。総合データのモデル（シフトファクター検討用のノートのモデル）の予測と、厚みごと・全厚みで比べる。
 
 **読むときの注意**：流動中樹脂温度 Tff は、せん断発熱で射出速度とともに変わる。そのため、Tff でのシフトは、温度の効果だけでなく、曲線の形の調整も兼ねうる。(a) だけでなく、(b)(c) も見るのはこのため。''')
 
 # ---------------------------------------------------------------- 1. 使い方・設定
 md(f'''## 使い方
 
-1. **先に元のノート `{MAIN_NB}` を実行しておく**（このノートは、その学習済みモデル `<モデル>/学習済みモデル_<モデル>.joblib` と予測値 `予測検証_3data_予測値.csv` を読む。入力の取り方 `INPUT_MODE` は、元のノートと同じにする）。
+1. **先にシフトファクター検討用のノート `{MAIN_NB}` を実行しておく**（このノートは、その学習済みモデル `<モデルのフォルダ>/学習済みモデル_<モデル>.joblib` と予測値 `予測検証_3data_予測値.csv`、指標の表を読む。入力の取り方 `INPUT_MODE` は、そのノートと同じにする。比べる列 `SHIFT_COLS` は既定〔2 つの温度の列〕のままで実行しておく）。
 2. メニューの「すべて実行」で、上から順に実行する（3 材料で約 10 分。大部分は 6 節のプロファイル尤度と、9 節の厚みごとのモデルの学習）。カーネルは、このプロジェクトの `.venv` を選ぶ。
-3. 設定を変えたいときは、最初の「設定エリア」のセルだけを直して、最初から実行し直す（時間を短くする：`THICK_PROFILE = False`。6・9 節と、8 節の (b) を飛ばす）。
-4. 各節の最後に、**判定**が出る（`>> 判定：OK` か `>> 判定：★要確認`）。OK は「想定どおり」、★ は「想定と違う、または結果を読むときに注意が要る点」。★ が出ても、エラーではない。最後の「判定の一覧」に一覧が出る。
-5. 図と表は、材料ごとに **`<材料フォルダ名>_学習結果/<入力の取り方>/厚みごとの比較/`** に保存される（例：`05_材料ごとの機械学習データと予測検証データ/01_バージンPP再々実験/01_バージンPP再々実験_学習結果/ショットごとの入力/厚みごとの比較/`）。どの図も、600 dpi の同じ図が `highres/` にある（Git には入れない）。
-6. 用語や図の見方は、説明書 `{PDF}` にある。''')
+3. **実行の始めに（「2. 読み込み」のセルで）、材料ごとにダイアログが 1 回開く**：シフトファクター検討用のノートで選んだ**学習結果フォルダ**を選ぶ。学習データ・検証データの場所は、学習済みモデルに記録されたものを使う（ファイルが見つからないときだけ、ダイアログで選ぶ）。ダイアログが見当たらないときは、VS Code の後ろに隠れているので、タスクバーで探す。設定 `FILES` に書けば、ダイアログは出ない。
+4. 設定を変えたいときは、最初の「設定エリア」のセルだけを直して、最初から実行し直す（時間を短くする：`THICK_PROFILE = False`。6・9 節と、8 節の (b) を飛ばす）。
+5. 各節の最後に、**判定**が出る（`>> 判定：OK` か `>> 判定：★要確認`）。OK は「想定どおり」、★ は「想定と違う、または結果を読むときに注意が要る点」。★ が出ても、エラーではない。最後の「判定の一覧」に一覧が出る。
+6. 図と表は、学習結果フォルダの **`<版>/厚みごと/`**（版は `INPUT_MODE` で、`全ショット版` か `条件ごとの平均版`）に、次の 4 つのフォルダに分けて保存される。`判定の一覧.csv` は `厚みごと/` の直下。**図は、すべて 600 dpi の 1 枚だけ**（設定 `FIG_DPI`）。
+   - `学習結果グラフ/`（3 節）、`温度シフトの確認/`（4 節）、`シフトに使う温度/`（5〜8 節の (a)(b)(c) とまとめ）、`厚みごとのモデルと総合の比較/`（9 節）
+7. 用語や図の見方は、説明書 `{PDF}` にある（10-26 までの結果で書いたもの。結果のフォルダの名前は、そのときの構成のまま）。''')
 md(r'''## 1. 設定''')
 code(r'''# セル1：設定エリア  ▼▼▼ 変えてよいのは、ここだけ ▼▼▼
 from pathlib import Path      # （下の REPO で、フォルダをたどるのに使う）
 SEED = 42                     # 乱数シード
-NOISE_LB = 1e-6               # ノイズ分散の下限（元のノートと同じ）
-USE_LINEAR = True             # 線形項（DotProduct）を足すか（元のノートと同じ）
-INPUT_MODE = "shot"           # 読む学習済みモデルの入力の取り方（元のノートと同じにする。"shot"：ショットごと〔既定〕、"cond"：条件平均）
-N_RESTARTS = 20               # 9 節：厚みごとの最終モデルの学習での、最適化のやり直し回数（元のノートと同じ）
-PROFILE_RESTARTS = 1          # 6 節：プロファイル尤度の格子の各点での、やり直し回数（元のノートと同じ）
-USE_EXCLUSIONS = True         # 問題データ一覧（05 フォルダ）の「除外」を除く（元のノートと同じ）
+NOISE_LB = 1e-6               # ノイズ分散の下限（シフトファクター検討用のノートと同じ）
+USE_LINEAR = True             # 線形項（DotProduct）を足すか（シフトファクター検討用のノートと同じ）
+INPUT_MODE = "shot"           # 読む学習済みモデルの入力の取り方（シフトファクター検討用のノートと同じにする。"shot"：ショットごと〔既定。全ショット版/〕、"cond"：条件平均〔条件ごとの平均版/〕）
+N_RESTARTS = 20               # 9 節：厚みごとの最終モデルの学習での、最適化のやり直し回数（シフトファクター検討用のノートと同じ）
+PROFILE_RESTARTS = 1          # 6 節：プロファイル尤度の格子の各点での、やり直し回数（シフトファクター検討用のノートと同じ）
+USE_EXCLUSIONS = True         # 問題データ一覧（05 フォルダ）の「除外」を除く（シフトファクター検討用のノートと同じ）
 REPO = str(next(p for p in [Path.cwd(), *Path.cwd().parents] if (p / "04_補助スクリプト").is_dir()))   # リポジトリ直下（このノートの場所から上へたどって、04_補助スクリプト があるフォルダを探す）
-MATERIALS = ["PP", "MIX", "GPPS"]    # 調べる材料
-MAT_FOLDERS = {"PP": "01_バージンPP再々実験", "MIX": "02_粉砕材混合PP実験", "GPPS": "03_GPPS実験"}
-FINE_B = (4.0, 1.0)           # 細かい格子：最良の点の ±4 を 1 刻み（元のノートと同じ。係数の粗い格子と型は、学習済みモデルの設定を使う）
+MATERIALS = ["PP", "MIX", "GPPS"]    # 調べる材料。材料ごとに、実行の始めにダイアログで、学習結果フォルダ（シフトファクター検討用のノートで選んだもの）を選ぶ
+MAT_FOLDERS = {"PP": "01_バージンPP再々実験", "MIX": "02_粉砕材混合PP実験", "GPPS": "03_GPPS実験"}   # 05 フォルダの中の材料フォルダ名（ダイアログの最初のフォルダ）
+FILES = {}                    # ダイアログを使わずに決めるとき：{"PP": {"結果": r"…"}}（相対パスはリポジトリ直下から。"学習"・"検証" も書くと、学習済みモデルの記録より、そちらを使う）
+FINE_B = (4.0, 1.0)           # 細かい格子：最良の点の ±4 を 1 刻み（シフトファクター検討用のノートと同じ。係数の粗い格子と型は、学習済みモデルの設定を使う）
 FINE_A = (2.5, 0.5)
-MAX_REFINE = 4                # 最良の点が細かい格子の端に当たったとき、取り直す回数の上限（元のノートと同じ）
+MAX_REFINE = 4                # 最良の点が細かい格子の端に当たったとき、取り直す回数の上限（シフトファクター検討用のノートと同じ）
 THICK_PROFILE = True          # 6 節：厚みごとの 5data で GPR を学習し、係数をプロファイル尤度で決める（False：6・9 節と 8 節の (b) を飛ばす）
 THICK_MODELS = True           # 9 節：厚みごとのモデルと、総合データのモデルを比べる（6 節の結果を使う）
 A_CLEAR = 0.5                 # (a) 重ね合わせのずれ [%] の差が、これ以上なら「差あり」
@@ -100,9 +105,7 @@ DL_CLEAR = 3.0                # (b) 対数周辺尤度の差が、これ以上�
 ERR_CLEAR = 1.0               # (c)・9 節：予測誤差 [%] の差が、これ以上なら「差あり」
 FLOW_POINTS = "shot"          # 3 節の学習結果グラフの点："shot"＝ショットごとの計測値（既定）／"cond"＝成形条件ごとの平均
 N_JOBS = 8                   # プロファイル尤度を並列に計算する数
-FIG_DPI = 200                 # 保存する PNG の解像度
-HR_ALL = True                 # すべての図を、600 dpi でも highres/ に保存する（Git の管理外）
-HR_ALL_DPI = 600
+FIG_DPI = 600                 # 保存する図の解像度（すべての図を、この解像度の 1 枚だけで保存する）
 SHOW_FIGS = True              # 図をノートにも表示する
 # ▲▲▲ 設定エリア終了 ▲▲▲''')
 code(r'''# セル2：ライブラリ、フォント
@@ -130,32 +133,61 @@ print("Python:", sys.executable, "/", sys.version.split()[0])
 print("材料:", MATERIALS, "／入力の取り方:", INPUT_MODE)''')
 md(r'''### 共通の部品
 
-元のノートと同じ部品（`04_補助スクリプト/mat_common.py`）と、厚みごとの比較の部品（`04_補助スクリプト/mat_thickness.py`）。''')
+シフトファクター検討用のノートと同じ部品（`04_補助スクリプト/mat_common.py`）と、厚みごとの比較の部品（`04_補助スクリプト/mat_thickness.py`）。''')
 code(COMMON_CELL)
 code(THICK_CELL)
+md(r'''### 読む結果と、結果の置き場所
+
+シフトファクター検討用のノートの結果（学習結果フォルダの `<版>/全厚み総合/シフトファクターの検討/`）を読み、このノートの結果を `<版>/厚みごと/` に保存する（版は `INPUT_MODE` で決まる：`全ショット版` か `条件ごとの平均版`）。''')
+code(r'''# セル2b：読む結果と、結果の置き場所
+def study_dir(mat):
+    """シフトファクター検討用のノートの結果のフォルダ：<学習結果フォルダ>/<版>/全厚み総合/シフトファクターの検討/（読むだけなので、フォルダは作らない）"""
+    return result_dir(mat, VERSION_DIRS[INPUT_MODE], THICK_TOTAL, STUDY_DIR, make=False)
+
+
+def model_dir(mat, key):
+    """シフトファクター検討用のノートが保存した、モデルのフォルダ（study_dir の下の「記号_説明」のフォルダ）"""
+    return os.path.join(study_dir(mat), MODEL_DIRS[key])
+
+
+def out_dir(mat, sub=None):
+    """このノートの結果の置き場所：<学習結果フォルダ>/<版>/厚みごと/（sub があれば、その下のフォルダ）"""
+    return result_dir(mat, VERSION_DIRS[INPUT_MODE], THICK_EACH, *([sub] if sub else []))
+
+
+print(f"読む結果：<学習結果フォルダ>/{VERSION_DIRS[INPUT_MODE]}/{THICK_TOTAL}/{STUDY_DIR}/")
+print(f"結果の置き場所：<学習結果フォルダ>/{VERSION_DIRS[INPUT_MODE]}/{THICK_EACH}/")''')
 
 # ---------------------------------------------------------------- 2. 読み込み
-md(r'''## 2. データと学習済みモデルの読み込み
+md(r'''## 2. 学習済みモデルとデータの読み込み
 
-元のノートと同じ手順でデータを読み（問題データ一覧の「除外」を除く）、学習済みモデル（B_Tset・B_Tff・C）と、3data の予測値を読む。
+**このセルで、材料ごとにダイアログが 1 回開く**（シフトファクター検討用のノートで選んだ学習結果フォルダを選ぶ。設定 `FILES` に書いたものは開かない）。学習済みモデル（B_Tset・B_Tff・C）と 3data の予測値を読み、学習済みモデルに記録された学習データ・検証データを、シフトファクター検討用のノートと同じ手順で読む（問題データ一覧の「除外」を除く）。学習済みモデルの材料が違うとき（学習結果フォルダの選び間違い）は、止める。
 
 **判定**：学習済みモデルの入力の取り方が `INPUT_MODE` と同じ／読んだモデルで 3data を予測し直すと、保存済みの予測値と一致する（データとモデルの組み合わせが正しい）。''')
 code(r'''# セル3：読み込み
 import joblib
 JUDGES.clear()
+display(choose_inputs(MATERIALS, FILES, need_data=False))      # 材料ごとに、学習結果フォルダを決める（設定 FILES に書いていなければ、ダイアログで選ぶ）
+FITS, PRED, OBJ = {}, {}, {}
+for mat in MATERIALS:
+    for key in KEYS:
+        path = os.path.join(model_dir(mat, key), f"学習済みモデル_{key}.joblib")
+        if not os.path.exists(path):
+            raise FileNotFoundError(f"{path} がありません。先にシフトファクター検討用のノートを INPUT_MODE = '{INPUT_MODE}' で実行し、同じ学習結果フォルダを選んでください")
+        OBJ[(mat, key)] = joblib.load(path)
+        if OBJ[(mat, key)]["材料"] != MAT_NAMES[mat]:
+            raise ValueError(f"{path} は {OBJ[(mat, key)]['材料']} のモデルです（{MAT_NAMES[mat]} の学習結果フォルダを選んでください）")
+        FITS[(mat, key)] = OBJ[(mat, key)]["fit"]
+        PRED[(mat, key)] = pd.read_csv(os.path.join(model_dir(mat, key), "予測検証_3data_予測値.csv"), encoding="utf-8-sig")
+    data_from_model(mat, OBJ[(mat, "B_Tff")])               # 学習データ・検証データの場所は、学習済みモデルの記録から取る（設定 FILES に書いてあれば、そちら）
 D = load_all(MATERIALS)
-TRAIN, TEST, POOL, FITS, PRED, CFG, OUT = {}, {}, {}, {}, {}, {}, {}
+TRAIN, TEST, POOL, CFG = {}, {}, {}, {}
 for mat in MATERIALS:
     TRAIN[mat] = D[(mat, "5data")]
     TEST[mat] = add_groups(TRAIN[mat], D[(mat, "3data")])
     POOL[mat] = pd.concat([TRAIN[mat], TEST[mat]], ignore_index=True)
-    OUT[mat] = result_dir(mat, "厚みごとの比較")
+    print(f"【{MAT_NAMES[mat]}】学習データ：{show_path(SOURCES[mat]['5data'])}／検証データ：{show_path(SOURCES[mat]['3data'])}")
     for key in KEYS:
-        path = os.path.join(result_dir(mat, key), f"学習済みモデル_{key}.joblib")
-        if not os.path.exists(path):
-            raise FileNotFoundError(f"{path} がありません。先に元のノートを INPUT_MODE = '{INPUT_MODE}' で実行してください")
-        FITS[(mat, key)] = joblib.load(path)["fit"]
-        PRED[(mat, key)] = pd.read_csv(os.path.join(result_dir(mat, key), "予測検証_3data_予測値.csv"), encoding="utf-8-sig")
         judge(FITS[(mat, key)].get("mode") == INPUT_MODE, f"{key}：学習済みモデルの入力の取り方が {INPUT_MODE}", mat, "2 読み込み")
         mu, _, _, _ = predict(FITS[(mat, key)], TEST[mat])
         chk = TEST[mat][["file"]].assign(mu=mu).merge(PRED[(mat, key)][["file", "予測_ln_eta"]], on="file")
@@ -178,12 +210,12 @@ md(r'''## 3. 厚みごとの学習結果グラフ（B_Tset と B_Tff）
 code(r'''# セル4：厚みごとの学習結果グラフ
 for mat in MATERIALS:
     for h in thicknesses(POOL[mat]):
-        thick_flow_pair({k: FITS[(mat, k)] for k in THICK_KEYS}, mat, POOL[mat], set(TRAIN[mat]["cond"]), h, OUT[mat], points=FLOW_POINTS)''')
+        thick_flow_pair({k: FITS[(mat, k)] for k in THICK_KEYS}, mat, POOL[mat], set(TRAIN[mat]["cond"]), h, out_dir(mat, "学習結果グラフ"), points=FLOW_POINTS)''')
 
 # ---------------------------------------------------------------- 4. 温度シフトの確認
 md(r'''## 4. 温度シフトファクターが効いているか（厚みごと、学習済みの係数）
 
-厚みごとに、温度による粘度の比 R（実測・予測）、温度の順序、学習済みの係数で換算する前後のずれを出し、○・△・× で判定する（基準は冒頭）。全厚みをまとめたずれ（元のノート・発表資料の値）も、照合のために表示する。
+厚みごとに、温度による粘度の比 R（実測・予測）、温度の順序、学習済みの係数で換算する前後のずれを出し、○・△・× で判定する（基準は冒頭）。全厚みをまとめたずれ（シフトファクター検討用のノートの重ね合わせの残差・発表資料の値）も、照合のために表示する。
 
 **判定**：判定が ○ の厚みは OK、△・× は ★（何が満たされなかったかを、文に書く）。''')
 code(r'''# セル5：温度シフトの確認
@@ -195,7 +227,7 @@ for mat in MATERIALS:
         CK.append(t)
         r0_ = superpose_rmse(shifted_cond_means(POOL[mat], None, CFG[mat], 0.0, 0.0))
         r1_ = superpose_rmse(shifted_cond_means(POOL[mat], key, CFG[mat], fit["th"], fit["tv"]))
-        print(f"【{MAT_NAMES[mat]}・{key}】全厚みのずれ（照合用）：換算前 {pct_err(r0_):.1f}% → 換算後 {pct_err(r1_):.1f}%")
+        print(f"【{MAT_NAMES[mat]}・{key}】全厚みのずれ（照合用。シフトファクター検討用のノートの重ね合わせの残差を % にしたもの）：換算前 {pct_err(r0_):.1f}% → 換算後 {pct_err(r1_):.1f}%")
         for _, r in t.iterrows():
             why = "、".join(s for s, ok in [("温度の順序が実測と予測で違う", r["順序が一致"]), ("比 R の大きさが合わない", r["比の大きさが一致"]),
                                               ("換算でずれが減らない", r["換算でずれが減る"])] if not ok)
@@ -209,22 +241,22 @@ show_cols = ["材料", "モデル", "厚み", "条件数", "比べた γ̇ の�
 display(CK[show_cols].round(3))
 for mat in MATERIALS:
     c = CK[CK["材料"] == MAT_NAMES[mat]]
-    to_csv(c, os.path.join(OUT[mat], "温度シフトの確認_厚みごと.csv"))
+    to_csv(c, os.path.join(out_dir(mat, "温度シフトの確認"), "温度シフトの確認_厚みごと.csv"))
     w = c.pivot(index="厚み", columns="モデル", values="R_予測").add_prefix("R_予測_").reset_index()
     w["R_実測"] = c.groupby("厚み")["R_実測"].first().to_numpy()
     thick_bars(w, None, {"R_実測": "実測", "R_予測_B_Tset": "予測（B_Tset）", "R_予測_B_Tff": "予測（B_Tff）"},
-               f"{MAT_NAMES[mat]}　温度による粘度の比 R（最低温度 ÷ 最高温度）", "粘度の比 R", OUT[mat], "温度による粘度の比", fmt="{:.2f}", hline=1.0)
+               f"{MAT_NAMES[mat]}　温度による粘度の比 R（最低温度 ÷ 最高温度）", "粘度の比 R", out_dir(mat, "温度シフトの確認"), "温度による粘度の比", fmt="{:.2f}", hline=1.0)
     z = c.pivot(index="厚み", columns="モデル", values="ずれ_換算後_%").add_prefix("換算後_").reset_index()
     z["換算前"] = c.groupby("厚み")["ずれ_換算前_%"].first().to_numpy()
     thick_bars(z, None, {"換算前": "換算前", "換算後_B_Tset": "加熱シリンダ温度で換算（学習済みの係数）", "換算後_B_Tff": "流動中樹脂温度で換算（学習済みの係数）"},
-               f"{MAT_NAMES[mat]}　重ね合わせのずれ（学習済みの係数）", "ずれ (%)", OUT[mat], "重ね合わせのずれ_学習済みの係数")
+               f"{MAT_NAMES[mat]}　重ね合わせのずれ（学習済みの係数）", "ずれ (%)", out_dir(mat, "温度シフトの確認"), "重ね合わせのずれ_学習済みの係数")
     for h in thicknesses(POOL[mat]):
-        thick_master(mat, POOL[mat], CFG[mat], h, {k: (FITS[(mat, k)]["th"], FITS[(mat, k)]["tv"]) for k in THICK_KEYS}, OUT[mat], "重ね合わせ_学習済みの係数")''')
+        thick_master(mat, POOL[mat], CFG[mat], h, {k: (FITS[(mat, k)]["th"], FITS[(mat, k)]["tv"]) for k in THICK_KEYS}, out_dir(mat, "温度シフトの確認"), "重ね合わせ_学習済みの係数")''')
 
 # ---------------------------------------------------------------- 5. (a) 重ね合わせ
 md(r'''## 5. (a) 厚みごとに係数を決め直した重ね合わせ
 
-厚みごとのデータ（5data＋3data の条件平均）だけで、ずれが最小になる係数（横・縦）を、元のノートのプロファイル尤度と同じ格子で探す。加熱シリンダ温度 Tset で換算した場合と、流動中樹脂温度 Tff で換算した場合の、最小のずれを比べる。モデル（GP）を使わず、データだけで決まる。
+厚みごとのデータ（5data＋3data の条件平均）だけで、ずれが最小になる係数（横・縦）を、シフトファクター検討用のノートのプロファイル尤度と同じ格子で探す。加熱シリンダ温度 Tset で換算した場合と、流動中樹脂温度 Tff で換算した場合の、最小のずれを比べる。モデル（GP）を使わず、データだけで決まる。
 
 **見方**：ずれが小さい温度ほど、その厚みで、温度の違う粘度曲線を 1 本に重ねやすい。
 
@@ -246,19 +278,19 @@ for mat in MATERIALS:
         row["適した温度(a)"] = decide(row["ずれ_Tff_%"], row["ずれ_Tset_%"], A_CLEAR, False)
         SUP.append(row)
         thick_master(mat, POOL[mat], CFG[mat], h, {k: (row[f"横の係数_{TEMP_SHORT[k]}"], row[f"縦の係数_{TEMP_SHORT[k]}"]) for k in THICK_KEYS},
-                     OUT[mat], "重ね合わせ_厚みごとの係数")
+                     out_dir(mat, "シフトに使う温度"), "重ね合わせ_厚みごとの係数")
 SUP = pd.DataFrame(SUP)
 display(SUP.round(2))
 for mat in MATERIALS:
     s = SUP[SUP["材料"] == MAT_NAMES[mat]]
-    to_csv(s, os.path.join(OUT[mat], "重ね合わせ_厚みごと.csv"))
+    to_csv(s, os.path.join(out_dir(mat, "シフトに使う温度"), "重ね合わせ_厚みごと.csv"))
     thick_bars(s, None, {"ずれ_換算前_%": "換算前", "ずれ_Tset_%": "加熱シリンダ温度で換算", "ずれ_Tff_%": "流動中樹脂温度で換算"},
-               f"{MAT_NAMES[mat]}　(a) 厚みごとに係数を決め直したときの重ね合わせのずれ", "ずれ (%)", OUT[mat], "重ね合わせのずれ_厚みごとの係数")''')
+               f"{MAT_NAMES[mat]}　(a) 厚みごとに係数を決め直したときの重ね合わせのずれ", "ずれ (%)", out_dir(mat, "シフトに使う温度"), "重ね合わせのずれ_厚みごとの係数")''')
 
 # ---------------------------------------------------------------- 6. (b) プロファイル尤度
 md(r'''## 6. (b) 厚みごとのプロファイル尤度（GPR）
 
-厚みごとの 5data だけで B_Tset・B_Tff を学習し、係数を元のノートと同じプロファイル尤度で決める。最大の対数周辺尤度 LML を比べ、ΔL = LML(B_Tff) − LML(B_Tset) を求める。あわせて、それぞれのシフトなし（係数 0）との差（2 つの係数を足した効果。3.0 以上で、尤度比検定の 5% 基準）も出す。
+厚みごとの 5data だけで B_Tset・B_Tff を学習し、係数をシフトファクター検討用のノートと同じプロファイル尤度で決める。最大の対数周辺尤度 LML を比べ、ΔL = LML(B_Tff) − LML(B_Tset) を求める。あわせて、それぞれのシフトなし（係数 0）との差（2 つの係数を足した効果。3.0 以上で、尤度比検定の 5% 基準）も出す。
 
 **見方**：ΔL が正で大きいほど、その厚みでは流動中樹脂温度でずらしたほうが、学習データをよく説明する（負なら加熱シリンダ温度）。
 
@@ -293,28 +325,28 @@ if THICK_PROFILE:
     display(PROF.round(2))
     display(PL.round(2))
     for mat in MATERIALS:
-        to_csv(PROF[PROF["材料"] == MAT_NAMES[mat]], os.path.join(OUT[mat], "プロファイル尤度_厚みごと.csv"))
-        to_csv(pd.concat(PROF_PTS)[lambda d: d["材料"] == MAT_NAMES[mat]], os.path.join(OUT[mat], "プロファイル尤度_格子_厚みごと.csv"))
+        to_csv(PROF[PROF["材料"] == MAT_NAMES[mat]], os.path.join(out_dir(mat, "シフトに使う温度"), "プロファイル尤度_厚みごと.csv"))
+        to_csv(pd.concat(PROF_PTS)[lambda d: d["材料"] == MAT_NAMES[mat]], os.path.join(out_dir(mat, "シフトに使う温度"), "プロファイル尤度_格子_厚みごと.csv"))
         p = PL[PL["材料"] == MAT_NAMES[mat]]
-        to_csv(p, os.path.join(OUT[mat], "対数周辺尤度の差_厚みごと.csv"))
+        to_csv(p, os.path.join(out_dir(mat, "シフトに使う温度"), "対数周辺尤度の差_厚みごと.csv"))
         thick_bars(p, None, {"係数0との差_Tset": "加熱シリンダ温度：シフトなしとの差", "係数0との差_Tff": "流動中樹脂温度：シフトなしとの差",
                              "ΔL（Tff − Tset）": "ΔL（流動中樹脂温度 − 加熱シリンダ温度）"},
-                   f"{MAT_NAMES[mat]}　(b) 厚みごとの対数周辺尤度の差", "対数周辺尤度の差", OUT[mat], "対数周辺尤度の差_厚みごと", hline=DL_CLEAR)
+                   f"{MAT_NAMES[mat]}　(b) 厚みごとの対数周辺尤度の差", "対数周辺尤度の差", out_dir(mat, "シフトに使う温度"), "対数周辺尤度の差_厚みごと", hline=DL_CLEAR)
 else:
     print("THICK_PROFILE = False のため、飛ばした（8 節の (b) と 9 節も飛ばす）")''')
 
 # ---------------------------------------------------------------- 7. (c) 検証データの誤差
 md(r'''## 7. (c) 検証データの誤差（厚みごと）
 
-元のノートで保存した 3data の予測値（B_Tset・B_Tff・C。総合データで学習したモデル）を、厚みごとに集計する。予測誤差は、ln η の RMSE を粘度の % に換算した値（e^RMSE − 1）。
+シフトファクター検討用のノートで保存した 3data の予測値（B_Tset・B_Tff・C。総合データで学習したモデル）を、厚みごとに集計する。予測誤差は、ln η の RMSE を粘度の % に換算した値（e^RMSE − 1）。
 
 **見方**：誤差が小さい温度ほど、その厚みで、学習に用いていない射出率条件の予測に向いている。低射出率側（3・5 mm/s）の検証は、厚み 1.5・2.0 mm にしかない。
 
-**判定**：全厚みをまとめた RMSE が、元のノートの指標の表（`比較/予測検証_3data_指標.csv`）と一致する。''')
+**判定**：全厚みをまとめた RMSE が、シフトファクター検討用のノートの指標の表（`シフトファクターの検討/予測検証_3data_指標.csv`）と一致する。''')
 code(r'''# セル8：(c) 検証データの誤差
 VAL = []
 for mat in MATERIALS:
-    met = pd.read_csv(os.path.join(result_dir(mat, "比較"), "予測検証_3data_指標.csv"), encoding="utf-8-sig")
+    met = pd.read_csv(os.path.join(study_dir(mat), "予測検証_3data_指標.csv"), encoding="utf-8-sig")
     for key in KEYS:
         p = PRED[(mat, key)]
         for h in thicknesses(p):
@@ -322,7 +354,7 @@ for mat in MATERIALS:
         allr = err_rows(p, {"材料": MAT_NAMES[mat], "モデル": key, "学習": "総合", "厚み": "全厚み"})
         VAL += allr
         ref = float(met[(met["モデル"] == key) & (met["範囲"] == "全体")]["RMSE"].iloc[0])
-        judge(np.isclose(allr[0]["RMSE"], ref), f"(c) {key}：全厚みの RMSE（{allr[0]['RMSE']:.4f}）が、元のノートの指標の表（{ref:.4f}）と一致", mat, "7 (c) 検証データ")
+        judge(np.isclose(allr[0]["RMSE"], ref), f"(c) {key}：全厚みの RMSE（{allr[0]['RMSE']:.4f}）が、シフトファクター検討用のノートの指標の表（{ref:.4f}）と一致", mat, "7 (c) 検証データ")
 VAL = pd.DataFrame(VAL)
 VC = []
 for mat in MATERIALS:
@@ -332,9 +364,9 @@ for mat in MATERIALS:
     w.insert(0, "材料", MAT_NAMES[mat])
     w["適した温度(c)"] = [decide(a, b, ERR_CLEAR, False) for a, b in zip(w["B_Tff"], w["B_Tset"])]
     VC.append(w)
-    to_csv(VAL[VAL["材料"] == MAT_NAMES[mat]], os.path.join(OUT[mat], "検証誤差_厚みごと.csv"))
+    to_csv(VAL[VAL["材料"] == MAT_NAMES[mat]], os.path.join(out_dir(mat, "シフトに使う温度"), "検証誤差_厚みごと.csv"))
     thick_bars(w, None, {"C": "C（シフトなし）", "B_Tset": "B_Tset（加熱シリンダ温度）", "B_Tff": "B_Tff（流動中樹脂温度）"},
-               f"{MAT_NAMES[mat]}　(c) 検証データの予測誤差（厚みごと）", "予測誤差 (%)", OUT[mat], "検証誤差_厚みごと")
+               f"{MAT_NAMES[mat]}　(c) 検証データの予測誤差（厚みごと）", "予測誤差 (%)", out_dir(mat, "シフトに使う温度"), "検証誤差_厚みごと")
 VC = pd.concat(VC, ignore_index=True)
 display(VC.round(2))
 display(VAL[VAL["厚み"] != "全厚み"].pivot_table(index=["材料", "厚み", "範囲"], columns="モデル", values="誤差_%").round(1))''')
@@ -342,7 +374,7 @@ display(VAL[VAL["厚み"] != "全厚み"].pivot_table(index=["材料", "厚み",
 # ---------------------------------------------------------------- 8. まとめ
 md(r'''## 8. まとめ：厚みごとに適した温度
 
-(a)(b)(c) の判定を、材料・厚みごとに並べ、多数決で「Tff（流動中樹脂温度）／Tset（加熱シリンダ温度）／差なし」を決める（同数なら「差なし」。「—」は数えない）。`厚みごとの比較_まとめ.csv` に保存する。''')
+(a)(b)(c) の判定を、材料・厚みごとに並べ、多数決で「Tff（流動中樹脂温度）／Tset（加熱シリンダ温度）／差なし」を決める（同数なら「差なし」。「—」は数えない）。`シフトに使う温度/厚みごとの比較_まとめ.csv` に保存する。''')
 code(r'''# セル9：まとめ（Tff か Tset か）
 SUMT = SUP[["材料", "厚み", "ずれ_Tset_%", "ずれ_Tff_%", "適した温度(a)"]].merge(VC[["材料", "厚み", "B_Tset", "B_Tff", "適した温度(c)"]].rename(
     columns={"B_Tset": "誤差_Tset_%", "B_Tff": "誤差_Tff_%"}), on=["材料", "厚み"], how="left")
@@ -355,13 +387,13 @@ SUMT = SUMT[["材料", "厚み", "ずれ_Tset_%", "ずれ_Tff_%", "適した温�
 display(SUMT.round(2))
 for mat in MATERIALS:
     s = SUMT[SUMT["材料"] == MAT_NAMES[mat]]
-    to_csv(s, os.path.join(OUT[mat], "厚みごとの比較_まとめ.csv"))
+    to_csv(s, os.path.join(out_dir(mat, "シフトに使う温度"), "厚みごとの比較_まとめ.csv"))
     print(f"【{MAT_NAMES[mat]}】" + "、".join(f"{h:g} mm：{j}" for h, j in zip(s["厚み"], s["総合の判定"])))''')
 
 # ---------------------------------------------------------------- 9. 厚みごとのモデルと総合データのモデル
 md(r'''## 9. 厚みごとのモデルと総合データのモデルの比較
 
-学習 5data・検証 3data のまま、厚みごとの 5data だけで B_Tset・B_Tff・C を学習し（B の係数は 6 節で決めたもの。最終モデルは `N_RESTARTS` 回の最適化）、同じ厚みの 3data を予測する。総合データのモデル（全厚みの 5data で学習した、元のノートのモデル）の予測と、厚みごと・全厚みで比べる。
+学習 5data・検証 3data のまま、厚みごとの 5data だけで B_Tset・B_Tff・C を学習し（B の係数は 6 節で決めたもの。最終モデルは `N_RESTARTS` 回の最適化）、同じ厚みの 3data を予測する。総合データのモデル（全厚みの 5data で学習した、シフトファクター検討用のノートのモデル）の予測と、厚みごと・全厚みで比べる。
 
 **見方**：予測誤差が、どちらかの学習のしかたで、多くの厚みで `ERR_CLEAR` ポイント以上小さければ、その学習のしかたが向いている。差が小さければ、データの量（1 つのモデルに使える条件の数）と使いやすさ（総合モデルは 1 つで全厚みを予測できる）から、総合データで学習するほうがよい。
 
@@ -404,14 +436,14 @@ if THICK_MODELS and THICK_PROFILE:
             fig_df["厚み"] = fig_df["厚みの名前"].astype(float)
             fig_df = fig_df.sort_values("厚み")
             thick_bars(fig_df, None, {"総合データのモデル": "総合データで学習", "厚みごとのモデル": "厚みごとに学習"},
-                       f"{MAT_NAMES[mat]}　{key}：厚みごとのモデルと総合データのモデルの予測誤差", "予測誤差 (%)", OUT[mat], f"厚みごとと総合_{key}")
+                       f"{MAT_NAMES[mat]}　{key}：厚みごとのモデルと総合データのモデルの予測誤差", "予測誤差 (%)", out_dir(mat, "厚みごとのモデルと総合の比較"), f"厚みごとと総合_{key}")
     REC = pd.DataFrame(rec)
     display(REC.round(2))
     display(CMP[CMP["範囲"] == "全体"].pivot_table(index=["材料", "モデル", "厚みの名前"], columns="学習", values="誤差_%").round(1))
     for mat in MATERIALS:
-        to_csv(CMP[CMP["材料"] == MAT_NAMES[mat]], os.path.join(OUT[mat], "厚みごとと総合の比較.csv"))
-        to_csv(REC[REC["材料"] == MAT_NAMES[mat]], os.path.join(OUT[mat], "厚みごとと総合の比較_まとめ.csv"))
-        to_csv(TPRED[TPRED["材料"] == MAT_NAMES[mat]], os.path.join(OUT[mat], "厚みごとのモデル_予測値.csv"))
+        to_csv(CMP[CMP["材料"] == MAT_NAMES[mat]], os.path.join(out_dir(mat, "厚みごとのモデルと総合の比較"), "厚みごとと総合の比較.csv"))
+        to_csv(REC[REC["材料"] == MAT_NAMES[mat]], os.path.join(out_dir(mat, "厚みごとのモデルと総合の比較"), "厚みごとと総合の比較_まとめ.csv"))
+        to_csv(TPRED[TPRED["材料"] == MAT_NAMES[mat]], os.path.join(out_dir(mat, "厚みごとのモデルと総合の比較"), "厚みごとのモデル_予測値.csv"))
     if len(PROF):
         print("\n厚みごとに決めた係数（6 節）と、総合データのモデルの係数：")
         for mat in MATERIALS:
@@ -425,14 +457,14 @@ else:
 # ---------------------------------------------------------------- 10. 判定の一覧
 md(r'''## 10. 判定の一覧
 
-★ の行を確かめる。材料ごとに `厚みごとの比較/判定の一覧.csv` に保存する。''')
+★ の行を確かめる。材料ごとに `厚みごと/判定の一覧.csv` に保存する。''')
 code(r'''# セル11：判定の一覧
 JT = pd.DataFrame(JUDGES)
 print(f"判定 {len(JT)} 件のうち、★要確認 {int((JT['判定'] != 'OK').sum())} 件")
 display(JT[JT["判定"] != "OK"])
 for mat in MATERIALS:
-    to_csv(JT[JT["材料"].isin([MAT_NAMES[mat], ""])], os.path.join(OUT[mat], "判定の一覧.csv"))
-print("結果の置き場所：" + "、".join(os.path.relpath(OUT[m], REPO) for m in MATERIALS))''')
+    to_csv(JT[JT["材料"].isin([MAT_NAMES[mat], ""])], os.path.join(out_dir(mat), "判定の一覧.csv"))
+print("結果の置き場所：" + "、".join(show_path(out_dir(m)) for m in MATERIALS))''')
 
 
 # ---------------------------------------------------------------- 書き出し

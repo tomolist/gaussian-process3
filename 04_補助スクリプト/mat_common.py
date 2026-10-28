@@ -1,11 +1,15 @@
 # -*- coding: utf-8 -*-
 """材料別の温度シフト GPR（05_材料ごとの機械学習データと予測検証データ）のノートで共通に使う部品。
 
-ノート（01_機械学習コードフォルダ/材料別_温度シフトファクター検討/材料別_温度シフトGPR_ARD対応Matern52＋線形＋ホワイトノイズ.ipynb）の「共通の部品」のセルに、
-この中身がそのまま入る（ノートは単独で動く）。直すときは、このファイルを直して、ノートを作り直す（04_補助スクリプト/build_mat_shift_nb.py）。
+ノート（01_機械学習コードフォルダ/材料別_温度シフトファクター検討/ の下の、材料別_温度シフト機械学習コード/ の学習用と、材料別_温度シフトファクター検討用コード/ の
+シフトファクター検討用・厚みごとの比較の 3 つ）の「共通の部品」のセルに、
+この中身がそのまま入る（ノートは単独で動く）。直すときは、このファイルを直して、ノートを作り直す（04_補助スクリプト/build_mat_shift_nb.py・
+build_mat_shiftfactor_nb.py・build_mat_thick_nb.py）。
 本体の検討（nb_common.py・step5_core.py）とは別のプロジェクト。部品の多くは、それらを写して、このデータ
 （説明変数 γ̇・P3_3・Tff・Tset。H は入れない）に合わせて直したもの。モジュールとして import しても使える。
 設定値（SEED など）は、ノートの「設定エリア」で先に決めた値があれば、それを使う。
+読むデータと結果の置き場所は、ノートの実行のときにダイアログで選ぶ（choose_inputs。2026-10-27 から）。何も選ばずに load_all を呼ぶと
+（ノートの外のスクリプト）、今までどおり 05 フォルダの材料フォルダから CSV を探す。
 """
 import glob
 import os
@@ -30,9 +34,7 @@ USE_LINEAR = globals().get("USE_LINEAR", True)              # True：6月のカ�
 USE_EXCLUSIONS = globals().get("USE_EXCLUSIONS", True)      # 問題データ一覧の「除外」を使うか
 REPO = globals().get("REPO", os.environ.get("NB_REPO", ".."))
 N_JOBS = globals().get("N_JOBS", 8)
-FIG_DPI = globals().get("FIG_DPI", 200)
-HR_ALL = globals().get("HR_ALL", True)                      # すべての図を、600 dpi でも highres/ に保存するか
-HR_ALL_DPI = globals().get("HR_ALL_DPI", 600)
+FIG_DPI = globals().get("FIG_DPI", 600)                     # 保存する図の解像度。すべての図を、この解像度の 1 枚だけで保存する（報告書・発表資料用。2026-10-27 から）
 SHOW_FIGS = globals().get("SHOW_FIGS", True)                # 図をノートに表示するか（False なら保存だけ）
 INPUT_MODE = globals().get("INPUT_MODE", "shot")            # "shot"：γ̇・P3_3・Tff をショットごとの値で入れる（6月のノートと同じ。既定）／"cond"：条件（設定温度・厚み・射出速度）ごとの平均で入れる（参考）
 MAX_REFINE = globals().get("MAX_REFINE", 4)                 # プロファイル尤度で、最良の点が細かい格子の端に当たったとき、その点を中心に細かい格子を取り直す回数の上限
@@ -60,22 +62,125 @@ FILE_INFO = {}     # (材料, 組) → 読んだファイルの情報
 REMOVED = {}       # (材料, 組) → 一覧の「除外」で除いた行（元ファイルと ID）
 INVALID = {}       # (材料, 組) → 0 以下の値（η・γ̇・P3_3）で対数がとれず、一覧に登録がないまま除いた行
 JUDGES = []        # 判定の記録（まとめの表に使う）
+SOURCES = {}       # 材料 → {"5data": 学習データの CSV, "3data": 検証データの CSV, "結果": 学習結果フォルダ}（choose_inputs で決める）
+
+# ---------------------------------------------------------------- 結果の置き場所（2026-10-27 からの構成）
+VERSION_DIRS = {"cond": "条件ごとの平均版", "shot": "全ショット版"}   # 学習結果フォルダの直下の分け方（入力の取り方 INPUT_MODE ごと）。図のタイトルと、表の「入力」の列にも使う
+THICK_TOTAL, THICK_EACH = "全厚み総合", "厚みごと"   # その下の分け方：全厚みの 5data で 1 つのモデルを学習した結果（学習用・シフトファクター検討用のノート）／厚みごとの比較のノートの結果
+STUDY_DIR = "シフトファクターの検討"                  # 全厚み総合/ の下の、シフトファクター検討用ノートの結果のフォルダ
+MODE_JA = {"shot": "ショットごとの入力", "cond": "条件平均の入力"}   # 10-26 までの結果のフォルダの名前（<材料フォルダ>_学習結果/ の下。その結果は、この構成のまま残す。発表資料・ポスターのスクリプトが読む）
+DATA_KINDS = {"5data": ("学習", "学習データ（5data）の CSV"), "3data": ("検証", "検証データ（3data）の CSV")}   # 組 → (設定 FILES での名前, ダイアログの説明)
+PATH_MAX = 260     # Windows のパスの長さの上限（文字）
+DEEPEST = 90       # 学習結果フォルダの下の、最も長いファイルの場所の長さ（文字）の目安（せん断速度_粘度_拡張版/ の英語の凡例の図など）
 
 
-MODE_JA = {"shot": "ショットごとの入力", "cond": "条件平均の入力"}         # 入力の取り方（INPUT_MODE）の呼び名。結果のサブフォルダの名前にも使う
+def show_path(p):
+    """表や記録に書く場所：リポジトリの中なら、リポジトリ直下からの相対パス。外なら、そのまま（絶対パス）"""
+    a, r = os.path.abspath(p), os.path.abspath(REPO)
+    try:
+        inside = os.path.normcase(os.path.commonpath([a, r])) == os.path.normcase(r)
+    except ValueError:                                       # ドライブが違う
+        inside = False
+    return os.path.relpath(a, r) if inside else a
 
 
-def result_dir(mat, sub=""):
-    """結果の保存先（学習データ・検証データのフォルダと同じ場所の <材料フォルダ>_学習結果/）。
-    データの確認（sub = "データ確認"）は入力の取り方によらないので直下、モデルと比較の結果は、入力の取り方ごとのサブフォルダ（MODE_JA）の下"""
-    folder = MAT_FOLDERS[mat]
-    base = os.path.join(DATA_ROOT, folder, f"{folder}_学習結果")
-    d = os.path.join(base, sub) if sub in ("", "データ確認") else os.path.join(base, MODE_JA[INPUT_MODE], sub)
-    os.makedirs(d, exist_ok=True)
+def full_path(p):
+    """設定や記録に書いた場所 → 絶対パス（相対パスは、リポジトリ直下から）"""
+    return os.path.abspath(p if os.path.isabs(p) else os.path.join(REPO, p))
+
+
+def ask_path(title, kind="file", initialdir=None):
+    """ダイアログで、CSV ファイル（kind = "file"）かフォルダ（kind = "dir"）を選ぶ（tkinter）。選んだ場所を返す。
+    キャンセルしたら止める（例外）。ダイアログは、ほかのウィンドウの手前に出す（VS Code の後ろに隠れたら、タスクバーで探す）"""
+    import tkinter as tk
+    from tkinter import filedialog
+    print(f"ダイアログを開きます：{title}", flush=True)
+    root = tk.Tk()
+    root.withdraw()                                          # 空の親ウィンドウは見せない
+    root.attributes("-topmost", True)                       # ダイアログを、ほかのウィンドウの手前に出す
+    root.update()
+    start = initialdir if initialdir and os.path.isdir(initialdir) else None
+    try:
+        if kind == "file":
+            p = filedialog.askopenfilename(parent=root, title=title, initialdir=start, filetypes=[("CSV ファイル", "*.csv"), ("すべてのファイル", "*.*")])
+        else:
+            p = filedialog.askdirectory(parent=root, title=title, initialdir=start, mustexist=False)
+    finally:
+        root.destroy()
+    if not p:
+        raise RuntimeError(f"選ばれなかったので止めました（{title}）。もう一度、このセルから実行してください")
+    return os.path.normpath(p)
+
+
+def choose_inputs(mats, files=None, need_data=True):
+    """材料ごとに、学習データ（5data）・検証データ（3data）の CSV と、学習結果フォルダを決めて、SOURCES に記録する（実行の始めに、まとめて聞く）。
+    files（ノートの設定 FILES）：{材料: {"学習": CSV, "検証": CSV, "結果": フォルダ}}。書いてあるものはそれを使い、ないものはダイアログで選ぶ（相対パスは、リポジトリ直下から）。
+    need_data = False なら、学習結果フォルダだけを決める（データの場所は、学習済みモデルの記録から取る。data_from_model）。
+    同じ学習結果フォルダを 2 つの材料で選ぶと、結果が上書きされるので止める。決めたものの表を返す"""
+    files = files or {}
+    rows = []
+    for mat in mats:
+        f, src = files.get(mat, {}), SOURCES.setdefault(mat, {})
+        start = os.path.join(DATA_ROOT, MAT_FOLDERS.get(mat, ""))   # ダイアログの最初のフォルダ（05 フォルダの材料フォルダ）
+        for grp, (name, what) in DATA_KINDS.items():
+            if not (f.get(name) or need_data):
+                continue
+            p = full_path(f[name]) if f.get(name) else ask_path(f"【{MAT_NAMES[mat]}】{what} を選んでください", "file", start)
+            if not os.path.isfile(p):
+                raise FileNotFoundError(f"{MAT_NAMES[mat]}：{what} が見つかりません（{p}）")
+            src[grp] = p
+        d = full_path(f["結果"]) if f.get("結果") else ask_path(
+            f"【{MAT_NAMES[mat]}】学習結果フォルダを選んでください（この下に「{VERSION_DIRS['shot']}」「{VERSION_DIRS['cond']}」などを作ります）", "dir", start)
+        os.makedirs(d, exist_ok=True)
+        src["結果"] = d
+        if len(os.path.abspath(d)) + DEEPEST > PATH_MAX:
+            print(f"★ 注意：{MAT_NAMES[mat]} の学習結果フォルダの場所が長い（{len(os.path.abspath(d))} 文字）ので、中に作るファイルの場所が、"
+                  f"Windows の上限 {PATH_MAX} 文字を超えるおそれがあります。もっと浅いフォルダを選ぶと安全です")
+        rows.append({"材料": MAT_NAMES[mat], **{f"{DATA_KINDS[g][0]}データ": show_path(src[g]) for g in DATA_KINDS if src.get(g)}, "学習結果フォルダ": show_path(d)})
+    roots = [os.path.normcase(os.path.abspath(SOURCES[m]["結果"])) for m in mats]
+    dup = sorted({r for r in roots if roots.count(r) > 1})
+    if dup:
+        raise ValueError("2 つ以上の材料で、同じ学習結果フォルダが選ばれました（結果が上書きされます）。材料ごとに別のフォルダを選んでください：" + "、".join(dup))
+    return pd.DataFrame(rows)
+
+
+def data_from_model(mat, obj):
+    """学習済みモデル（joblib の中身 obj）に記録した、学習データ・検証データの場所を SOURCES に入れる（設定 FILES で決めたものは、そのまま使う）。
+    記録の場所にファイルがなければ、ダイアログで選ぶ"""
+    src = SOURCES.setdefault(mat, {})
+    for grp, (name, what) in DATA_KINDS.items():
+        if src.get(grp):
+            continue
+        rec = obj.get(f"{name}データのファイル")
+        p = full_path(rec) if rec else None
+        if not (p and os.path.isfile(p)):
+            print(f"【{MAT_NAMES[mat]}】学習済みモデルに記録された{what} が見つかりません（{rec}）")
+            p = ask_path(f"【{MAT_NAMES[mat]}】{what} を選んでください", "file", os.path.join(DATA_ROOT, MAT_FOLDERS.get(mat, "")))
+        src[grp] = p
+
+
+def result_root(mat):
+    """学習結果フォルダ（choose_inputs で決めたもの）"""
+    d = SOURCES.get(mat, {}).get("結果")
+    if not d:
+        raise RuntimeError(f"{MAT_NAMES[mat]}：学習結果フォルダが決まっていません（先に choose_inputs で決める）")
+    return d
+
+
+def result_dir(mat, *parts, make=True):
+    """学習結果フォルダの下の場所。parts の中のモデルの記号（B_Tset など）は、フォルダの名前（MODEL_DIRS）に直す。
+    make が True なら、フォルダがなければ作る（読むだけのときは False）。
+    例：result_dir(mat, "データ確認")、result_dir(mat, VERSION_DIRS[INPUT_MODE], THICK_TOTAL, "B_Tset")"""
+    d = os.path.join(result_root(mat), *[MODEL_DIRS.get(p, p) for p in parts])
+    if make:
+        os.makedirs(d, exist_ok=True)
     return d
 
 
 def path_of(mat, grp):
+    """読む CSV：choose_inputs で決めたもの。決めていなければ（ノートの外のスクリプト）、今までどおり 05 フォルダの材料フォルダから探す"""
+    if SOURCES.get(mat, {}).get(grp):
+        return SOURCES[mat][grp]
     fs = sorted(glob.glob(os.path.join(DATA_ROOT, MAT_FOLDERS[mat], GROUP_DIRS[grp], "*.csv")))
     assert len(fs) == 1, f"{MAT_FOLDERS[mat]}/{GROUP_DIRS[grp]} に CSV が 1 つだけあるはず（見つかったもの: {fs}）"
     return fs[0]
@@ -115,7 +220,7 @@ def problem_mask(df, mat, grp, plist, kinds):
 
 # ---------------------------------------------------------------- 読み込み
 def load(mat, grp, plist=None, exclude=None):
-    """結合ファイルを読み、形式を確かめ、問題データ一覧の「除外」を除く。
+    """結合ファイル（path_of：choose_inputs で選んだ CSV）を読み、形式を確かめ、問題データ一覧の「除外」を除く。
     加熱シリンダ温度の列がないファイル（PP の 3data）は、元ファイル名から設定温度を取る。列があれば、ファイル名と一致するかを確かめる。
     η・γ̇・P3_3 が 0 以下の行は対数がとれないので、一覧に登録がなくても除き、INVALID に記録する（判定で ★）。
     列 sens には「感度確認」の ID が入る（なければ空文字）。圧力は Pa に直してから ln をとる。Tff の ln は K で"""
@@ -159,7 +264,7 @@ def load(mat, grp, plist=None, exclude=None):
         df[f"ln_{c}_cm"] = df.groupby("cond")[f"ln_{c}"].transform("mean")
     df["Tff_cm"] = np.exp(df["ln_Tff_cm"]) - 273.15
     df["grp"] = grp
-    FILE_INFO[(mat, grp)] = {"材料": MAT_NAMES[mat], "組": grp, "ファイル": os.path.relpath(path, DATA_ROOT), "読んだ行数": n_raw,
+    FILE_INFO[(mat, grp)] = {"材料": MAT_NAMES[mat], "組": grp, "ファイル": show_path(path), "読んだ行数": n_raw,
                              "一覧で除外": n_raw - len(df) - int(bad.sum()), "0以下で除外（未登録）": int(bad.sum()), "使う行数": len(df),
                              "条件数": df["cond"].nunique(), "ショット/条件": f"{df.groupby('cond').size().min()}〜{df.groupby('cond').size().max()}",
                              "設定温度": "・".join(str(int(t)) for t in sorted(df["Tset"].unique())), "設定温度の取り方": "列" if has_tset else "元ファイル名",
@@ -216,7 +321,34 @@ def theta_names(cfg):
 MODEL_JA = {"B_Tset": "B_Tset（設定温度 Tset で横・縦にシフト）", "B_Tff": "B_Tff（流動中樹脂温度 Tff で横・縦にシフト）",
             "A_Tset": "A_Tset（Tset で縦だけシフト）", "A_Tff": "A_Tff（Tff で縦だけシフト）",
             "C": "C（シフト構造なし。4 変数を並べた通常の GPR）"}
+MODEL_DIRS = {"B_Tset": "B_Tset_温度シフトに加熱シリンダ温度採用", "B_Tff": "B_Tff_温度シフトに型内樹脂温度採用",
+              "A_Tset": "A_Tset_縦だけの温度シフトに加熱シリンダ温度採用", "A_Tff": "A_Tff_縦だけの温度シフトに型内樹脂温度採用",
+              "C": "C_温度シフトなし"}     # モデルの結果のフォルダの名前（記号_学習方法の短い説明。型内樹脂温度＝流動中樹脂温度 Tff。2026-10-27 のユーザー依頼）
 COL_JA = {"ln_gd": "ln γ̇", "ln_P33": "ln P3_3", "ln_Tff": "ln Tff", "Tset": "Tset"}
+
+
+def shift_key(col, struct="B"):
+    """シフトファクターに使うデータ列 → モデルの記号。col：学習ファイルの列名（"加熱シリンダ温度[℃]"・"加熱シリンダ温度(℃)"・"流動中樹脂温度(℃)"）か、
+    短い名前（"Tset"・"Tff"）。None（または空の文字）なら、シフトなしの "C"。struct："B"（横・縦を別々にずらす）か "A"（縦だけ）。温度でない列はエラー"""
+    if col is None or str(col).strip() == "":
+        return "C"
+    t = COLS.get(str(col).strip(), str(col).strip())
+    if t not in ("Tset", "Tff"):
+        raise ValueError(f"シフトファクターに使える列は、温度の列（加熱シリンダ温度・流動中樹脂温度）だけです（指定された列：{col}）")
+    if struct not in ("A", "B"):
+        raise ValueError(f"シフトの形は \"B\"（横・縦を別々）か \"A\"（縦だけ）です（指定：{struct}）")
+    return f"{struct}_{t}"
+
+
+def model_keys(cols, structs=("B",)):
+    """比べるモデルの記号の一覧（シフトの形 structs と、列 cols の組み合わせ。同じものは 1 つにする）"""
+    out = []
+    for s in structs:
+        for c in cols:
+            k = shift_key(c, s)
+            if k not in out:
+                out.append(k)
+    return out
 
 
 def layout(key):
@@ -229,8 +361,8 @@ def layout(key):
 
 
 def model_title(key, mode=None):
-    """図のタイトルに使うモデルの名前（入力の取り方つき）"""
-    return f"{MODEL_JA[key]}・{MODE_JA[INPUT_MODE if mode is None else mode]}"
+    """図のタイトルに使うモデルの名前（版〔入力の取り方〕つき）"""
+    return f"{MODEL_JA[key]}・{VERSION_DIRS[INPUT_MODE if mode is None else mode]}"
 
 
 def input_labels(key):
@@ -702,20 +834,16 @@ def tick_labels_overlap(fig, axis, gap=0.4):
 
 
 def save_fig(fig, out_dir, stem, show=None):
-    """図を out_dir に PNG で保存する（FIG_DPI）。HR_ALL が True なら、同じ図を HR_ALL_DPI（既定 600 dpi）で out_dir/highres/ にも保存する。
-    show（既定 SHOW_FIGS）なら表示し、閉じる"""
+    """図を out_dir に PNG で保存する（解像度 FIG_DPI。既定 600 dpi の 1 枚だけ。報告書・発表資料にそのまま使える。2026-10-27 から、低い解像度の版は作らない）。
+    show（既定 SHOW_FIGS）なら表示し、閉じる。保存したファイルの一覧を返す"""
     import matplotlib.pyplot as plt
     os.makedirs(out_dir, exist_ok=True)
-    paths = [os.path.join(out_dir, f"{stem}.png")]
-    fig.savefig(paths[0], dpi=FIG_DPI, bbox_inches="tight")
-    if HR_ALL:
-        os.makedirs(os.path.join(out_dir, "highres"), exist_ok=True)
-        paths.append(os.path.join(out_dir, "highres", f"{stem}.png"))
-        fig.savefig(paths[1], dpi=HR_ALL_DPI, bbox_inches="tight")
+    path = os.path.join(out_dir, f"{stem}.png")
+    fig.savefig(path, dpi=FIG_DPI, bbox_inches="tight")
     if SHOW_FIGS if show is None else show:
         plt.show()
     plt.close(fig)
-    return paths
+    return [path]
 
 
 DEP92_STYLE = {0.5: ("#d62728", "o", 14), 1.0: ("#1f77b4", "s", 13), 1.5: ("#ffd30ed9", "^", 12), 2.0: ("#41ea4f", "D", 11)}      # 6月のノートのセル9-2 の style_dict（色・形・zorder）
@@ -727,8 +855,8 @@ def dependency_plots_92(fit, mat, tr, out_dir, stem="依存性グラフ", **kw):
     """GPR6月ノートのセル9-2（目的変数に対する各説明変数の依存性グラフ）と同じ図を、学習データ（tr）と学習済みモデルで作る。
     説明変数ごとに 1 枚：その変数だけを動かし、ほかは学習データの平均（対数の変数は、対数の平均）に固定した、予測平均（赤線）と 95% 区間（帯）に、
     学習データ全部の点（色・形は厚み）を重ねる。図の大きさ・文字・点・目盛り（対数軸は 10 の累乗）・凡例・タイトルは、6月のセル9-2 と同じ。
-    設定（kw）：figsize、dpi、axis_fs・legend_fs・title_fs・tick_fs、plot_marker・legend_marker、show_xlabel・show_ylabel、ylim、xlim（変数 → (下限, 上限)）、n_grid、formats、show。
-    保存したファイルの一覧を返す"""
+    設定（kw）：figsize、dpi（保存の解像度。None なら FIG_DPI）、axis_fs・legend_fs・title_fs・tick_fs、plot_marker・legend_marker、show_xlabel・show_ylabel、ylim、
+    xlim（変数 → (下限, 上限)）、n_grid、formats、show。保存したファイルの一覧を返す"""
     import matplotlib.pyplot as plt
     import matplotlib.ticker as ticker
     from matplotlib.lines import Line2D
@@ -740,7 +868,7 @@ def dependency_plots_92(fit, mat, tr, out_dir, stem="依存性グラフ", **kw):
     base = {"gd": float(np.exp(tr["ln_gd"].mean())), "P33": float(np.exp(tr["ln_P33"].mean()) / 1e6), "Tff": float(np.exp(tr["ln_Tff"].mean()) - 273.15), "Tset": float(tr["Tset"].mean())}
     saved = []
     for var, name, sym, unit, logx, fname in DEP92_VARS:
-        fig, ax = plt.subplots(figsize=cfg["figsize"], dpi=dpi)
+        fig, ax = plt.subplots(figsize=cfg["figsize"])
         x = tr[var].to_numpy(float)
         lim = cfg["xlim"].get(var)
         if lim is None:                                           # 6月と同じ：データの範囲を、両側に 10% 広げる（対数軸の変数は、対数で）
@@ -792,9 +920,6 @@ def dependency_plots_92(fit, mat, tr, out_dir, stem="依存性グラフ", **kw):
             path = os.path.join(out_dir, f"{stem}_{fname}.{fmt}")
             fig.savefig(path, bbox_inches="tight", dpi=dpi)
             saved.append(path)
-        if HR_ALL and dpi < HR_ALL_DPI:
-            os.makedirs(os.path.join(out_dir, "highres"), exist_ok=True)
-            fig.savefig(os.path.join(out_dir, "highres", f"{stem}_{fname}.png"), bbox_inches="tight", dpi=HR_ALL_DPI)
         if SHOW_FIGS if cfg["show"] is None else cfg["show"]:
             plt.show()
         plt.close(fig)
@@ -876,9 +1001,6 @@ def flow_plot_common(fit, mat, pool, train_conds, out_dir, stem, tr=None, **kw):
             path = os.path.join(out_dir, f"{base}.{fmt}")
             fg.savefig(path, bbox_inches="tight", dpi=dpi)
             saved.append(path)
-        if HR_ALL and dpi < HR_ALL_DPI:
-            os.makedirs(os.path.join(out_dir, "highres"), exist_ok=True)
-            fg.savefig(os.path.join(out_dir, "highres", f"{base}.png"), bbox_inches="tight", dpi=HR_ALL_DPI)
 
     def draw_curve(ax, t, tff_med, col, lw, xl):
         """平均関数と 95% 区間を、グラフエリアの端（横軸の範囲 xl）まで描く（6月のセル9-2 と同じ。軸の範囲を変えても、常に端まで描く）"""
@@ -1073,9 +1195,6 @@ def flow_plot(fit, mat, pool, train_conds, out_dir, stem, **kw):
                 path = os.path.join(out_dir, f"{base}.{fmt}")
                 fig.savefig(path, bbox_inches="tight", dpi=dpi)
                 saved.append(path)
-            if HR_ALL and dpi < HR_ALL_DPI:
-                os.makedirs(os.path.join(out_dir, "highres"), exist_ok=True)
-                fig.savefig(os.path.join(out_dir, "highres", f"{base}.png"), bbox_inches="tight", dpi=HR_ALL_DPI)
             if SHOW_FIGS if cfg["show"] is None else cfg["show"]:
                 plt.show()
             plt.close(fig)

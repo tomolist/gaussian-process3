@@ -1,15 +1,18 @@
 # -*- coding: utf-8 -*-
-"""材料別の温度シフト GPR のノートに、Python 初心者向けの解説を 1 行ずつ付けた「解説付き」のノートを生成する（未実行）。
+"""材料別の温度シフト GPR のノート（学習用・シフトファクター検討用）に、Python 初心者向けの解説を 1 行ずつ付けた「解説付き」のノートを生成する（未実行）。
 
-使い方: uv run python 04_補助スクリプト/build_mat_shift_nb_commented.py [--force]
-既存ファイルがある場合は、--force を付けない限り上書きしない。
+使い方: uv run python 04_補助スクリプト/build_mat_shift_nb_commented.py [学習|検討] [--force]
+（学習・検討を書かなければ、両方を作る。既存ファイルがある場合は、--force を付けない限り上書きしない）
 
-- 元のノート（01_機械学習コードフォルダ/材料別_温度シフトファクター検討/材料別_温度シフトGPR_….ipynb）を読み、各コードセルの各行の上に、
-  解説の行（「# ▶ 」で始まるコメント）を差し込む。コードそのものは変えない。
-- 解説は 04_補助スクリプト/mat_shift_nb_解説/codeNN.txt（NN はコードセルの順番。長いセルは codeNN_a.txt・codeNN_b.txt … に分けてある）に、
-  「行番号 ⇒ 解説」の形で 1 行ずつ書いてある。行番号は、元のセルの中の行の番号（1 から）。
-  「 ⏎ 」で区切ると、解説を複数行に分けられる。各ファイルの「@sha1」は、元のセルの中身の指紋。元のノートを作り直してセルの中身が
-  変わったときは、ここでエラーになる（行番号がずれて、解説が別の行に付くのを防ぐため）。その場合は、解説ファイルを直す。
+- 元のノート（01_機械学習コードフォルダ/材料別_温度シフトファクター検討/ の下の、材料別_温度シフト機械学習コード/ の 材料別_温度シフトGPR_….ipynb〔学習用〕と
+  材料別_温度シフトファクター検討用コード/ の 材料別_温度シフトファクターの検討_….ipynb〔シフトファクター検討用。2026-10-27 に学習用から分けた〕）を読み、
+  各コードセルの各行の上に、解説の行（「# ▶ 」で始まるコメント）を差し込む。コードそのものは変えない。解説付きの版は、元のノートと同じフォルダに置く。
+- 解説は、学習用は 04_補助スクリプト/mat_shift_nb_解説/、シフトファクター検討用は mat_shiftfactor_nb_解説/ の codeNN.txt
+  （NN はコードセルの順番。長いセルは codeNN_a.txt・codeNN_b.txt … に分けてある）に、「行番号 ⇒ 解説」の形で 1 行ずつ書いてある。
+  行番号は、元のセルの中の行の番号（1 から）。「 ⏎ 」で区切ると、解説を複数行に分けられる。各ファイルの「@sha1」は、元のセルの中身の指紋。
+  元のノートを作り直してセルの中身が変わったときは、ここでエラーになる（行番号がずれて、解説が別の行に付くのを防ぐため）。その場合は、解説ファイルを直す。
+- シフトファクター検討用のノートで、解説のフォルダに同じ番号のファイルがないセルは、学習用の解説のフォルダから、@sha1 が同じセルの解説を使う
+  （ライブラリのセルや共通の部品のセルのように、2 つのノートで中身が同じセル）。
 - 解説を付けない行：空行、コメントだけの行、閉じかっこだけの行、複数行の文字列の 2 行目以降と、行末が \\ の次の行（コメントを挟めないため）。
 - 差し込んだ後のセルと元のセルの構文木（ast）が同じことを確かめる（＝実行したときの動作は元のノートと同じ）。
 """
@@ -24,21 +27,21 @@ import tokenize
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
-NAME = "材料別_温度シフトGPR_ARD対応Matern52＋線形＋ホワイトノイズ.ipynb"
 NB_DIR = os.path.join(REPO, "01_機械学習コードフォルダ", "材料別_温度シフトファクター検討")     # ユーザーがノートを移したフォルダ（2026-10-23）
-SRC = os.path.join(NB_DIR, NAME)
-OUT = os.path.join(NB_DIR, "解説付き_" + NAME)
-CDIR = os.path.join(HERE, "mat_shift_nb_解説")
+NOTEBOOKS = {     # 名前 → (NB_DIR の下のフォルダ〔2026-10-28 のユーザー依頼で分けた〕, 元のノート, 解説のフォルダ, 解説が見つからないときに @sha1 で探すフォルダ)
+    "学習": ("材料別_温度シフト機械学習コード", "材料別_温度シフトGPR_ARD対応Matern52＋線形＋ホワイトノイズ.ipynb", "mat_shift_nb_解説", []),
+    "検討": ("材料別_温度シフトファクター検討用コード", "材料別_温度シフトファクターの検討_ARD対応Matern52＋線形＋ホワイトノイズ.ipynb", "mat_shiftfactor_nb_解説", ["mat_shift_nb_解説"]),
+}
 MARK = "# ▶ "
 
 INTRO = r'''# 解説付きの版について
 
-このノートは、`材料別_温度シフトGPR_ARD対応Matern52＋線形＋ホワイトノイズ.ipynb`（元のノート）の**コードの各行に、Python 初心者向けの解説を付けた版**です。
+このノートは、`{name}`（元のノート）の**コードの各行に、Python 初心者向けの解説を付けた版**です。
 
 - **`# ▶` で始まる行が、すぐ下の行の解説**です（灰色のコメントで、実行には影響しません）。もとからあるコメント（`#` の後ろ）は、元のノートの説明です。
-- コードそのものは元のノートと同じです（生成するときに、構文が元のノートと同じことを確かめています）。**実行すると、元のノートと同じ結果が、同じフォルダ（`<材料フォルダ名>_学習結果/`）に上書き保存されます。**
+- コードそのものは元のノートと同じです（生成するときに、構文が元のノートと同じことを確かめています）。**実行すると、元のノートと同じように、実行の始めにダイアログで選んだ学習結果フォルダに、同じ結果が保存されます（同じフォルダを選ぶと、上書きされます）。**
 - 解説を付けていない行：空行、コメントだけの行、閉じかっこ `)`・`]`・`}` だけの行、複数行にまたがる文字列（`"""…"""` など）の 2 行目以降。
-- このノートは、`04_補助スクリプト/build_mat_shift_nb_commented.py` で作っています。元のノートを作り直したときは、このスクリプトを実行し直してください（元のセルの中身が変わっていたら、エラーで知らせます。そのときは解説ファイル `04_補助スクリプト/mat_shift_nb_解説/` を直します）。
+- このノートは、`04_補助スクリプト/build_mat_shift_nb_commented.py` で作っています。元のノートを作り直したときは、このスクリプトを実行し直してください（元のセルの中身が変わっていたら、エラーで知らせます。そのときは解説ファイル `04_補助スクリプト/{cdir}/` を直します）。
 
 ## Python の読み方の基本（このノートによく出る書き方）
 
@@ -145,19 +148,36 @@ def to_lines(s):
     return [l + "\n" for l in lines[:-1]] + [lines[-1]]
 
 
-def main():
-    if os.path.exists(OUT) and "--force" not in sys.argv[1:]:
-        sys.exit(f"既にファイルがあるため上書きしません（上書きするときは --force）: {OUT}")
-    nb = json.load(open(SRC, encoding="utf-8"))
+def by_sha1(dirs):
+    """解説のフォルダの中の解説ファイルを、セルの指紋（@sha1）ごとにまとめる：{sha1: [ファイル, …]}（codeNN_a・codeNN_b … は 1 つのセルの分）"""
+    out = {}
+    for d in dirs:
+        groups = {}
+        for p in sorted(glob.glob(os.path.join(HERE, d, "code*.txt"))):
+            groups.setdefault(os.path.basename(p)[:6], []).append(p)
+        for paths in groups.values():
+            h, _ = read_comments(paths)
+            if h:
+                out.setdefault(h, paths)
+    return out
+
+
+def build(folder, name, cdir_name, fallback):
+    src_nb, out_nb = os.path.join(NB_DIR, folder, name), os.path.join(NB_DIR, folder, "解説付き_" + name)
+    cdir = os.path.join(HERE, cdir_name)
+    if os.path.exists(out_nb) and "--force" not in sys.argv[1:]:
+        sys.exit(f"既にファイルがあるため上書きしません（上書きするときは --force）: {out_nb}")
+    nb = json.load(open(src_nb, encoding="utf-8"))
+    other = by_sha1(fallback)
     errors, k, n_com = [], 0, 0
     for c in nb["cells"]:
         if c["cell_type"] != "code":
             continue
         k += 1
         src = "".join(c["source"])
-        paths = sorted(glob.glob(os.path.join(CDIR, f"code{k:02d}*.txt")))
+        paths = sorted(glob.glob(os.path.join(cdir, f"code{k:02d}*.txt"))) or other.get(sha1(src), [])
         if not paths:
-            errors.append(f"code{k:02d}：解説ファイルがない（{CDIR}）")
+            errors.append(f"code{k:02d}：解説ファイルがない（{cdir}）")
             continue
         h, com = read_comments(paths)
         if h != sha1(src):
@@ -175,15 +195,22 @@ def main():
         c["source"] = to_lines(new)
         n_com += len(need)
     if errors:
-        sys.exit("エラー：\n" + "\n".join(errors))
-    intro = {"cell_type": "markdown", "id": "commented-intro", "metadata": {}, "source": to_lines(INTRO.strip("\n"))}
+        sys.exit(f"エラー（{name}）：\n" + "\n".join(errors))
+    text = INTRO.replace("{name}", name).replace("{cdir}", cdir_name)     # （INTRO には { } を含む Python の例があるので、format は使わない）
+    intro = {"cell_type": "markdown", "id": "commented-intro", "metadata": {}, "source": to_lines(text.strip("\n"))}
     nb["cells"].insert(0, intro)
     for c in nb["cells"]:
         if c["cell_type"] == "code":
             c["outputs"], c["execution_count"] = [], None
-    with open(OUT, "wb") as f:
+    with open(out_nb, "wb") as f:
         f.write((json.dumps(nb, sort_keys=True, indent=1, ensure_ascii=False) + "\n").encode("utf-8"))
-    print(f"作成: {os.path.relpath(OUT, REPO)}（コードセル {k} 個、解説を付けた行 {n_com} 行）")
+    print(f"作成: {os.path.relpath(out_nb, REPO)}（コードセル {k} 個、解説を付けた行 {n_com} 行）")
+
+
+def main():
+    names = [a for a in sys.argv[1:] if a in NOTEBOOKS] or list(NOTEBOOKS)
+    for n in names:
+        build(*NOTEBOOKS[n])
 
 
 if __name__ == "__main__":

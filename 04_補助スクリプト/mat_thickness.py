@@ -1,10 +1,12 @@
 # -*- coding: utf-8 -*-
 """材料別の温度シフト GPR の「厚みごとの比較」の部品。
 
-ノート（01_機械学習コードフォルダ/材料別_温度シフトファクター検討/材料別_温度シフトGPR_ARD対応Matern52＋線形＋ホワイトノイズ_厚みごとの比較.ipynb）の
+ノート（01_機械学習コードフォルダ/材料別_温度シフトファクター検討/材料別_温度シフトファクター検討用コード/材料別_温度シフトGPR_ARD対応Matern52＋線形＋ホワイトノイズ_厚みごとの比較.ipynb）の
 「厚みごとの比較の部品」のセルに、この中身（下の import の行を除く）がそのまま入る。直すときは、このファイルを直して、
 ノートを作り直す（04_補助スクリプト/build_mat_thick_nb.py）。ノートでは、この前のセルに mat_common の中身がある。
 モジュールとして import しても使える（mat_common の部品を、下の import で読み込む）。
+
+学習済みのモデルは、シフトファクター検討用のノート（2026-10-27 に学習用のノートから分けた）が保存したものを使う。
 
 調べること（ユーザー依頼、2026-10-22）：
   1. 厚みごとに、学習済みのモデルで、温度シフトファクターが効いているか（温度の順序、温度による粘度の比 R、換算前後のずれ）
@@ -58,7 +60,7 @@ def superpose_by_h(t):
 
 
 def best_superpose(pool_h, key, cfg, fine=None, max_refine=None):
-    """(a) 1 つの厚みのデータ（pool_h。5data＋3data）で、重ね合わせのずれが最小になる係数（横・縦）を、元のノートのプロファイル尤度と同じ格子で探す
+    """(a) 1 つの厚みのデータ（pool_h。5data＋3data）で、重ね合わせのずれが最小になる係数（横・縦）を、シフトファクター検討用のノートのプロファイル尤度と同じ格子で探す
     （粗い格子 → 最良の点の周りの細かい格子 → 最良の点が動いたら取り直す）。at_edge：最良の点が粗い格子の端"""
     fine = fine or FINE_B
     max_refine = MAX_REFINE if max_refine is None else max_refine
@@ -132,7 +134,7 @@ def thick_check(fit, pool):
 
 # ---------------------------------------------------------------- 2(b)・3：厚みごとに学習した GPR
 def thick_profile(key, tr, cfg, h, n_jobs=None, restarts=None, mode="shot"):
-    """(b) 1 つの厚みの 5data だけで、モデル key の係数をプロファイル尤度で決める（元のノートと同じ run_profile）。返り値：(格子の表, profile_best の辞書)"""
+    """(b) 1 つの厚みの 5data だけで、モデル key の係数をプロファイル尤度で決める（シフトファクター検討用のノートと同じ run_profile）。返り値：(格子の表, profile_best の辞書)"""
     pts, conv = run_profile(key, sub_h(tr, h), cfg, n_jobs=n_jobs, restarts=restarts, mode=mode)
     return pts, profile_best(pts, key, cfg, conv)
 
