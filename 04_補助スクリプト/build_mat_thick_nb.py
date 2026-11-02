@@ -9,6 +9,8 @@
 厚みごとに学習したモデルと全厚みの総合データのモデルのどちらがよいかを調べる（ユーザー依頼、2026-10-22。学習 5data・検証 3data のまま）。
 2026-10-27：読む場所と保存先を新しい結果の構成（<学習結果フォルダ>/<版>/全厚み総合/シフトファクターの検討/ → <版>/厚みごと/）にし、
 学習結果フォルダをダイアログで選ぶ形にした。図は 600 dpi だけを保存する。
+2026-11-02（ユーザー決定で、シフトファクターの型を材料ごとに分けなくなった）：設定 SHIFT_FORM の型のモデル（B_Tset_Arr・B_Tff_Arr など）を読み、
+結果は <版>/厚みごと/<型>/ に保存する。ノートの中では、型を付けずに B_Tset・B_Tff と呼ぶ（表の列名などは前のまま）。
 """
 import json
 import os
@@ -53,7 +55,7 @@ md(rf'''# 材料別の温度シフト GPR：厚みごとの比較
 | B_Tff | ln η = ln a_v(Tff) ＋ f( ln γ̇ ＋ ln a_h(Tff), ln P3_3, Tset ) | 流動中樹脂温度 Tff | 加熱シリンダ温度 Tset |
 | C（基準） | ln η = f( ln γ̇, ln P3_3, ln Tff, Tset ) | なし | 両方 |
 
-横のシフトファクター a_h、縦のシフトファクター a_v（基準温度 Tref で 1）。PP・粉砕材混合 PP はアレニウス型（係数 E_h・E_v [kJ/mol]）、GPPS は WLF 型（係数 A1_h・A1_v）。
+横のシフトファクター a_h、縦のシフトファクター a_v（基準温度 Tref で 1）。シフトファクターの型は、設定 `SHIFT_FORM` で選び、すべての材料に同じ型を使う（アレニウス型の係数は E_h・E_v [kJ/mol]、WLF 型は A1_h・A1_v。2026-11-02 のユーザー決定で、材料ごとに分けなくなった）。読むモデルは、シフトファクター検討用のノートが学習した、その型のモデル（アレニウス型なら B_Tset_Arr・B_Tff_Arr）。このノートの中では、型を付けずに B_Tset・B_Tff と呼ぶ。
 
 **1 の見方（4 節）**：厚みごとに、次の 3 つを見る。
 - 温度の順序：同じせん断速度で、低温ほど粘度が高いか（実測と予測）
@@ -76,17 +78,18 @@ md(f'''## 使い方
 
 **初めての人へ**：1 つ上のフォルダ（`材料別_温度シフトファクター検討/`）の説明書 `{MANUAL}` に、3 つのノートの目的・関係・使えるデータ（学習ファイルの条件）・使い方をまとめてある。先に読む。
 
-1. **先にシフトファクター検討用のノート `{MAIN_NB}` を実行しておく**（このノートは、その学習済みモデル `<モデルのフォルダ>/学習済みモデル_<モデル>.joblib` と予測値 `予測検証_3data_予測値.csv`、指標の表を読む。入力の取り方 `INPUT_MODE` は、そのノートと同じにする。比べる列 `SHIFT_COLS` は既定〔2 つの温度の列〕のままで実行しておく）。
+1. **先にシフトファクター検討用のノート `{MAIN_NB}` を実行しておく**（このノートは、その学習済みモデル `<モデルのフォルダ>/学習済みモデル_<モデル>.joblib` と予測値 `予測検証_3data_予測値.csv`、指標の表を読む。入力の取り方 `INPUT_MODE` は、そのノートと同じにする。比べる列 `SHIFT_COLS` は既定〔2 つの温度の列〕のまま、型 `SHIFT_FORMS` には、このノートの `SHIFT_FORM` の型を入れて実行しておく）。**注意：`SHIFT_FORM` の型は、`MATERIALS` のすべての材料に同じものを使う。材料ごとに型を変えたいとき（例：PP はアレニウス型、GPPS は WLF 型）は、`MATERIALS` を 1 つの材料にして、材料ごとに分けて実行する**（学習結果フォルダは材料ごとに別なので、結果は混ざらない）。
 2. メニューの「すべて実行」で、上から順に実行する（3 材料で約 10 分。大部分は 6 節のプロファイル尤度と、9 節の厚みごとのモデルの学習）。カーネルは、このプロジェクトの `.venv` を選ぶ。
 3. **実行の始めに（「2. 読み込み」のセルで）、材料ごとにダイアログが 1 回開く**：シフトファクター検討用のノートで選んだ**学習結果フォルダ**を選ぶ。学習データ・検証データの場所は、学習済みモデルに記録されたものを使う（ファイルが見つからないときだけ、ダイアログで選ぶ）。ダイアログが見当たらないときは、VS Code の後ろに隠れているので、タスクバーで探す。設定 `FILES` に書けば、ダイアログは出ない。
 4. 設定を変えたいときは、最初の「設定エリア」のセルだけを直して、最初から実行し直す（時間を短くする：`THICK_PROFILE = False`。6・9 節と、8 節の (b) を飛ばす）。
 5. 各節の最後に、**判定**が出る（`>> 判定：OK` か `>> 判定：★要確認`）。OK は「想定どおり」、★ は「想定と違う、または結果を読むときに注意が要る点」。★ が出ても、エラーではない。最後の「判定の一覧」に一覧が出る。
-6. 図と表は、学習結果フォルダの **`<版>/厚みごと/`**（版は `INPUT_MODE` で、`全ショット版` か `条件ごとの平均版`）に、次の 4 つのフォルダに分けて保存される。`判定の一覧.csv` は `厚みごと/` の直下。**図は、すべて 600 dpi の 1 枚だけ**（設定 `FIG_DPI`）。
+6. 図と表は、学習結果フォルダの **`<版>/厚みごと/<型>/`**（版は `INPUT_MODE` で、`全ショット版` か `条件ごとの平均版`。型は `SHIFT_FORM` で、`アレニウス型` か `WLF型`。型を変えて実行しても、上書きしない）に、次の 4 つのフォルダに分けて保存される。`判定の一覧.csv` は `厚みごと/<型>/` の直下。**図は、すべて 600 dpi の 1 枚だけ**（設定 `FIG_DPI`）。
    - `学習結果グラフ/`（3 節）、`温度シフトの確認/`（4 節）、`シフトに使う温度/`（5〜8 節の (a)(b)(c) とまとめ）、`厚みごとのモデルと総合の比較/`（9 節）
 7. 用語や図の見方は、説明書 `{PDF}` にある（10-26 までの結果で書いたもの。結果のフォルダの名前は、そのときの構成のまま）。''')
 md(r'''## 1. 設定''')
 code(r'''# セル1：設定エリア  ▼▼▼ 変えてよいのは、ここだけ ▼▼▼
 from pathlib import Path      # （下の REPO で、フォルダをたどるのに使う）
+SHIFT_FORM = "arrhenius"      # 読むモデルのシフトファクターの型："arrhenius"＝アレニウス型（B_Tset_Arr・B_Tff_Arr）／"wlf"＝WLF 型（B_Tset_WLF・B_Tff_WLF）。すべての材料に同じ型（2026-11-02）。材料ごとに型を変えたいときは、MATERIALS を 1 つの材料にして、材料ごとに分けて実行する
 SEED = 42                     # 乱数シード
 NOISE_LB = 1e-6               # ノイズ分散の下限（シフトファクター検討用のノートと同じ）
 USE_LINEAR = True             # 線形項（DotProduct）を足すか（シフトファクター検討用のノートと同じ）
@@ -141,25 +144,30 @@ code(COMMON_CELL)
 code(THICK_CELL)
 md(r'''### 読む結果と、結果の置き場所
 
-シフトファクター検討用のノートの結果（学習結果フォルダの `<版>/全厚み総合/シフトファクターの検討/`）を読み、このノートの結果を `<版>/厚みごと/` に保存する（版は `INPUT_MODE` で決まる：`全ショット版` か `条件ごとの平均版`）。''')
+シフトファクター検討用のノートの結果（学習結果フォルダの `<版>/全厚み総合/シフトファクターの検討/`）のうち、設定 `SHIFT_FORM` の型のモデルを読み、このノートの結果を `<版>/厚みごと/<型>/` に保存する（版は `INPUT_MODE` で決まる：`全ショット版` か `条件ごとの平均版`）。''')
 code(r'''# セル2b：読む結果と、結果の置き場所
+def study_key(key):
+    """このノートの中の記号（B_Tset・B_Tff・C）→ シフトファクター検討用のノートのモデルの記号（SHIFT_FORM の型を付ける。例：B_Tset_Arr）"""
+    return key if key == "C" else f"{key}_{FORMS[SHIFT_FORM]}"
+
+
 def study_dir(mat):
     """シフトファクター検討用のノートの結果のフォルダ：<学習結果フォルダ>/<版>/全厚み総合/シフトファクターの検討/（読むだけなので、フォルダは作らない）"""
     return result_dir(mat, VERSION_DIRS[INPUT_MODE], THICK_TOTAL, STUDY_DIR, make=False)
 
 
 def model_dir(mat, key):
-    """シフトファクター検討用のノートが保存した、モデルのフォルダ（study_dir の下の「記号_説明」のフォルダ）"""
-    return os.path.join(study_dir(mat), MODEL_DIRS[key])
+    """シフトファクター検討用のノートが保存した、モデルのフォルダ（study_dir の下の「記号_説明」のフォルダ。SHIFT_FORM の型のもの）"""
+    return os.path.join(study_dir(mat), MODEL_DIRS[study_key(key)])
 
 
 def out_dir(mat, sub=None):
-    """このノートの結果の置き場所：<学習結果フォルダ>/<版>/厚みごと/（sub があれば、その下のフォルダ）"""
-    return result_dir(mat, VERSION_DIRS[INPUT_MODE], THICK_EACH, *([sub] if sub else []))
+    """このノートの結果の置き場所：<学習結果フォルダ>/<版>/厚みごと/<型>/（sub があれば、その下のフォルダ）"""
+    return result_dir(mat, VERSION_DIRS[INPUT_MODE], THICK_EACH, FORM_JA[SHIFT_FORM], *([sub] if sub else []))
 
 
-print(f"読む結果：<学習結果フォルダ>/{VERSION_DIRS[INPUT_MODE]}/{THICK_TOTAL}/{STUDY_DIR}/")
-print(f"結果の置き場所：<学習結果フォルダ>/{VERSION_DIRS[INPUT_MODE]}/{THICK_EACH}/")''')
+print(f"読む結果：<学習結果フォルダ>/{VERSION_DIRS[INPUT_MODE]}/{THICK_TOTAL}/{STUDY_DIR}/ の " + "・".join(study_key(k) for k in KEYS))
+print(f"結果の置き場所：<学習結果フォルダ>/{VERSION_DIRS[INPUT_MODE]}/{THICK_EACH}/{FORM_JA[SHIFT_FORM]}/")''')
 
 # ---------------------------------------------------------------- 2. 読み込み
 md(r'''## 2. 学習済みモデルとデータの読み込み
@@ -174,9 +182,9 @@ display(choose_inputs(MATERIALS, FILES, need_data=False))      # 材料ごとに
 FITS, PRED, OBJ = {}, {}, {}
 for mat in MATERIALS:
     for key in KEYS:
-        path = os.path.join(model_dir(mat, key), f"学習済みモデル_{key}.joblib")
+        path = os.path.join(model_dir(mat, key), f"学習済みモデル_{study_key(key)}.joblib")
         if not os.path.exists(path):
-            raise FileNotFoundError(f"{path} がありません。先にシフトファクター検討用のノートを INPUT_MODE = '{INPUT_MODE}' で実行し、同じ学習結果フォルダを選んでください")
+            raise FileNotFoundError(f"{path} がありません。先にシフトファクター検討用のノートを INPUT_MODE = '{INPUT_MODE}'、SHIFT_FORMS に '{SHIFT_FORM}' を入れて実行し、同じ学習結果フォルダを選んでください")
         OBJ[(mat, key)] = joblib.load(path)
         if OBJ[(mat, key)]["材料"] != MAT_NAMES[mat]:
             raise ValueError(f"{path} は {OBJ[(mat, key)]['材料']} のモデルです（{MAT_NAMES[mat]} の学習結果フォルダを選んでください）")
@@ -356,7 +364,7 @@ for mat in MATERIALS:
             VAL += err_rows(sub_h(p, h), {"材料": MAT_NAMES[mat], "モデル": key, "学習": "総合", "厚み": h})
         allr = err_rows(p, {"材料": MAT_NAMES[mat], "モデル": key, "学習": "総合", "厚み": "全厚み"})
         VAL += allr
-        ref = float(met[(met["モデル"] == key) & (met["範囲"] == "全体")]["RMSE"].iloc[0])
+        ref = float(met[(met["モデル"] == study_key(key)) & (met["範囲"] == "全体")]["RMSE"].iloc[0])     # 指標の表のモデルの名前は、型の付いた記号
         judge(np.isclose(allr[0]["RMSE"], ref), f"(c) {key}：全厚みの RMSE（{allr[0]['RMSE']:.4f}）が、シフトファクター検討用のノートの指標の表（{ref:.4f}）と一致", mat, "7 (c) 検証データ")
 VAL = pd.DataFrame(VAL)
 VC = []
@@ -460,7 +468,7 @@ else:
 # ---------------------------------------------------------------- 10. 判定の一覧
 md(r'''## 10. 判定の一覧
 
-★ の行を確かめる。材料ごとに `厚みごと/判定の一覧.csv` に保存する。''')
+★ の行を確かめる。材料ごとに `厚みごと/<型>/判定の一覧.csv` に保存する。''')
 code(r'''# セル11：判定の一覧
 JT = pd.DataFrame(JUDGES)
 print(f"判定 {len(JT)} 件のうち、★要確認 {int((JT['判定'] != 'OK').sum())} 件")

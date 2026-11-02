@@ -7,6 +7,7 @@ report_mat_nb_manual_template.tex の @@項目@@ に、mat_common の設定（�
 そのフォルダで LuaLaTeX を 2 回動かす（補助ファイルは _tmp/report_mat_nb_manual/ に出す）。学習の結果は使わないので、ノートを実行していなくても作れる。
 2026-10-28（ユーザー依頼）：このフォルダを初めて開いた人向けに、ノートの目的・調べること・使えるデータ・使い方を 1 冊にまとめた。
 列・フォルダの名前・材料をコードから取るので、mat_common.py を直したときは、これを実行し直す。
+2026-11-02：シフトファクターの型を材料ごとに分けなくなった（ユーザー決定）ので、材料の表は基準温度と WLF 型の Tg だけにし、モデルのフォルダの表は型の付いた記号と C にした。
 """
 import os
 import re
@@ -62,15 +63,15 @@ V["RE_SRC"] = mc.RE_SRC
 rows = []
 for mat, name in mc.MAT_NAMES.items():
     cfg = mc.DEFAULT_SHIFT_CFG[mat]
-    form = "アレニウス型（係数 $\\Eh$・$\\Ev$、kJ/mol）" if cfg["type"] == "arrhenius" else f"WLF 型（係数 $A_{{1,h}}$・$A_{{1,v}}$。$A_2={cfg['A2']:g}$ K、$D_2=T_g$〔仮置き {cfg['Tg']:g} ℃〕を固定）"
-    rows.append(f"\\file{{{mat}}} & {esc(name)} & \\file{{{mc.MAT_FOLDERS[mat]}}} & {form} & {cfg['Tref']:g} ℃ \\\\")
+    rows.append(f"\\file{{{mat}}} & {esc(name)} & \\file{{{mc.MAT_FOLDERS[mat]}}} & {cfg['Tref']:g} ℃ & ${cfg['Tg']:g}$ ℃ \\\\")
 V["TABLE_MATS"] = "\n".join(rows)
 
 # ---- モデルのフォルダの名前（mat_common.MODEL_DIRS・MODEL_JA から）
-V["TABLE_MODEL_DIRS"] = "\n".join(f"{esc(k)} & \\file{{{d}}} & {esc(mc.MODEL_JA[k].split('（', 1)[1].rstrip('）'))} \\\\" for k, d in mc.MODEL_DIRS.items())
+V["TABLE_MODEL_DIRS"] = "\n".join(f"{esc(k)} & \\file{{{d}}} & {esc(mc.MODEL_JA[k].split('（', 1)[1].rstrip('）'))} \\\\" for k, d in mc.MODEL_DIRS.items()
+                                  if mc.key_form(k) or k == "C")     # 型の付いた記号と C（型の付かない記号は、10-26 までの結果のためだけに残してある）
 V["V_SHOT"], V["V_COND"] = mc.VERSION_DIRS["shot"], mc.VERSION_DIRS["cond"]
 V["THICK_TOTAL"], V["THICK_EACH"], V["STUDY_DIR"] = mc.THICK_TOTAL, mc.THICK_EACH, mc.STUDY_DIR
-for k in ["B_Tset", "B_Tff", "C"]:
+for k in ["B_Tset_Arr", "B_Tset_WLF", "B_Tff_Arr", "B_Tff_WLF", "C"]:
     V[f"DIR_{k.upper()}"] = mc.MODEL_DIRS[k]
 
 # ---- 05 フォルダの今のデータ（問題データ一覧の「除外」を除いた後）

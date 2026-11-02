@@ -97,19 +97,19 @@
 
 \subsection{モデル}
 \begin{table}[!htbp]
-\caption{比べるモデル。$f$ はガウス過程（GP）。どのモデルも両方の温度を使い、違うのは\textbf{シフトに使う温度}だけ}\label{tab:models}
+\caption{比べるモデル。$f$ はガウス過程（GP）。どのモデルも両方の温度を使い、違うのは\textbf{シフトに使う温度と型}だけ。記号の末尾は型（\_Arr＝アレニウス型、\_WLF＝WLF 型）}\label{tab:models}
 \small
-\begin{tabularx}{\linewidth}{@{}l>{\raggedright\arraybackslash}X@{}}
+\begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}p{0.25\linewidth}>{\raggedright\arraybackslash}X@{}}
 \toprule
 モデル & 式と考え方 \\
 \midrule
-B\_Tset & $\ln\eta=\ln a_v(\Tset)+f(\ln\gd+\ln a_h(\Tset),\ \ln\PIII,\ \ln\Tff)$。加熱シリンダ温度で横・縦にずらす \\
-B\_Tff & $\ln\eta=\ln a_v(\Tff)+f(\ln\gd+\ln a_h(\Tff),\ \ln\PIII,\ \Tset)$。流動中樹脂温度で横・縦にずらす \\
+B\_Tset\_Arr・B\_Tset\_WLF & $\ln\eta=\ln a_v(\Tset)+f(\ln\gd+\ln a_h(\Tset),\ \ln\PIII,\ \ln\Tff)$。加熱シリンダ温度で横・縦にずらす \\
+B\_Tff\_Arr・B\_Tff\_WLF & $\ln\eta=\ln a_v(\Tff)+f(\ln\gd+\ln a_h(\Tff),\ \ln\PIII,\ \Tset)$。流動中樹脂温度で横・縦にずらす \\
 C（基準） & $\ln\eta=f(\ln\gd,\ \ln\PIII,\ \ln\Tff,\ \Tset)$。シフトの構造なし。4 つを並べただけの通常の GPR \\
-A\_Tset・A\_Tff & 縦だけずらす対案（$a_h=1$）。設定で選んだときだけ作る \\
+A\_Tset\_Arr など & 縦だけずらす対案（$a_h=1$）。設定で選んだときだけ作る \\
 \midrule
 カーネル & 6月のノート（\file{01_機械学習コードフォルダ/原案_6月/GPR6月_ARD対応Matern52カーネル ＋ ホワイトノイズ.ipynb}）と同じ ARD Matern 5/2 ＋ ホワイトノイズに、線形項を足したもの（外挿で平均に戻らないように） \\
-シフトの式 & $a_h$（横）は「温度が変わると、同じ粘度になるせん断速度が $a_h$ 倍ずれる」、$a_v$（縦）は「同じせん断速度で、粘度が $a_v$ 倍になる」。基準温度 $T_{\mathrm{ref}}$ で 1。PP・粉砕材混合 PP はアレニウス型、GPPS は WLF 型（表 \ref{tab:mats}） \\
+シフトの式 & $a_h$（横）は「温度が変わると、同じ粘度になるせん断速度が $a_h$ 倍ずれる」、$a_v$（縦）は「同じせん断速度で、粘度が $a_v$ 倍になる」。基準温度 $T_{\mathrm{ref}}$ で 1。型は\textbf{アレニウス型}と \textbf{WLF 型}の 2 つで、\textbf{材料ごとに分けず、どの材料にも当てはめる}（①は両方を比べ、②③は設定で 1 つを選ぶ。2026 年 11 月 2 日のユーザーの決定。それまでは PP・粉砕材混合 PP がアレニウス型、GPPS が WLF 型）。WLF 型の $T_g$ は材料ごと（表 \ref{tab:mats}） \\
 係数の決め方 & シフトの係数（横と縦の 2 つ）を格子の上で動かし、各点で GPR を学習して、データへの合い具合（対数周辺尤度 LML）が最大の点を採る（プロファイル尤度） \\
 \bottomrule
 \end{tabularx}
@@ -121,7 +121,7 @@ A\_Tset・A\_Tff & 縦だけずらす対案（$a_h=1$）。設定で選んだと
 
 \subsection{ほかの検討との関係}
 \begin{points}
-\pt{本体の検討とは別}同じリポジトリの \file{01_機械学習コードフォルダ/検討お任せ/} の手順2〜5b のノートは、圧力と流動中樹脂温度を説明変数に\textbf{使わない}方針の、別の検討です（データも \file{02_検討お任せ用機械学習データ/} の別のファイル）。このフォルダのノートは、ユーザーの指定で、圧力 \PIII\ と $\Tff$ を説明変数に使います。2 つのモデルの記号（このフォルダの B\_Tset と、本体の B\_1 など）は別物です。
+\pt{本体の検討とは別}同じリポジトリの \file{01_機械学習コードフォルダ/検討お任せ/} の手順2〜5b のノートは、圧力と流動中樹脂温度を説明変数に\textbf{使わない}方針の、別の検討です（データも \file{02_検討お任せ用機械学習データ/} の別のファイル）。このフォルダのノートは、ユーザーの指定で、圧力 \PIII\ と $\Tff$ を説明変数に使います。2 つのモデルの記号（このフォルダの B\_Tset\_Arr などと、本体の B\_1 など）は別物です。
 \pt{基準}ノートの組み立て（設定エリア・図の見せ方・セルの番号の付け方）は、6月のノートにならっています。
 \end{points}
 
@@ -136,14 +136,14 @@ A\_Tset・A\_Tff & 縦だけずらす対案（$a_h=1$）。設定で選んだと
   arr/.style={-{Stealth[length=2.4mm]}, thick},
   lab/.style={font=\footnotesize, align=center, inner sep=1.5pt}]
 \node[data] (csv) {材料ごとの CSV\\学習データ（5data）\\検証データ（3data）};
-\node[nb=blue!8, right=10mm of csv] (study) {\textbf{① シフトファクター検討用}\\温度の列ごとのシフトと\\基準の C を比べる};
+\node[nb=blue!8, right=10mm of csv] (study) {\textbf{① シフトファクター検討用}\\温度の列と型ごとのシフトと\\基準の C を比べる};
 \node[nb=orange!12, right=15mm of study] (thick) {\textbf{③ 厚みごとの比較}\\①のモデルを\\厚みごとに見直す};
-\node[nb=green!10, below=22mm of study] (train) {\textbf{② 学習用}\\設定 \texttt{SHIFT\_COL} の\\1 つのモデルを学習};
+\node[nb=green!10, below=22mm of study] (train) {\textbf{② 学習用}\\設定 \texttt{SHIFT\_COL}・\texttt{SHIFT\_FORM}\\の 1 つのモデルを学習};
 \node[nb=gray!10, below=22mm of thick] (res) {\textbf{学習結果フォルダ}（材料ごと）\\3 つのノートが、それぞれの\\場所に結果を書く（5.4 節）};
 \draw[arr] (csv) -- (study);
 \draw[arr] (csv) |- (train);
 \draw[arr] (study) -- node[lab, above=1pt] {学習済み} node[lab, below=1pt] {モデル} (thick);
-\draw[arr, dashed] (study) -- node[lab, left=2pt] {まとめの \texttt{SHIFT\_COL} の\\候補を見て人が決め、\\②の設定に書く} (train);
+\draw[arr, dashed] (study) -- node[lab, left=2pt] {まとめの \texttt{SHIFT\_COL}・\\\texttt{SHIFT\_FORM} の候補を\\見て人が決め、②に書く} (train);
 \draw[arr, gray] (train) -- (res);
 \draw[arr, gray] (thick) -- (res);
 \draw[arr, gray] (study.south east) -- (res.north west);
@@ -152,9 +152,9 @@ A\_Tset・A\_Tff & 縦だけずらす対案（$a_h=1$）。設定で選んだと
 \end{figure}
 
 \begin{enumerate}[itemsep=0.4ex,topsep=0.5ex]
-\item \textbf{①シフトファクター検討用を実行する}。最後の「まとめ」に、材料ごとに「学習用のノートの \file{SHIFT_COL} の候補」が出ます（温度のシフトがデータで最も強く支持された列。どれも支持されなければ、シフトなしの \file{None} も候補）。
-\item \textbf{②学習用の設定 \file{SHIFT_COL} を決めて、実行する}。候補を参考に、3data の誤差なども見て、人が決めます。決まっていれば、①を飛ばして②だけを実行してもかまいません（2026 年 10 月 23 日の結果では、全ショット版で B\_Tset が支持され、既定の \file{SHIFT_COL} は加熱シリンダ温度です）。
-\item \textbf{③厚みごとの比較は、①の後で実行する}（②とは独立）。①と同じ入力の取り方（\file{INPUT_MODE}）にし、①の比べる列（\file{SHIFT_COLS}）は既定のままにしておきます（③は B\_Tset・B\_Tff・C の 3 つのモデルを読むため）。
+\item \textbf{①シフトファクター検討用を実行する}。選んだすべての材料に、アレニウス型と WLF 型の両方を当てはめて比べます（設定 \file{SHIFT_FORMS}）。最後の「まとめ」に、材料ごとに「学習用のノートの \file{SHIFT_COL}・\file{SHIFT_FORM} の候補」が出ます（温度のシフトがデータで最も強く支持された列と型。どれも支持されなければ、シフトなしの \file{None} も候補）。
+\item \textbf{②学習用の設定 \file{SHIFT_COL}・\file{SHIFT_FORM} を決めて、実行する}。候補を参考に、3data の誤差なども見て、人が決めます。\file{SHIFT_FORM} の型は、選んだすべての材料に使います（材料で候補の型が違うときは、材料ごとに実行を分けるか、どちらかにそろえる）。決まっていれば、①を飛ばして②だけを実行してもかまいません（2026 年 10 月 23 日の結果では、全ショット版で B\_Tset が支持され、既定の \file{SHIFT_COL} は加熱シリンダ温度です。既定の \file{SHIFT_FORM} はアレニウス型）。
+\item \textbf{③厚みごとの比較は、①の後で実行する}（②とは独立）。①と同じ入力の取り方（\file{INPUT_MODE}）にし、①の比べる列（\file{SHIFT_COLS}）は既定のまま、型（\file{SHIFT_FORMS}）には③の設定 \file{SHIFT_FORM} の型を入れておきます（③は、その型の B\_Tset・B\_Tff と C の 3 つのモデルを読むため）。
 \end{enumerate}
 解説付きの版は、元のノートと同じ動きをするので、どちらか一方を実行すれば十分です（同じ学習結果フォルダを選ぶと、結果は上書きされます）。
 
@@ -214,18 +214,18 @@ CSV は \textbf{UTF-8}（BOM 付きでも、なしでもよい）で保存して
 \begin{table}[!htbp]
 \caption{ノートが扱える材料。設定 \file{MATERIALS} には、左の記号を書く}\label{tab:mats}
 \small
-\begin{tabularx}{\linewidth}{@{}ll>{\raggedright\arraybackslash}p{0.25\linewidth}>{\raggedright\arraybackslash}X r@{}}
+\begin{tabularx}{\linewidth}{@{}ll>{\raggedright\arraybackslash}X r r@{}}
 \toprule
-記号 & 名前 & 05 フォルダの材料フォルダ & シフトファクターの式 & $T_{\mathrm{ref}}$ \\
+記号 & 名前 & 05 フォルダの材料フォルダ & $T_{\mathrm{ref}}$ & WLF 型の $T_g$（仮置き） \\
 \midrule
 @@TABLE_MATS@@
 \bottomrule
 \end{tabularx}
 \end{table}
 \begin{points}
-\pt{ほかの材料}この 3 つ以外の材料は、そのままでは使えません（設定 \file{MATERIALS} に書くと \file{KeyError} で止まります）。使うには、\file{04_補助スクリプト/mat_common.py} の \file{MAT_NAMES}・\file{MAT_FOLDERS} と、各ノートの設定 \file{SHIFT_CFG}（シフトの式・基準温度・係数の格子）に足して、ノートを作り直す必要があります（7 章）。
+\pt{ほかの材料}この 3 つ以外の材料は、そのままでは使えません（設定 \file{MATERIALS} に書くと \file{KeyError} で止まります）。使うには、\file{04_補助スクリプト/mat_common.py} の \file{MAT_NAMES}・\file{MAT_FOLDERS} と、各ノートの設定 \file{SHIFT_CFG}（基準温度と WLF 型の $T_g$）に足して、ノートを作り直す必要があります（7 章）。
 \pt{設定温度}学習・検証とも 3 水準あることを想定しています（足りなければ判定が ★）。基準温度 $T_{\mathrm{ref}}$ は、学習データの設定温度の範囲の中にある必要があります（外なら ★。材料とファイルの組み合わせを確かめる）。
-\pt{GPPS のガラス転移温度}WLF 型の $T_g$ は仮置き（100 ℃）です。分かれば、設定 \file{SHIFT_CFG} の \file{"Tg"} を直します。
+\pt{シフトファクターの型}アレニウス型と WLF 型は、材料ごとに分けず、どの材料にも当てはめます（2026 年 11 月 2 日から）。WLF 型の $T_g$（式の $D_2$）は、PP・粉砕材混合 PP が $-10$ ℃（Moldflow の PP でよく使われる値）、GPPS が 100 ℃ の仮置きです。分かれば、設定 \file{SHIFT_CFG} の \file{"Tg"} を直します。
 \end{points}
 
 \subsection{問題データ一覧}
@@ -297,7 +297,8 @@ BOM なしの UTF-8 & そのまま読める \\
 \file{N_RESTARTS} & 最終モデルの最適化のやり直し回数（20） \\
 \file{PROFILE_RESTARTS} & プロファイル尤度の格子の各点でのやり直し回数（1。0 にすると時間が約半分） \\
 \file{USE_EXCLUSIONS} & 問題データ一覧の「除外」を除くか（\file{True}） \\
-\file{SHIFT_CFG} & 材料ごとのシフトの式・基準温度・係数を調べる範囲（①・②） \\
+\file{SHIFT_FORMS}・\file{SHIFT_FORM} & シフトファクターの型（\file{"arrhenius"}・\file{"wlf"}）。①は \file{SHIFT_FORMS} で比べる型（既定は両方）、②③は \file{SHIFT_FORM} で 1 つ（既定はアレニウス型）。どれも、選んだすべての材料に同じ型を当てはめる \\
+\file{SHIFT_CFG}・\file{FORM_CFG} & 材料ごとの基準温度と WLF 型の $T_g$（\file{SHIFT_CFG}）、型ごとの係数を調べる範囲と細かい格子（\file{FORM_CFG}）（①・②） \\
 \file{FIG_DPI}、\file{SHOW_FIGS} & 保存する図の解像度（600 dpi）、図をノートにも表示するか \\
 \file{N_JOBS} & 並列に計算する数（8。CPU の数に合わせる） \\
 \bottomrule
@@ -330,17 +331,20 @@ FILES = {"PP": {
 .2 データ確認/\DTcomment{データの概要・一覧で除いた行（①②）、外れ値の検知・\PIII\ の性質（②）}.
 .2 @@V_SHOT@@/\DTcomment{\file{INPUT_MODE = "shot"}（既定）}.
 .3 @@THICK_TOTAL@@/\DTcomment{全厚みの 5data で 1 つのモデルを学習した結果}.
-.4 \file{@@DIR_B_TSET@@}/\DTcomment{②学習用（\file{SHIFT_COL} で選んだモデルの名前）}.
+.4 \file{@@DIR_B_TSET_ARR@@}/\DTcomment{②学習用（\file{SHIFT_COL}・\file{SHIFT_FORM} で選んだモデルの名前）}.
 .4 @@STUDY_DIR@@/\DTcomment{①検討用：モデルを比べる表と図}.
-.5 \file{@@DIR_B_TSET@@}/\DTcomment{①の各モデル}.
-.5 \file{@@DIR_B_TFF@@}/.
+.5 \file{@@DIR_B_TSET_ARR@@}/\DTcomment{①の各モデル（型ごと）}.
+.5 \file{@@DIR_B_TSET_WLF@@}/.
+.5 \file{@@DIR_B_TFF_ARR@@}/.
+.5 \file{@@DIR_B_TFF_WLF@@}/.
 .5 \file{@@DIR_C@@}/.
 .3 @@THICK_EACH@@/\DTcomment{③厚みごとの比較}.
-.4 学習結果グラフ/.
-.4 温度シフトの確認/.
-.4 シフトに使う温度/.
-.4 厚みごとのモデルと総合の比較/.
-.4 {判定の一覧.csv}.
+.4 アレニウス型/\DTcomment{③の \file{SHIFT_FORM} の型ごと（WLF 型なら \file{WLF型/}）}.
+.5 学習結果グラフ/.
+.5 温度シフトの確認/.
+.5 シフトに使う温度/.
+.5 厚みごとのモデルと総合の比較/.
+.5 {判定の一覧.csv}.
 .2 @@V_COND@@/\DTcomment{\file{INPUT_MODE = "cond"}（同じ構成）}.
 }
 \caption{学習結果フォルダの中の構成}\label{fig:tree}
@@ -379,9 +383,9 @@ FILES = {"PP": {
 \subsection{① シフトファクター検討用}
 \begin{points}
 \pt{ファイル}\file{@@DIR_STUDY@@/@@NB_STUDY@@}
-\pt{目的}温度のデータ列ごとに、シフトファクターを推定して、シフトのない基準のモデル C と比べ、\textbf{どの列をシフトに使うのが適しているか}を調べます。②で使う列（\file{SHIFT_COL}）を決める材料にします。
-\pt{主な設定}\file{SHIFT_COLS}：比べる列（既定 \file{["加熱シリンダ温度[℃]", "流動中樹脂温度(℃)"]}。B\_Tset・B\_Tff ができる。C はいつも学習する）。\file{STRUCTS}：シフトの形（\file{["B"]}。\file{["B", "A"]} で対案 A も）。\file{MAIN_KEY}：図をノートに表示するモデル。
-\pt{時間}3 材料で、全ショット版 約 40 分、条件ごとの平均版 約 80 分（大部分はプロファイル尤度）。
+\pt{目的}温度のデータ列と型（アレニウス型・WLF 型）の組み合わせごとに、シフトファクターを推定して、シフトのない基準のモデル C と比べ、\textbf{どの列と型をシフトに使うのが適しているか}を調べます。②で使う列と型（\file{SHIFT_COL}・\file{SHIFT_FORM}）を決める材料にします。
+\pt{主な設定}\file{SHIFT_COLS}：比べる列（既定 \file{["加熱シリンダ温度[℃]", "流動中樹脂温度(℃)"]}）。\file{SHIFT_FORMS}：比べる型（既定 \file{["arrhenius", "wlf"]}）。列と型の組み合わせごとに B\_Tset\_Arr・B\_Tset\_WLF・B\_Tff\_Arr・B\_Tff\_WLF ができる（C はいつも学習する）。\file{STRUCTS}：シフトの形（\file{["B"]}。\file{["B", "A"]} で対案 A も）。\file{MAIN_KEY}：図をノートに表示するモデル。
+\pt{時間}3 材料・2 つの型で、全ショット版 約 1.5 時間、条件ごとの平均版 約 3 時間（型が 1 つのときの約 2 倍。大部分はプロファイル尤度）。
 \end{points}
 \begin{table}[!htbp]
 \caption{①の節の流れ}\label{tab:study}
@@ -396,7 +400,7 @@ FILES = {"PP": {
 5. シフトファクター & 温度ごとの倍率の図と、マスターカーブ（シフトで温度ごとの曲線が重なるか。\textbf{低温ほど粘い向きか}） \\
 6. 3data の予測 & 誤差（RMSE）と 95\% 予測区間に入る割合（\textbf{C の 1.1 倍以内か}、入る割合が 0.8 以上か）、RMSE の比較の図 \\
 7. 保存 & 学習済みモデル（③が読む） \\
-8. まとめ & 判定の一覧と、材料ごとの「\file{SHIFT_COL} の候補」（$\Delta$LML が 3.0 以上で最大の列） \\
+8. まとめ & 判定の一覧と、材料ごとの「\file{SHIFT_COL}・\file{SHIFT_FORM} の候補」（$\Delta$LML が 3.0 以上で最大の列と型） \\
 \bottomrule
 \end{tabularx}
 \end{table}
@@ -406,7 +410,7 @@ FILES = {"PP": {
 \begin{points}
 \pt{ファイル}\file{@@DIR_TRAIN@@/@@NB_TRAIN@@}
 \pt{目的}シフトに使う列を 1 つ決めて、\textbf{そのモデルを学習し、データの確認から報告書用の図まで一式を作ります}。6月のノートの図（損失関数の推移・特徴スケール・カーネル行列・依存性グラフ・せん断速度 ― 粘度・3次元グラフ）を、同じ見せ方で作ります。
-\pt{主な設定}\file{SHIFT_COL}：シフトに使う列（学習ファイルの列名で書く）。\file{"加熱シリンダ温度[℃]"}（既定。B\_Tset）、\file{"流動中樹脂温度(℃)"}（B\_Tff）、\file{None}（シフトなし。C）。GPPS の書き方 \file{"加熱シリンダ温度(℃)"}、短い名前 \file{"Tset"}・\file{"Tff"} も使えます。温度でない列を書くと止まります。\file{SHIFT_STRUCT}：\file{"B"}（横・縦）か \file{"A"}（縦だけ）。そのほか、外れ値を一覧に登録する材料（\file{OUTLIER_REGISTER}）、参考の Cross-WLF の設定（\file{CWLF_*}）。
+\pt{主な設定}\file{SHIFT_COL}：シフトに使う列（学習ファイルの列名で書く）。\file{"加熱シリンダ温度[℃]"}（既定。B\_Tset\_Arr・B\_Tset\_WLF）、\file{"流動中樹脂温度(℃)"}（B\_Tff\_Arr・B\_Tff\_WLF）、\file{None}（シフトなし。C）。GPPS の書き方 \file{"加熱シリンダ温度(℃)"}、短い名前 \file{"Tset"}・\file{"Tff"} も使えます。温度でない列を書くと止まります。\file{SHIFT_STRUCT}：\file{"B"}（横・縦）か \file{"A"}（縦だけ）。\file{SHIFT_FORM}：型（\file{"arrhenius"}〔既定〕か \file{"wlf"}。選んだすべての材料に同じ型を使う。記号の末尾が \_Arr・\_WLF になる）。そのほか、外れ値を一覧に登録する材料（\file{OUTLIER_REGISTER}）、参考の Cross-WLF の設定（\file{CWLF_*}）。
 \pt{時間}3 材料で、全ショット版 約 25 分、条件ごとの平均版 約 45 分（C なら約 10 分）。
 \end{points}
 \begin{table}[!htbp]
@@ -432,15 +436,15 @@ FILES = {"PP": {
 \end{table}
 \begin{points}
 \pt{図だけを描き直す}セル16・16-2・17（せん断速度 ― 粘度、依存性グラフ、3次元グラフ）は、セルの先頭に専用の設定エリアがあり、全体を一度実行した後で、\textbf{そのセルだけを直して実行し直せます}（学習はやり直しません）。軸の範囲・図の大きさ・文字の大きさ・タイトルなどを変えられます。
-\pt{出力}\file{<版>/@@THICK_TOTAL@@/<モデルのフォルダ>/}（例：\file{@@DIR_B_TSET@@/}）に、すべての図・表・判定の一覧・まとめ・学習済みモデル。中に \file{せん断速度_粘度/}・\file{せん断速度_粘度_拡張版/}・\file{依存性グラフ_セル9-2/}・\file{3次元グラフ/}。外れ値の検知と \PIII\ の性質は \file{データ確認/}。
+\pt{出力}\file{<版>/@@THICK_TOTAL@@/<モデルのフォルダ>/}（例：\file{@@DIR_B_TSET_ARR@@/}。型ごとに別のフォルダ）に、すべての図・表・判定の一覧・まとめ・学習済みモデル。中に \file{せん断速度_粘度/}・\file{せん断速度_粘度_拡張版/}・\file{依存性グラフ_セル9-2/}・\file{3次元グラフ/}。外れ値の検知と \PIII\ の性質は \file{データ確認/}。
 \end{points}
 
 \subsection{③ 厚みごとの比較}
 \begin{points}
 \pt{ファイル}\file{@@DIR_STUDY@@/@@NB_THICK@@}
 \pt{目的}①で全厚みのデータから学習したモデルを、\textbf{キャビティ厚みごとに}見直します。調べることは 3 つです：厚みごとに温度シフトが効いているか（4 節）、厚みごとにシフトに使う温度は $\Tff$ と $\Tset$ のどちらが適しているか（5〜8 節）、厚みごとに学習したモデルと全厚みのモデルのどちらがよいか（9 節）。
-\pt{前提}①を、同じ \file{INPUT_MODE} で、\file{SHIFT_COLS} を既定のままにして実行しておくこと。厚みが 2 水準以上あるデータを想定しています。
-\pt{主な設定}\file{THICK_PROFILE}（厚みごとのプロファイル尤度と 9 節を行うか。\file{False} で速くなる）、\file{THICK_MODELS}（9 節）、差ありとする基準 \file{A_CLEAR}（0.5 ポイント）・\file{DL_CLEAR}（3.0）・\file{ERR_CLEAR}（1.0 ポイント）、学習結果グラフの点 \file{FLOW_POINTS}。
+\pt{前提}①を、同じ \file{INPUT_MODE} で、\file{SHIFT_COLS} を既定のまま、\file{SHIFT_FORMS} に③の \file{SHIFT_FORM} の型を入れて実行しておくこと。厚みが 2 水準以上あるデータを想定しています。
+\pt{主な設定}\file{SHIFT_FORM}（読むモデルの型。\file{"arrhenius"}〔既定〕か \file{"wlf"}。結果は \file{@@THICK_EACH@@/<型>/} に分けて保存）、\file{THICK_PROFILE}（厚みごとのプロファイル尤度と 9 節を行うか。\file{False} で速くなる）、\file{THICK_MODELS}（9 節）、差ありとする基準 \file{A_CLEAR}（0.5 ポイント）・\file{DL_CLEAR}（3.0）・\file{ERR_CLEAR}（1.0 ポイント）、学習結果グラフの点 \file{FLOW_POINTS}。
 \pt{時間}3 材料で約 10 分。
 \end{points}
 \begin{table}[!htbp]
@@ -538,7 +542,7 @@ uv run python 04_補助スクリプト/build_mat_nb_manual.py
 \term{カーネル}「入力が近い点どうしは、出力も似ている」という度合いを決める関数。ARD Matern 5/2 は、入力ごとに「どれだけ離れると似なくなるか」（長さスケール）を別々に学ぶ。線形項は、学習の範囲の外を一次式で延ばす役目。ホワイトノイズは、同じ条件でもショットごとにばらつく分。
 \term{見かけの粘度・せん断速度}2 つの圧力センサの間を樹脂が流れる時間と圧力の差から、簡単な式（スリット近似）で求めた粘度とせん断速度。せん断発熱や冷却の影響も含んだ「見かけ」の値。
 \term{シフトファクター $a(T)$}温度による粘度の曲線のずれの大きさ。横（$a_h$）と縦（$a_v$）がある。基準温度 $T_{\mathrm{ref}}$ で 1。
-\term{アレニウス型・WLF 型}シフトファクターの温度の式。結晶性の樹脂（PP）はアレニウス型、非晶性の樹脂（GPPS）は WLF 型がよく使われる。
+\term{アレニウス型・WLF 型}シフトファクターの温度の式。結晶性の樹脂（PP）はアレニウス型、非晶性の樹脂（GPPS）は WLF 型がよく使われる。このフォルダのノートでは、材料ごとに分けず、どの材料にも両方を当てはめて比べられる（2026 年 11 月 2 日から）。
 \term{対数周辺尤度（LML）}モデルがデータにどれだけ合うかを表す数（大きいほど合う）。複雑すぎるモデルには自動で罰がかかる。
 \term{$\Delta$LML}シフトの係数を最良にしたときと、係数 0（シフトなし）のときの LML の差。3.0 以上なら、シフトがデータで支持されたと判断する（尤度比検定の 5\% の基準）。
 \term{プロファイル尤度}係数を格子の上で動かし、各点でほかのパラメータを最適にしたときの LML。最大の点を係数の推定値にする。

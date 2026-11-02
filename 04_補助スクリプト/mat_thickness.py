@@ -111,6 +111,7 @@ def thick_check(fit, pool):
     """1 の表：厚みごとに、温度による粘度の比 R（実測・予測）、温度の順序、学習済みの係数で換算する前後のずれ、判定（○・△・×）。
     ○：順序が一致し、|ln R_予測 − ln R_実測| がショット間の標準偏差（純粋誤差、shot_sd）以内で、換算後のずれ < 換算前。×：予測の順序が実測と逆。△：それ以外"""
     key, cfg = fit["key"], fit["cfg"]
+    name = key.rsplit("_", 1)[0] if key_form(key) else key     # 表のモデルの名前：このノートの中の呼び名（型を付けない B_Tset・B_Tff。学習済みモデルの記号は B_Tset_Arr など。2026-11-02）
     noise_sd = float(np.sqrt(fit["gp"].kernel_.k2.noise_level))
     tol = shot_sd(pool)
     before = superpose_by_h(shifted_cond_means(pool, None, cfg, 0.0, 0.0))
@@ -124,7 +125,7 @@ def thick_check(fit, pool):
         size_ok = bool(np.isfinite(r_obs) and np.isfinite(r_pred) and abs(np.log(r_pred) - np.log(r_obs)) <= tol)
         shift_ok = bool(after[h][0] < before[h][0])
         mark = "○" if (order_ok and size_ok and shift_ok) else ("×" if not order_ok else "△")
-        rows.append({"材料": None, "モデル": key, "厚み": h, "条件数": len(cm), "R_実測": r_obs, "R_予測": r_pred,
+        rows.append({"材料": None, "モデル": name, "厚み": h, "条件数": len(cm), "R_実測": r_obs, "R_予測": r_pred,
                      "lnR の差": (np.log(r_pred) - np.log(r_obs)) if np.isfinite(r_obs) and np.isfinite(r_pred) else np.nan, "許容差（ショット間の標準偏差）": tol,
                      "ノイズの標準偏差": noise_sd,
                      "比べた γ̇ の範囲": f"{g0:.0f}〜{g1:.0f}" if np.isfinite(g0) else "なし", "順序が一致": order_ok, "比の大きさが一致": size_ok,

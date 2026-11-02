@@ -9,7 +9,8 @@ build_mat_shiftfactor_nb.py・build_mat_thick_nb.py）。
 （説明変数 γ̇・P3_3・Tff・Tset。H は入れない）に合わせて直したもの。モジュールとして import しても使える。
 設定値（SEED など）は、ノートの「設定エリア」で先に決めた値があれば、それを使う。
 読むデータと結果の置き場所は、ノートの実行のときにダイアログで選ぶ（choose_inputs。2026-10-27 から）。何も選ばずに load_all を呼ぶと
-（ノートの外のスクリプト）、今までどおり 05 フォルダの材料フォルダから CSV を探す。
+（ノートの外のスクリプト）、今までどおり 05 フォルダの材料フォルダから CSV を探す（名前に「温度適切」を含むフォルダは除く。2026-11-02）。
+シフトファクターの型（アレニウス型・WLF 型）は、材料ごとに分けず、どの材料にも両方を当てはめられる（2026-11-02 のユーザー決定）。
 """
 import glob
 import os
@@ -71,7 +72,7 @@ STUDY_DIR = "シフトファクターの検討"                  # 全厚み総�
 MODE_JA = {"shot": "ショットごとの入力", "cond": "条件平均の入力"}   # 10-26 までの結果のフォルダの名前（<材料フォルダ>_学習結果/ の下。その結果は、この構成のまま残す。発表資料・ポスターのスクリプトが読む）
 DATA_KINDS = {"5data": ("学習", "学習データ（5data）の CSV"), "3data": ("検証", "検証データ（3data）の CSV")}   # 組 → (設定 FILES での名前, ダイアログの説明)
 PATH_MAX = 260     # Windows のパスの長さの上限（文字）
-DEEPEST = 90       # 学習結果フォルダの下の、最も長いファイルの場所の長さ（文字）の目安（せん断速度_粘度_拡張版/ の英語の凡例の図など）
+DEEPEST = 105      # 学習結果フォルダの下の、最も長いファイルの場所の長さ（文字）の目安（せん断速度_粘度_拡張版/ の英語の凡例の図など。2026-11-02 にモデルのフォルダの名前に型が入って長くなった）
 
 
 def show_path(p):
@@ -178,10 +179,11 @@ def result_dir(mat, *parts, make=True):
 
 
 def path_of(mat, grp):
-    """読む CSV：choose_inputs で決めたもの。決めていなければ（ノートの外のスクリプト）、今までどおり 05 フォルダの材料フォルダから探す"""
+    """読む CSV：choose_inputs で決めたもの。決めていなければ（ノートの外のスクリプト）、今までどおり 05 フォルダの材料フォルダから探す。
+    そのときは、名前に「温度適切」を含むフォルダ（2026-11-02 に増えた温度適切版）を除き、通常版（10-26 までの結果に使ったデータ）を使う"""
     if SOURCES.get(mat, {}).get(grp):
         return SOURCES[mat][grp]
-    fs = sorted(glob.glob(os.path.join(DATA_ROOT, MAT_FOLDERS[mat], GROUP_DIRS[grp], "*.csv")))
+    fs = [f for f in sorted(glob.glob(os.path.join(DATA_ROOT, MAT_FOLDERS[mat], GROUP_DIRS[grp], "*.csv"))) if "温度適切" not in os.path.basename(os.path.dirname(f))]
     assert len(fs) == 1, f"{MAT_FOLDERS[mat]}/{GROUP_DIRS[grp]} に CSV が 1 つだけあるはず（見つかったもの: {fs}）"
     return fs[0]
 
@@ -292,12 +294,38 @@ def add_groups(tr, te):
 
 
 # ---------------------------------------------------------------- 温度のシフトファクター
-DEFAULT_SHIFT_CFG = {     # h_grid・v_grid：尤度を調べる粗い格子（下限, 上限, 刻み）。h が横、v が縦のシフトの係数。fine：細かい格子（±幅, 刻み）。書いた材料だけ、FINE_A・FINE_B の代わりに使う
-    "PP": {"type": "arrhenius", "Tref": 210.0, "h_grid": (-20.0, 40.0, 5.0), "v_grid": (-20.0, 60.0, 5.0)},
-    "MIX": {"type": "arrhenius", "Tref": 210.0, "h_grid": (-20.0, 40.0, 5.0), "v_grid": (-20.0, 60.0, 5.0)},
-    "GPPS": {"type": "wlf", "Tref": 220.0, "Tg": 100.0, "A2": 51.6, "h_grid": (-20.0, 40.0, 5.0), "v_grid": (-20.0, 40.0, 5.0), "fine": (2.0, 0.25)},   # WLF 型の A1 の 1 は、粘度の比にしてアレニウス型の 1 kJ/mol の約 3.5 倍なので、細かい格子の刻みを 0.25 にする（2026-11-02。0.5 では 95% 区間の中が 3 点だった）
+# 2026-11-02（ユーザー決定）：型を材料ごとに分けず、どの材料にも両方の型を当てはめられるようにした。材料ごとの設定 SHIFT_CFG は基準温度と WLF 型の Tg、
+# 型ごとの設定 FORM_CFG は係数を調べる格子。モデルに使う設定（cfg）は、2 つを合わせたもの（shift_cfg）
+FORMS = {"arrhenius": "Arr", "wlf": "WLF"}          # シフトファクターの型 → モデルの記号の末尾（例：B_Tset_Arr）
+FORM_JA = {"arrhenius": "アレニウス型", "wlf": "WLF型"}
+DEFAULT_SHIFT_CFG = {     # 材料ごとの基準温度 Tref [℃]（None なら中央の設定温度）と、WLF 型の D2 = Tg [℃]（PP・粉砕材混合 PP の −10 ℃ は、Moldflow の PP でよく使われる D2 = 263.15 K。GPPS の 100 ℃ とも仮置き）
+    "PP": {"Tref": 210.0, "Tg": -10.0},
+    "MIX": {"Tref": 210.0, "Tg": -10.0},
+    "GPPS": {"Tref": 220.0, "Tg": 100.0},
+}
+DEFAULT_FORM_CFG = {      # 型ごとの、尤度を調べる粗い格子（下限, 上限, 刻み。h が横、v が縦のシフトの係数）と、細かい格子 fine（±幅, 刻み。書いた型だけ、FINE_A・FINE_B の代わりに使う）
+    "arrhenius": {"h_grid": (-20.0, 40.0, 5.0), "v_grid": (-20.0, 60.0, 5.0)},                            # θ = E [kJ/mol]。細かい格子は FINE_B・FINE_A
+    "wlf": {"A2": 51.6, "h_grid": (-20.0, 40.0, 5.0), "v_grid": (-20.0, 40.0, 5.0), "fine": (2.0, 0.25)},   # θ = A1 [−]、A2 [K] は固定。A1 の 1 は、粘度の比にして E の 1 kJ/mol より大きい（GPPS で約 3.5 倍）ので、0.25 刻み
 }
 SHIFT_CFG = globals().get("SHIFT_CFG", DEFAULT_SHIFT_CFG)
+FORM_CFG = globals().get("FORM_CFG", DEFAULT_FORM_CFG)
+
+
+def shift_cfg(mat, form, tr=None):
+    """材料 mat に型 form（"arrhenius"・"wlf"）を当てはめるときの設定（shift_ln・run_profile などに渡す cfg）。Tref が None なら、学習データ tr の中央の設定温度"""
+    if form not in FORMS:
+        raise ValueError(f"シフトファクターの型は {list(FORMS)} のどれかです（指定：{form}）")
+    cfg = {**FORM_CFG[form], **SHIFT_CFG[mat], "type": form}
+    if cfg.get("Tref") is None:
+        lv = sorted(tr["Tset"].unique())
+        cfg["Tref"] = float(lv[len(lv) // 2])
+    return cfg
+
+
+def key_form(key):
+    """モデルの記号 → シフトファクターの型（末尾が Arr・WLF の記号だけ。C と、型の付かない 10-26 までの記号〔B_Tset など〕は None）"""
+    p = str(key).split("_")
+    return next((f for f, s in FORMS.items() if len(p) == 3 and p[2] == s), None)
 
 
 def shift_ln(T_c, theta, cfg):
@@ -324,12 +352,17 @@ MODEL_JA = {"B_Tset": "B_Tset（設定温度 Tset で横・縦にシフト）", 
 MODEL_DIRS = {"B_Tset": "B_Tset_温度シフトに加熱シリンダ温度採用", "B_Tff": "B_Tff_温度シフトに型内樹脂温度採用",
               "A_Tset": "A_Tset_縦だけの温度シフトに加熱シリンダ温度採用", "A_Tff": "A_Tff_縦だけの温度シフトに型内樹脂温度採用",
               "C": "C_温度シフトなし"}     # モデルの結果のフォルダの名前（記号_学習方法の短い説明。型内樹脂温度＝流動中樹脂温度 Tff。2026-10-27 のユーザー依頼）
+for _k in ["B_Tset", "B_Tff", "A_Tset", "A_Tff"]:      # 型の付いた記号（2026-11-02。例：B_Tset_Arr）。型の付かない記号は、10-26 までの結果を読むスクリプトのために残す
+    for _f, _s in FORMS.items():
+        MODEL_JA[f"{_k}_{_s}"] = f"{_k}_{_s}" + MODEL_JA[_k][len(_k):-1] + f"。{FORM_JA[_f]}）"
+        MODEL_DIRS[f"{_k}_{_s}"] = f"{_k}_{_s}_{FORM_JA[_f]}の" + MODEL_DIRS[_k].split("_", 2)[2]
 COL_JA = {"ln_gd": "ln γ̇", "ln_P33": "ln P3_3", "ln_Tff": "ln Tff", "Tset": "Tset"}
 
 
-def shift_key(col, struct="B"):
+def shift_key(col, struct="B", form=None):
     """シフトファクターに使うデータ列 → モデルの記号。col：学習ファイルの列名（"加熱シリンダ温度[℃]"・"加熱シリンダ温度(℃)"・"流動中樹脂温度(℃)"）か、
-    短い名前（"Tset"・"Tff"）。None（または空の文字）なら、シフトなしの "C"。struct："B"（横・縦を別々にずらす）か "A"（縦だけ）。温度でない列はエラー"""
+    短い名前（"Tset"・"Tff"）。None（または空の文字）なら、シフトなしの "C"。struct："B"（横・縦を別々にずらす）か "A"（縦だけ）。温度でない列はエラー。
+    form：シフトファクターの型（"arrhenius"・"wlf"）。書くと、記号の末尾に型が付く（B_Tset_Arr など。2026-11-02）"""
     if col is None or str(col).strip() == "":
         return "C"
     t = COLS.get(str(col).strip(), str(col).strip())
@@ -337,17 +370,20 @@ def shift_key(col, struct="B"):
         raise ValueError(f"シフトファクターに使える列は、温度の列（加熱シリンダ温度・流動中樹脂温度）だけです（指定された列：{col}）")
     if struct not in ("A", "B"):
         raise ValueError(f"シフトの形は \"B\"（横・縦を別々）か \"A\"（縦だけ）です（指定：{struct}）")
-    return f"{struct}_{t}"
+    if form is not None and form not in FORMS:
+        raise ValueError(f"シフトファクターの型は {list(FORMS)} のどれかです（指定：{form}）")
+    return f"{struct}_{t}" + (f"_{FORMS[form]}" if form else "")
 
 
-def model_keys(cols, structs=("B",)):
-    """比べるモデルの記号の一覧（シフトの形 structs と、列 cols の組み合わせ。同じものは 1 つにする）"""
+def model_keys(cols, structs=("B",), forms=(None,)):
+    """比べるモデルの記号の一覧（シフトの形 structs、列 cols、型 forms の組み合わせ。同じものは 1 つにする）"""
     out = []
     for s in structs:
         for c in cols:
-            k = shift_key(c, s)
-            if k not in out:
-                out.append(k)
+            for f in forms:
+                k = shift_key(c, s, f)
+                if k not in out:
+                    out.append(k)
     return out
 
 

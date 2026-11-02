@@ -6,7 +6,7 @@
 材料（PP・MIX・GPPS）ごとに、シフトファクター検討用のノートで選んだ学習結果フォルダを、ダイアログで選ぶ（キャンセルした材料は飛ばす）。
 引数に「PP=<フォルダ>」のように書いたときは、書いた材料だけを調べ、ダイアログは出さない（相対パスはリポジトリ直下から）。
 前提：シフトファクター検討用のノートを、同じ入力の取り方で実行済みであること（<学習結果フォルダ>/<版>/全厚み総合/シフトファクターの検討/ の
-シフトファクターの推定.csv の係数 θ と、学習済みモデルに記録された学習データ・検証データ・シフトファクターの設定を読む）。
+シフトファクターの推定.csv の係数 θ と、学習済みモデルに記録された学習データ・検証データ・シフトファクターの設定を読む。設定は、モデルごとに、その学習済みモデルから読む〔2026-11-02 から、型がモデルごとに違うため〕）。
 やること：θ は、ノートの結果に固定する。カーネルのハイパーパラメータは、尤度の格子の初期値を使わず（theta0 = None）、
 最適化のやり直しの乱数の初期値だけで学習する（シードを 0, 1, … と変える）。LML の最大と最小の差が小さければ、最適化はほぼ同じ解に着いている。
 RMSE のばらつきが、モデルどうしの差より小さければ、モデルの比較は、最適化の運に左右されていない。
@@ -57,7 +57,8 @@ for mat in [m for m in ["PP", "MIX", "GPPS"] if m in given or not given]:     # 
     if obj["材料"] != mc.MAT_NAMES[mat] or obj["fit"].get("mode") != mode:
         raise ValueError(f"{STUDY[mat]} は、{mc.MAT_NAMES[mat]}・{mc.VERSION_DIRS[mode]} の結果ではありません（{obj['材料']}・{obj['入力の取り方']}）")
     mc.data_from_model(mat, obj)                               # 学習データ・検証データは、学習済みモデルに記録された場所から読む
-    CFG[mat] = dict(obj["シフトファクター"])
+    for key in list(TAB[mat].index) + ["C"]:                   # シフトファクターの設定は、モデルごとに、その学習済みモデルの記録から取る（型がモデルごとに違うため。2026-11-02）
+        CFG[(mat, key)] = dict(joblib.load(os.path.join(STUDY[mat], mc.MODEL_DIRS[key], f"学習済みモデル_{key}.joblib"))["シフトファクター"])
     MATS.append(mat)
 mc.D = mc.load_all(MATS)
 MARKS = [("o", "#1f77b4"), ("s", "#d62728"), ("D", "#9467bd"), ("v", "#8c564b")]
@@ -74,7 +75,7 @@ for mat in MATS:
         for seed in range(n_seeds):
             mc.SEED = seed
             t0 = time.time()
-            f = mc.fit_gp(key, tr, CFG[mat], th, tv, restarts=n_restarts, theta0=None, mode=mode)
+            f = mc.fit_gp(key, tr, CFG[(mat, key)], th, tv, restarts=n_restarts, theta0=None, mode=mode)
             mu, sd, sdf, nsd = mc.predict(f, te)
             r = {x["範囲"]: x for x in mc.metrics_rows(mat, key, te, mu, sd, sdf)}
             rows.append({"材料": mc.MAT_NAMES[mat], "入力": mc.VERSION_DIRS[mode], "モデル": key, "シード": seed, "LML": float(f["gp"].log_marginal_likelihood_value_),

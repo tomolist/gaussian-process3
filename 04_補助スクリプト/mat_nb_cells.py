@@ -6,6 +6,7 @@ build_mat_shift_nb.py（学習用）と build_mat_shiftfactor_nb.py（シフト�
 MAIN_KEY（図をノートに表示するモデル）と、結果の置き場所の関数 out_dir(mat, key=None, sub=None) を使う。
 学習用ノートはモデルが 1 つ（C だけのこともある）、シフトファクター検討用ノートは、シフトのあるモデルと基準の C。どちらでも動くように書いてある。
 判定の「節」には、2 つのノートで番号が違うので、節の名前だけを書く（2026-10-27）。
+シフトファクターの設定は、材料と型の組 (mat, form) ごとに CFG に入れ、モデルごとに kcfg(mat, key) で取り出す（読み込みのセルで決める。2026-11-02）。
 """
 
 # ---------------------------------------------------------------- ライブラリ、フォント
@@ -39,16 +40,22 @@ D = load_all(MATERIALS)
 INFO = pd.DataFrame([FILE_INFO[(m, g)] for m in MATERIALS for g in ["5data", "3data"]])
 display(INFO)
 TRAIN, TEST, CFG = {}, {}, {}
+FORMS_USED = [f for f in FORMS if any(key_form(k) == f for k in KEYS)] or [next(iter(FORMS))]   # 学習するモデルの型（C だけのときは、記録用にアレニウス型）
+
+
+def kcfg(mat, key):
+    """モデル key のシフトファクターの設定（材料の Tref・Tg と、型の格子）。C は、記録用に最初の型の設定"""
+    return CFG[(mat, key_form(key) or FORMS_USED[0])]
+
+
 for mat in MATERIALS:
     chk_dir = result_dir(mat, "データ確認")         # データの確認の結果（入力の取り方によらないので、学習結果フォルダの直下）
     to_csv(INFO[INFO["材料"] == MAT_NAMES[mat]], os.path.join(chk_dir, "データの概要.csv"))
     TRAIN[mat] = D[(mat, "5data")]
     TEST[mat] = add_groups(TRAIN[mat], D[(mat, "3data")])
-    cfg = dict(SHIFT_CFG[mat])
-    if cfg.get("Tref") is None:
-        lv = sorted(TRAIN[mat]["Tset"].unique())
-        cfg["Tref"] = float(lv[len(lv) // 2])
-    CFG[mat] = cfg
+    for form in FORMS_USED:
+        CFG[(mat, form)] = shift_cfg(mat, form, TRAIN[mat])
+    cfg = CFG[(mat, FORMS_USED[0])]                 # 基準温度 Tref は、型によらず同じ
     rem = pd.concat([REMOVED[(mat, g)].assign(組=g) for g in ["5data", "3data"]], ignore_index=True)
     inv = pd.concat([INVALID[(mat, g)].assign(組=g) for g in ["5data", "3data"]], ignore_index=True)
     to_csv(rem, os.path.join(chk_dir, "一覧で除いた行.csv"))
@@ -63,7 +70,7 @@ for mat in MATERIALS:
     judge(min(n_t) >= 3, f"学習・検証とも、設定温度が 3 水準以上ある（学習 {n_t[0]}・検証 {n_t[1]} 水準。設定温度は、{how}）", mat, "データ")
     judge(len(inv) == 0, f"η・γ̇・P3_3 が 0 以下の行（対数がとれない）は、すべて問題データ一覧に登録済み（未登録のまま自動で除いた行 {len(inv)} 行）。未登録なら、一覧に「除外」で登録する", mat, "データ")
     judge(TRAIN[mat]["Tset"].min() <= cfg["Tref"] <= TRAIN[mat]["Tset"].max(),
-          f"基準温度 Tref = {cfg['Tref']:g} ℃ が、学習データの設定温度の範囲の中にある（シフトファクターは{'アレニウス型' if cfg['type'] == 'arrhenius' else 'WLF 型'}）", mat, "データ")
+          f"基準温度 Tref = {cfg['Tref']:g} ℃ が、学習データの設定温度の範囲の中にある（シフトファクターの型：{'・'.join(FORM_JA[f] for f in FORMS_USED)}）", mat, "データ")
     judge((TEST[mat]["group"] != "範囲内").any(), f"検証データに、学習データの射出速度の範囲（{TRAIN[mat]['v'].min():g}〜{TRAIN[mat]['v'].max():g} mm/s）の外の条件がある"
           "（すべて範囲の中なら、学習データと検証データのファイルを逆に選んだおそれがある）", mat, "データ")'''
 
@@ -71,21 +78,21 @@ for mat in MATERIALS:
 PROFILE = r'''PROF, BEST = {}, {}
 t_all = time.time()
 for mat in MATERIALS:
-    thn, tvn, un = theta_names(CFG[mat])
     for key in SHIFT_KEYS:
+        thn, tvn, un = theta_names(kcfg(mat, key))
         t0 = time.time()
-        pts, conv = run_profile(key, TRAIN[mat], CFG[mat])
+        pts, conv = run_profile(key, TRAIN[mat], kcfg(mat, key))
         PROF[(mat, key)] = pts
-        BEST[(mat, key)] = b = profile_best(pts, key, CFG[mat], conv)
+        BEST[(mat, key)] = b = profile_best(pts, key, kcfg(mat, key), conv)
         to_csv(pts.drop(columns="theta"), os.path.join(out_dir(mat, key), "プロファイル尤度_格子.csv"))
         print(f"{MAT_NAMES[mat]} {key}：{len(pts)} 点、{time.time() - t0:.0f} 秒（細かい格子の取り直しが{'収束' if conv else '収束せず'}）。最良 {thn} = {b['th_best']:g}、{tvn} = {b['tv_best']:g} {un}"
               f"（差 {tvn} − {thn} = {b['diff_best']:g}〔{b['diff_lo']:g}〜{b['diff_hi']:g}〕）、格子の LML {b['LML_best']:.1f}")
 print(f"合計 {(time.time() - t_all) / 60:.1f} 分" + ("" if SHIFT_KEYS else "（シフトのあるモデルがないので、計算なし）"))
 for mat in MATERIALS:
-    thn, tvn, un = theta_names(CFG[mat])
     for key in SHIFT_KEYS:
+        thn, tvn, un = theta_names(kcfg(mat, key))
         b = BEST[(mat, key)]
-        judge((not b["at_edge"]) and b["refine_converged"], f"{key}：最良の θ が、粗い格子の端にも、細かい格子の端にもない（{thn} = {b['th_best']:g}、{tvn} = {b['tv_best']:g} {un}。取り直しが{'収束' if b['refine_converged'] else '収束せず'}）。端なら SHIFT_CFG の範囲を広げる。収束していなければ MAX_REFINE を増やす", mat, "尤度")'''
+        judge((not b["at_edge"]) and b["refine_converged"], f"{key}：最良の θ が、粗い格子の端にも、細かい格子の端にもない（{thn} = {b['th_best']:g}、{tvn} = {b['tv_best']:g} {un}。取り直しが{'収束' if b['refine_converged'] else '収束せず'}）。端なら FORM_CFG（型ごとの格子）の範囲を広げる。収束していなければ MAX_REFINE を増やす", mat, "尤度")'''
 
 # ---------------------------------------------------------------- 最良の θ と θ = 0 の念入りな最適化
 CAREFUL = r'''from joblib import Parallel, delayed
@@ -93,7 +100,7 @@ t0 = time.time()
 FITS, ZERO, LOSS = {}, {}, {}
 jobs = [(mat, key, kind) for mat in MATERIALS for key in SHIFT_KEYS for kind in ("best", "zero")]
 res = Parallel(n_jobs=min(N_JOBS, len(jobs)))(
-    delayed(fit_job)(key, TRAIN[mat], CFG[mat], (BEST[(mat, key)]["th_best"] if kind == "best" else 0.0), (BEST[(mat, key)]["tv_best"] if kind == "best" else 0.0),
+    delayed(fit_job)(key, TRAIN[mat], kcfg(mat, key), (BEST[(mat, key)]["th_best"] if kind == "best" else 0.0), (BEST[(mat, key)]["tv_best"] if kind == "best" else 0.0),
                      N_RESTARTS, (BEST[(mat, key)]["theta_best"] if kind == "best" else BEST[(mat, key)]["theta_zero"]), INPUT_MODE, kind == "best")
     for mat, key, kind in jobs) if jobs else []
 for (mat, key, kind), f in zip(jobs, res):
@@ -104,27 +111,27 @@ for (mat, key, kind), f in zip(jobs, res):
         ZERO[(mat, key)] = f
 print(f"念入りな最適化：{len(jobs)} 回、{(time.time() - t0) / 60:.1f} 分")
 for mat in (MATERIALS if SHIFT_KEYS else []):       # シフトのあるモデルがなければ（C だけなら）、飛ばす
-    thn, tvn, un = theta_names(CFG[mat])
     for key in SHIFT_KEYS:
         b = BEST[(mat, key)]
         lml_b, lml_z = float(FITS[(mat, key)]["gp"].log_marginal_likelihood_value_), float(ZERO[(mat, key)]["gp"].log_marginal_likelihood_value_)
         b["LML_best_grid"], b["LML_at_0_grid"], b["dLML_vs_0_grid"] = b["LML_best"], b["LML_at_0"], b["dLML_vs_0"]
         b["LML_best"], b["LML_at_0"] = max(lml_b, b["LML_best_grid"]), max(lml_z, b["LML_at_0_grid"])
         b["dLML_vs_0"] = b["LML_best"] - b["LML_at_0"]
-    t = pd.DataFrame([{"材料": MAT_NAMES[mat], "モデル": key, "入力": VERSION_DIRS[INPUT_MODE], "θ の名前": f"{thn}・{tvn}", "単位": un,
+    t = pd.DataFrame([{"材料": MAT_NAMES[mat], "モデル": key, "入力": VERSION_DIRS[INPUT_MODE], "型": FORM_JA[kcfg(mat, key)["type"]],
+                       "θ の名前": "・".join(theta_names(kcfg(mat, key))[:2]), "単位": theta_names(kcfg(mat, key))[2],
                        **{k: v for k, v in BEST[(mat, key)].items() if k not in ("theta_best", "theta_zero")}} for key in SHIFT_KEYS])
     to_csv(t, os.path.join(out_dir(mat), "シフトファクターの推定.csv"))
-    display(t[["材料", "モデル", "θ の名前", "単位", "th_best", "th_lo", "th_hi", "tv_best", "tv_lo", "tv_hi", "diff_best", "diff_lo", "diff_hi", "LML_best", "LML_at_0", "dLML_vs_0", "dLML_vs_0_grid", "at_edge", "refine_converged"]].round(2))
+    display(t[["材料", "モデル", "型", "θ の名前", "単位", "th_best", "th_lo", "th_hi", "tv_best", "tv_lo", "tv_hi", "diff_best", "diff_lo", "diff_hi", "LML_best", "LML_at_0", "dLML_vs_0", "dLML_vs_0_grid", "at_edge", "refine_converged"]].round(2))
     for key in SHIFT_KEYS:
         b = BEST[(mat, key)]
-        other = "Tff・P3_3" if key.endswith("Tset") else "Tset・P3_3"
+        other = "Tff・P3_3" if layout(key)[1] == "Tset" else "Tset・P3_3"
         print(f"{MAT_NAMES[mat]} {key}：念入りな最適化の LML {b['LML_best']:.1f}（格子 {b['LML_best_grid']:.1f}）、θ = 0 は {b['LML_at_0']:.1f}（格子 {b['LML_at_0_grid']:.1f}）→ ΔLML {b['dLML_vs_0']:+.1f}（格子では {b['dLML_vs_0_grid']:+.1f}）")
         judge(b["dLML_vs_0"] >= LRT_DLML, f"{key}：温度のシフトが尤度で支持される（念入りに最適化した LML が、θ = 0〔{key.split('_')[1]} を使わない〕より {b['dLML_vs_0']:.1f} 大きい。基準 {LRT_DLML:g} 以上＝尤度比検定の 5% 基準）。小さければ、温度の効果はほかの入力（{other}）が担っている", mat, "尤度")'''
 
 # ---------------------------------------------------------------- 尤度の面
 SURFACE = r'''for mat in MATERIALS:
-    thn, tvn, un = theta_names(CFG[mat])
     for key in SHIFT_KEYS:
+        thn, tvn, un = theta_names(kcfg(mat, key))
         pts, b = PROF[(mat, key)], BEST[(mat, key)]
         val = (pts["LML"] - b["LML_best"]).to_numpy()
         if key.startswith("A"):
@@ -139,7 +146,7 @@ SURFACE = r'''for mat in MATERIALS:
             ax.grid(True, ls=":", alpha=0.5)
         else:
             fig, axes = plt.subplots(1, 2, figsize=(16, 6.5))
-            rng = (CFG[mat].get("fine") or FINE_B)[0]
+            rng = (kcfg(mat, key).get("fine") or FINE_B)[0]
             near = pts[pts["th"].between(b["th_best"] - rng, b["th_best"] + rng) & pts["tv"].between(b["tv_best"] - rng, b["tv_best"] + rng)]
             for ax, sub, lo, ttl in [(axes[0], pts, -60.0, "全体（粗い格子＋細かい格子）"), (axes[1], near, -15.0, "最良の点の近く（細かい格子）")]:
                 v = np.maximum((sub["LML"] - b["LML_best"]).to_numpy(), lo)
@@ -154,14 +161,14 @@ SURFACE = r'''for mat in MATERIALS:
                 ax.set_ylabel(f"縦のシフト {tvn} ({un})")
                 ax.set_title(f"{ttl}。赤線の内側：95% 区間の目安")
                 ax.legend(loc="upper left", fontsize=10)
-        fig.suptitle(f"{MAT_NAMES[mat]}　{model_title(key)}　プロファイル尤度（{'アレニウス型' if CFG[mat]['type'] == 'arrhenius' else 'WLF 型'}）")
+        fig.suptitle(f"{MAT_NAMES[mat]}　{model_title(key)}　プロファイル尤度（{FORM_JA[kcfg(mat, key)['type']]}）")
         save_fig(fig, out_dir(mat, key), "プロファイル尤度")'''
 
 # ---------------------------------------------------------------- シフトのないモデル（C）の学習と、ハイパーパラメータの表
 NOSHIFT = r'''t0 = time.time()
 NOSHIFT_KEYS = [k for k in KEYS if k not in SHIFT_KEYS]      # シフトのないモデル（C）
 jobs = [(mat, key) for mat in MATERIALS for key in NOSHIFT_KEYS]
-res = Parallel(n_jobs=min(N_JOBS, len(jobs)))(delayed(fit_job)(key, TRAIN[mat], CFG[mat], 0.0, 0.0, N_RESTARTS, None, INPUT_MODE, True) for mat, key in jobs) if jobs else []
+res = Parallel(n_jobs=min(N_JOBS, len(jobs)))(delayed(fit_job)(key, TRAIN[mat], kcfg(mat, key), 0.0, 0.0, N_RESTARTS, None, INPUT_MODE, True) for mat, key in jobs) if jobs else []
 for (mat, key), f in zip(jobs, res):
     FITS[(mat, key)] = f
     LOSS[(mat, key)] = f["loss_runs"]
@@ -189,8 +196,7 @@ for mat in MATERIALS:
 # ---------------------------------------------------------------- シフトファクターとマスターカーブ
 SHIFT = r'''SHIFT_ROWS = []
 for mat in MATERIALS:
-    cfg = CFG[mat]
-    thn, tvn, un = theta_names(cfg)
+    cfg0 = CFG[(mat, FORMS_USED[0])]                # 基準温度 Tref は、型によらず同じ
     pool = pd.concat([TRAIN[mat], TEST[mat]], ignore_index=True)
     train_c = set(TRAIN[mat]["cond"])
     tl, th_ = pool["Tset"].min(), pool["Tset"].max()
@@ -198,17 +204,19 @@ for mat in MATERIALS:
         Tg = np.linspace(min(pool["Tff"].min(), tl) - 5, max(pool["Tff"].max(), th_) + 5, 200)
         fig, axes = plt.subplots(1, 2, figsize=(16, 6.2))
         cols_ = ["#1f77b4", "#d62728", "#2ca02c", "#9467bd"]
-        for key, col in zip(SHIFT_KEYS, cols_):
-            pts, b = PROF[(mat, key)], BEST[(mat, key)]
+        for key, col in zip(SHIFT_KEYS, cols_ * 2):
+            pts, b, cfg = PROF[(mat, key)], BEST[(mat, key)], kcfg(mat, key)
+            thn, tvn, un = theta_names(cfg)
             inside = pts[pts["LML"] >= b["LML_best"] - 1.92]
             for ax, w, nm in [(axes[0], "th", thn), (axes[1], "tv", tvn)]:
                 if w == "th" and key.startswith("A"):
                     continue
                 cur = np.array([shift_ln(Tg, v, cfg) for v in inside[w]])
                 ax.fill_between(Tg, cur.min(axis=0), cur.max(axis=0), color=col, alpha=0.18)
-                ax.plot(Tg, shift_ln(Tg, b[f"{w}_best"], cfg), color=col, lw=2.5, label=f"{key}（{nm} = {b[f'{w}_best']:g} {un}、95%：{b[f'{w}_lo']:g}〜{b[f'{w}_hi']:g}）")
-            SHIFT_ROWS.append({"材料": MAT_NAMES[mat], "モデル": key, "型": "アレニウス" if cfg["type"] == "arrhenius" else "WLF", "Tref [℃]": cfg["Tref"],
-                               f"横 {thn}": b["th_best"], f"縦 {tvn}": b["tv_best"], "単位": un,
+                ax.plot(Tg, shift_ln(Tg, b[f"{w}_best"], cfg), color=col, lw=2.5, ls="-" if cfg["type"] == "arrhenius" else "--",
+                        label=f"{key}（{nm} = {b[f'{w}_best']:g} {un}、95%：{b[f'{w}_lo']:g}〜{b[f'{w}_hi']:g}）")
+            SHIFT_ROWS.append({"材料": MAT_NAMES[mat], "モデル": key, "型": FORM_JA[cfg["type"]], "Tref [℃]": cfg["Tref"], "係数の名前": f"{thn}・{tvn}",
+                               "横の係数": b["th_best"], "縦の係数": b["tv_best"], "単位": un,
                                f"縦の倍率 a_v({tl:g})/a_v({th_:g})": float(np.exp(shift_ln(tl, b["tv_best"], cfg) - shift_ln(th_, b["tv_best"], cfg))),
                                f"横の倍率 a_h({tl:g})/a_h({th_:g})": float(np.exp(shift_ln(tl, b["th_best"], cfg) - shift_ln(th_, b["th_best"], cfg)))})
         for ax, ttl in [(axes[0], "横のシフト ln a_h(T)（せん断速度の向き）"), (axes[1], "縦のシフト ln a_v(T)（粘度の向き）")]:
@@ -216,13 +224,13 @@ for mat in MATERIALS:
                 ax.axvline(t, color="gray", ls=":", lw=1)
             ax.axvspan(pool["Tff"].min(), pool["Tff"].max(), color="orange", alpha=0.07, label="Tff の範囲（データ）")
             ax.axhline(0, color="k", lw=0.6)
-            ax.set_xlabel("温度 T (℃)（B_Tset は設定温度、B_Tff は流動中樹脂温度）")
+            ax.set_xlabel("温度 T (℃)（B_Tset_… は設定温度、B_Tff_… は流動中樹脂温度。実線＝アレニウス型、破線＝WLF 型）")
             ax.set_ylabel(ttl.split("（")[0].replace("のシフト ", " "))
             ax.set_title(ttl)
             ax.legend(fontsize=9, loc="best")
             ax.grid(True, ls=":", alpha=0.5)
-        typ = "アレニウス型" if cfg["type"] == "arrhenius" else f"WLF 型（D2 = Tg = {cfg['Tg']:g} ℃、A2 = {cfg['A2']:g} K）"
-        fig.suptitle(f"{MAT_NAMES[mat]}　温度のシフトファクター（{typ}、Tref = {cfg['Tref']:g} ℃。帯：尤度の 95% 区間）")
+        typ = "・".join(FORM_JA[f] + (f"〔D2 = Tg = {CFG[(mat, f)]['Tg']:g} ℃、A2 = {CFG[(mat, f)]['A2']:g} K〕" if f == "wlf" else "") for f in FORMS_USED)
+        fig.suptitle(f"{MAT_NAMES[mat]}　温度のシフトファクター（{typ}、Tref = {cfg0['Tref']:g} ℃。帯：尤度の 95% 区間）")
         save_fig(fig, out_dir(mat), "シフトファクター")
     # マスターカーブ（シフト前と、モデルごと）
     Hs = sorted(pool["H"].unique())
@@ -232,7 +240,7 @@ for mat in MATERIALS:
     sup = {}
     for key in [None] + SHIFT_KEYS:
         b = BEST.get((mat, key), {"th_best": 0.0, "tv_best": 0.0})
-        t = shifted_cond_means(pool, key, cfg, b["th_best"] if (key or "").startswith("B") else 0.0, b["tv_best"])
+        t = shifted_cond_means(pool, key, kcfg(mat, key) if key else cfg0, b["th_best"] if (key or "").startswith("B") else 0.0, b["tv_best"])
         sup[key] = superpose_rmse(t)
         fig, axes = plt.subplots(nrow, ncol, figsize=(7.5 * ncol, 5.6 * nrow), squeeze=False)
         for ax, h in zip(axes.flat, Hs):
@@ -259,7 +267,8 @@ for mat in MATERIALS:
         if r["材料"] == MAT_NAMES[mat]:
             r["重ね合わせの残差（シフト後）"], r["重ね合わせの残差（シフト前）"] = sup[r["モデル"]], sup[None]
     for key in SHIFT_KEYS:
-        b = BEST[(mat, key)]
+        b, cfg = BEST[(mat, key)], kcfg(mat, key)
+        thn, tvn, un = theta_names(cfg)
         judge(shift_ln(tl, b["tv_best"], cfg) > 0, f"{key}：縦のシフトの向きが「低温ほど粘い」（ln a_v({tl:g} ℃) = {float(shift_ln(tl, b['tv_best'], cfg)):+.3f}。{tvn} = {b['tv_best']:g} {un}）", mat, "シフト")
         judge(sup[key] < sup[None], f"{key}：シフトで温度ごとの曲線が近づく（重ね合わせの残差 {sup[None]:.3f} → {sup[key]:.3f}）", mat, "シフト")
 SHIFT_TAB = pd.DataFrame(SHIFT_ROWS)
@@ -325,6 +334,6 @@ for mat in MATERIALS:
     for key in KEYS:
         path = os.path.join(out_dir(mat, key), f"学習済みモデル_{key}.joblib")
         joblib.dump({"fit": FITS[(mat, key)], "材料": MAT_NAMES[mat], "モデル": key, "説明": model_title(key), "入力": input_labels(key), "入力の取り方": INPUT_MODE,
-                     "シフトファクター": CFG[mat], "学習データのファイル": show_path(SOURCES[mat]["5data"]), "検証データのファイル": show_path(SOURCES[mat]["3data"]),
+                     "シフトファクター": kcfg(mat, key), "学習データのファイル": show_path(SOURCES[mat]["5data"]), "検証データのファイル": show_path(SOURCES[mat]["3data"]),
                      "scikit-learn": sklearn.__version__, "作成日": time.strftime("%Y-%m-%d")}, path)
         print("保存:", show_path(path))'''
