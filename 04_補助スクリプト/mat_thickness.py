@@ -61,8 +61,8 @@ def superpose_by_h(t):
 
 def best_superpose(pool_h, key, cfg, fine=None, max_refine=None):
     """(a) 1 つの厚みのデータ（pool_h。5data＋3data）で、重ね合わせのずれが最小になる係数（横・縦）を、シフトファクター検討用のノートのプロファイル尤度と同じ格子で探す
-    （粗い格子 → 最良の点の周りの細かい格子 → 最良の点が動いたら取り直す）。at_edge：最良の点が粗い格子の端"""
-    fine = fine or FINE_B
+    （粗い格子 → 最良の点の周りの細かい格子〔材料の設定に "fine" があればそれ、なければ FINE_B〕 → 最良の点が動いたら取り直す）。at_edge：最良の点が粗い格子の端"""
+    fine = fine or cfg.get("fine") or FINE_B
     max_refine = MAX_REFINE if max_refine is None else max_refine
     hg, vg = grid_of(*cfg["h_grid"]), grid_of(*cfg["v_grid"])
     vals = {}

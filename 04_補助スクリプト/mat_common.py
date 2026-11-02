@@ -39,7 +39,7 @@ SHOW_FIGS = globals().get("SHOW_FIGS", True)                # 図をノートに
 INPUT_MODE = globals().get("INPUT_MODE", "shot")            # "shot"：γ̇・P3_3・Tff をショットごとの値で入れる（6月のノートと同じ。既定）／"cond"：条件（設定温度・厚み・射出速度）ごとの平均で入れる（参考）
 MAX_REFINE = globals().get("MAX_REFINE", 4)                 # プロファイル尤度で、最良の点が細かい格子の端に当たったとき、その点を中心に細かい格子を取り直す回数の上限
 FINE_B = globals().get("FINE_B", (4.0, 1.0))               # 構造 B の細かい格子：最良の点の ±4 を 1 刻み
-FINE_A = globals().get("FINE_A", (2.5, 0.5))                # 構造 A の細かい格子：最良の点の ±2.5 を 0.5 刻み
+FINE_A = globals().get("FINE_A", (4.5, 0.5))                # 構造 A の細かい格子：最良の点の ±4.5 を 0.5 刻み（粗い格子の刻み 5 の、隣の点の手前まで。2026-11-02）
 OUTLIER_Z = globals().get("OUTLIER_Z", 3.5)                 # 規則 f：|z| がこれを超え、かつ |残差|（ln η）が次の値を超える条件
 OUTLIER_RESID = globals().get("OUTLIER_RESID", 0.1)
 P33_DEV = globals().get("P33_DEV", 0.2)                     # 規則 g：P3_3 が条件の中央値から、この割合以上離れたショットを候補にする
@@ -292,10 +292,10 @@ def add_groups(tr, te):
 
 
 # ---------------------------------------------------------------- 温度のシフトファクター
-DEFAULT_SHIFT_CFG = {     # h_grid・v_grid：尤度を調べる粗い格子（下限, 上限, 刻み）。h が横、v が縦のシフトの係数
+DEFAULT_SHIFT_CFG = {     # h_grid・v_grid：尤度を調べる粗い格子（下限, 上限, 刻み）。h が横、v が縦のシフトの係数。fine：細かい格子（±幅, 刻み）。書いた材料だけ、FINE_A・FINE_B の代わりに使う
     "PP": {"type": "arrhenius", "Tref": 210.0, "h_grid": (-20.0, 40.0, 5.0), "v_grid": (-20.0, 60.0, 5.0)},
     "MIX": {"type": "arrhenius", "Tref": 210.0, "h_grid": (-20.0, 40.0, 5.0), "v_grid": (-20.0, 60.0, 5.0)},
-    "GPPS": {"type": "wlf", "Tref": 220.0, "Tg": 100.0, "A2": 51.6, "h_grid": (-20.0, 40.0, 5.0), "v_grid": (-20.0, 40.0, 5.0)},
+    "GPPS": {"type": "wlf", "Tref": 220.0, "Tg": 100.0, "A2": 51.6, "h_grid": (-20.0, 40.0, 5.0), "v_grid": (-20.0, 40.0, 5.0), "fine": (2.0, 0.5)},   # WLF 型の A1 の 1 は、粘度の比にしてアレニウス型の 1 kJ/mol の約 3.5 倍なので、細かい格子の刻みを 0.5 にする（2026-11-02）
 }
 SHIFT_CFG = globals().get("SHIFT_CFG", DEFAULT_SHIFT_CFG)
 
