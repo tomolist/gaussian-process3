@@ -3,7 +3,7 @@
 
 使い方（リポジトリ直下から）: uv run python 04_補助スクリプト/build_report_mat_shift.py [--run-min 分]
 前提：ノート（条件平均の入力・ショットごとの入力の両方）を実行済みで、mat_seed_check.py（cond）も実行済みであること。
-各材料の <材料フォルダ>_学習結果/ の CSV から数値を取り出して report_mat_shift_template.tex に入れ、
+各材料の <材料フォルダ>_学習結果(5all学習データ)/ の CSV から数値を取り出して report_mat_shift_template.tex に入れ、
 05_材料ごとの機械学習データと予測検証データ/学習結果説明_材料別温度シフトGPR.tex を書き、そのフォルダで LuaLaTeX を2回動かす
 （補助ファイルは _tmp/report_mat/ に出す）。図は、tex から相対パスで読む。
 """
@@ -20,6 +20,7 @@ import report_common as rc
 
 ROOT = os.path.join(rc.W, "05_材料ごとの機械学習データと予測検証データ")
 FOLD = {"PP": "01_バージンPP再々実験", "MIX": "02_粉砕材混合PP実験", "GPPS": "03_GPPS実験"}
+RES_SUFFIX = "_学習結果(5all学習データ)"   # 10-26 までの結果のフォルダの名前の末尾（<材料フォルダ> の後ろ。2026-11-02 に「_学習結果」から変えた）
 JA = {"PP": "PP", "MIX": "粉砕材混合 PP", "GPPS": "GPPS"}
 MODES = {"cond": "条件平均の入力", "shot": "ショットごとの入力"}
 KEYS = ["B_Tset", "B_Tff", "C"]
@@ -30,12 +31,12 @@ C, Sh = "条件平均の入力", "ショットごとの入力"
 
 
 def base(mat):
-    return os.path.join(ROOT, FOLD[mat], f"{FOLD[mat]}_学習結果")
+    return os.path.join(ROOT, FOLD[mat], f"{FOLD[mat]}{RES_SUFFIX}")
 
 
 def rel(mat, *parts):
     """tex から見た図の相対パス（ROOT から）"""
-    return "/".join([FOLD[mat], f"{FOLD[mat]}_学習結果", *parts])
+    return "/".join([FOLD[mat], f"{FOLD[mat]}{RES_SUFFIX}", *parts])
 
 
 def rd(mat, mode, sub, name):
@@ -382,7 +383,7 @@ V["CONCLUSION"] = f"""
 ノートの判定は、OK {V['N_OK']} 個、★ {V['N_STAR']} 個でした。以下、主にショットごとの入力（既定）の結果をまとめ、条件平均の入力（参考）と比べます。
 
 \\begin{{enumerate}}[itemsep=0.8ex,topsep=0.6ex]
-\\item \\textbf{{プログラムと結果}}：6月のノートを基準に、材料ごとのデータ（5data で学習、3data で検証）を一人で実行できるノートを作りました。結果は、各材料フォルダの \\file{{<材料フォルダ>_学習結果/<入力の取り方>/}} にあります。ノートは 3 材料 $\\times$ 3 モデルを学習し、ショットごとの入力で約 {run_min} 分（そのうち、大部分はプロファイル尤度）かかります。
+\\item \\textbf{{プログラムと結果}}：6月のノートを基準に、材料ごとのデータ（5data で学習、3data で検証）を一人で実行できるノートを作りました。結果は、各材料フォルダの \\file{{<材料フォルダ>{RES_SUFFIX}/<入力の取り方>/}} にあります。ノートは 3 材料 $\\times$ 3 モデルを学習し、ショットごとの入力で約 {run_min} 分（そのうち、大部分はプロファイル尤度）かかります。
 \\item \\textbf{{データと外れ値}}：規則 f で拾ったのは、PP の P03 の 1 条件だけで、除外しました。GPPS の 3data には \\PIII\\ が負のショットがあり（P09）、除外しました。\\PIII\\ は、粘度の算出式の圧力ではありませんが、流れの結果として測られる量で、成形の前には分かりません。このモデルは、「測った流れの状態（$\\gd$・\\PIII・$\\Tff$）と設定温度 $\\rightarrow$ 粘度」のモデルです。
 \\item \\textbf{{入力の取り方（ユーザーの決定、10 月 23 日）}}：ショットごとの値で学習する仕様にしました（既定 \\file{{"shot"}}）。ショットごとの入力では、同じ条件の中のせん断速度と粘度のゆれ（センサへの到達時刻のゆれ）に GP が合わせるので、$\\ln\\gd$ の長さスケールが短く（C で {'・'.join(f'{v:.2f}' for v in ls_gd[P])}。条件平均では {'・'.join(f'{v:.1f}' for v in ls_gd[R])}）、ノイズの標準偏差も小さく出ます（{'・'.join(f'{v:.3f}' for v in nsd[P])}。条件平均では {'・'.join(f'{v:.3f}' for v in nsd[R])}）。その結果、曲線がデータの範囲の中でも波打ち、3data の低速側の誤差が大きくなりました（C の RMSE：ショットごと {f3(LOW[P], 'C', '.3f')}、条件平均 {f3(LOW[R], 'C', '.3f')}。PP・粉砕材混合 PP・GPPS）。
 \\item \\textbf{{温度のシフト}}：ショットごとの入力では、\\textbf{{加熱シリンダ温度 $\\Tset$ でずらす B\\_Tset のシフトが支持され}}（$\\theta=0$ との LML の差：{f3(dl[P], 'B_Tset')}。基準 3.0）、\\textbf{{流動中樹脂温度 $\\Tff$ でずらす B\\_Tff は支持されませんでした}}（{f3(dl[P], 'B_Tff')}）。{'B\\_Tset の横の係数は 3 材料とも 0 で、縦のシフト（同じせん断速度での粘度の倍率）だけが支持されました。' if no_h else ''}条件平均の入力では逆で、B\\_Tff が支持され（{f3(dl[R], 'B_Tff')}）、B\\_Tset は基準に届かないか、ぎりぎりでした（{f3(dl[R], 'B_Tset')}）。\\textbf{{どちらの温度がシフトに適するかは、入力の取り方に左右されます}}。ショットごとの入力では、ショットごとに変わる $\\Tff$ が GP の入力として粘度の違いを担うため、と考えられます。
