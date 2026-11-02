@@ -11,6 +11,8 @@
 最適化のやり直しの乱数の初期値だけで学習する（シードを 0, 1, … と変える）。LML の最大と最小の差が小さければ、最適化はほぼ同じ解に着いている。
 RMSE のばらつきが、モデルどうしの差より小さければ、モデルの比較は、最適化の運に左右されていない。
 結果：同じフォルダ（シフトファクターの検討/）の 乱数シードの確認.csv（1 行が 1 回の学習）、乱数シードの確認_まとめ.csv（モデルごとの最小・最大）、乱数シードの確認.png
+2026-11-02：検証データにない範囲（低速側・高速側・範囲内）は、記録しない形にした（温度適切版のデータは、検証が高速側〔280・320 mm/s〕だけで、低速側がない）。
+まとめの表と図の 2 枚目は、外挿の範囲のうち、低速側があれば低速側（通常版。前と同じ出力）、なければ高速側を使う。
 2026-10-27：結果の新しい構成（学習結果フォルダをダイアログで選ぶ）に合わせた。10-26 までの結果（<材料フォルダ>_学習結果(5all学習データ)/<入力の取り方>/比較/。2026-11-02 に「_学習結果」から名前を変えた）の確認は、
 その時点のこのスクリプト（Git の履歴）で行ったもの。
 """
@@ -64,6 +66,8 @@ for mat in MATS:
     te = mc.add_groups(tr, mc.D[(mat, "3data")])
     sh = TAB[mat]
     keys = list(sh.index) + ["C"]
+    groups = [g for g in ["低速側", "高速側", "範囲内"] if (te["group"] == g).any()]     # 検証データにある範囲（温度適切版は高速側だけ）
+    side = next((g for g in ["低速側", "高速側"] if g in groups), None)                  # まとめと図の 2 枚目に使う外挿の範囲（低速側があれば低速側）
     rows = []
     for key in keys:
         th, tv = (sh.loc[key, "th_best"], sh.loc[key, "tv_best"]) if key != "C" else (0.0, 0.0)
@@ -74,18 +78,22 @@ for mat in MATS:
             mu, sd, sdf, nsd = mc.predict(f, te)
             r = {x["範囲"]: x for x in mc.metrics_rows(mat, key, te, mu, sd, sdf)}
             rows.append({"材料": mc.MAT_NAMES[mat], "入力": mc.VERSION_DIRS[mode], "モデル": key, "シード": seed, "LML": float(f["gp"].log_marginal_likelihood_value_),
-                         "RMSE 全体": r["全体"]["RMSE"], "RMSE 低速側": r["低速側"]["RMSE"], "RMSE 高速側": r["高速側"]["RMSE"], "秒": round(time.time() - t0)})
+                         "RMSE 全体": r["全体"]["RMSE"], **{f"RMSE {g}": r[g]["RMSE"] for g in groups}, "秒": round(time.time() - t0)})
             print(rows[-1], flush=True)
     t = pd.DataFrame(rows)
     mc.to_csv(t, os.path.join(STUDY[mat], "乱数シードの確認.csv"))
     s = t.groupby("モデル", sort=False).agg(LML最大=("LML", "max"), LML最小=("LML", "min"), RMSE全体の最小=("RMSE 全体", "min"), RMSE全体の最大=("RMSE 全体", "max"),
-                                          RMSE低速側の最小=("RMSE 低速側", "min"), RMSE低速側の最大=("RMSE 低速側", "max")).reset_index()
+                                          **({f"RMSE{side}の最小": (f"RMSE {side}", "min"), f"RMSE{side}の最大": (f"RMSE {side}", "max")} if side else {})).reset_index()
     s.insert(0, "材料", mc.MAT_NAMES[mat])
     mc.to_csv(s, os.path.join(STUDY[mat], "乱数シードの確認_まとめ.csv"))
     print(s.round(4).to_string(), flush=True)
     # 図：横軸 LML、縦軸 3data の RMSE（点が 1 回の学習。同じ LML なのに RMSE が大きく違う点があれば、最適化の運に左右されている）
-    fig, axes = plt.subplots(1, 2, figsize=(14, 5.8))
-    for ax, col, ttl in [(axes[0], "RMSE 全体", "3data 全体"), (axes[1], "RMSE 低速側", "3data の低速側（3・5 mm/s。外挿）")]:
+    panels = [("RMSE 全体", "3data 全体")]
+    if side:
+        vs = "・".join(f"{v:g}" for v in sorted(te.loc[te["group"] == side, "v"].unique()))
+        panels.append((f"RMSE {side}", f"3data の{side}（{vs} mm/s。外挿）"))
+    fig, axes = plt.subplots(1, len(panels), figsize=(7 * len(panels), 5.8), squeeze=False)
+    for ax, (col, ttl) in zip(axes[0], panels):
         for key, (mk, c) in zip(keys, MARKS[:len(keys) - 1] + [("^", "#2ca02c")]):
             u = t[t["モデル"] == key]
             ax.scatter(u["LML"], u[col], marker=mk, s=110, color=c, alpha=0.75, edgecolors="k", linewidths=0.6, label=key)
