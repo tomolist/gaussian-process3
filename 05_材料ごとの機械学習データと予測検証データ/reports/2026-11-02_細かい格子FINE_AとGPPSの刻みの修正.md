@@ -2,7 +2,7 @@
 type: report
 status: 確認済み
 date: 2026-11-02
-commit:
+commit: cc1cf85
 ---
 
 # 細かい格子の設定（FINE_A の幅と、GPPS の刻み）の修正

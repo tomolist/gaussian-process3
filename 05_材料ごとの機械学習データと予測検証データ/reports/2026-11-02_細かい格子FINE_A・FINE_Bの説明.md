@@ -2,7 +2,7 @@
 type: report
 status: 確認済み
 date: 2026-11-02
-commit:
+commit: cc1cf85
 ---
 
 # シフトファクター検討用のノートの設定 FINE_B・FINE_A の役割と初期値の理由の説明
