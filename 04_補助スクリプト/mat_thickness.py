@@ -135,8 +135,9 @@ def thick_check(fit, pool):
 
 # ---------------------------------------------------------------- 2(b)・3：厚みごとに学習した GPR
 def thick_profile(key, tr, cfg, h, n_jobs=None, restarts=None, mode="shot"):
-    """(b) 1 つの厚みの 5data だけで、モデル key の係数をプロファイル尤度で決める（シフトファクター検討用のノートと同じ run_profile）。返り値：(格子の表, profile_best の辞書)"""
-    pts, conv = run_profile(key, sub_h(tr, h), cfg, n_jobs=n_jobs, restarts=restarts, mode=mode)
+    """(b) 1 つの厚みの 5data だけで、モデル key の係数をプロファイル尤度で決める（シフトファクター検討用のノートと同じ run_profile）。返り値：(格子の表, profile_best の辞書)。
+    このノートは 95% 区間を使わない（最良の係数と LML だけを比べる）ので、区間の延長はしない（extend=False。見直しは行う。2026-11-03）"""
+    pts, conv = run_profile(key, sub_h(tr, h), cfg, n_jobs=n_jobs, restarts=restarts, mode=mode, extend=False)
     return pts, profile_best(pts, key, cfg, conv)
 
 

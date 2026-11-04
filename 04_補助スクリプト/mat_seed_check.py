@@ -13,8 +13,9 @@ RMSE のばらつきが、モデルどうしの差より小さければ、モデ
 結果：同じフォルダ（シフトファクターの検討/）の 乱数シードの確認.csv（1 行が 1 回の学習）、乱数シードの確認_まとめ.csv（モデルごとの最小・最大）、乱数シードの確認.png
 2026-11-02：検証データにない範囲（低速側・高速側・範囲内）は、記録しない形にした（温度適切版のデータは、検証が高速側〔280・320 mm/s〕だけで、低速側がない）。
 まとめの表と図の 2 枚目は、外挿の範囲のうち、低速側があれば低速側（通常版。前と同じ出力）、なければ高速側を使う。
-2026-10-27：結果の新しい構成（学習結果フォルダをダイアログで選ぶ）に合わせた。10-26 までの結果（<材料フォルダ>_学習結果(5all学習データ)/<入力の取り方>/比較/。2026-11-02 に「_学習結果」から名前を変えた）の確認は、
-その時点のこのスクリプト（Git の履歴）で行ったもの。
+2026-10-27：結果の新しい構成（学習結果フォルダをダイアログで選ぶ）に合わせた。10-26 までの結果（<材料フォルダ>/<番号>_学習結果/<材料フォルダ>_学習結果(5all学習データ)/<入力の取り方>/比較/。
+2026-11-02 に「_学習結果」から名前を変え、2026-11-03 に <番号>_学習結果/ の下に移した）の確認は、その時点のこのスクリプト（Git の履歴）で行ったもの。
+2026-11-03：図の点の形と色を、モデルが 5 つより多くても足りるようにした（それまでは 4 つ分しかなく、シフトのあるモデルが 5 つ以上だと、図から抜けるモデルが出て、C の凡例も別のモデルに付いた）。
 """
 import os
 import sys
@@ -61,7 +62,7 @@ for mat in [m for m in ["PP", "MIX", "GPPS"] if m in given or not given]:     # 
         CFG[(mat, key)] = dict(joblib.load(os.path.join(STUDY[mat], mc.MODEL_DIRS[key], f"学習済みモデル_{key}.joblib"))["シフトファクター"])
     MATS.append(mat)
 mc.D = mc.load_all(MATS)
-MARKS = [("o", "#1f77b4"), ("s", "#d62728"), ("D", "#9467bd"), ("v", "#8c564b")]
+MARKS = [("o", "#1f77b4"), ("s", "#d62728"), ("D", "#9467bd"), ("v", "#8c564b"), ("P", "#e377c2"), ("X", "#7f7f7f"), ("<", "#bcbd22"), (">", "#17becf")]   # シフトのあるモデルの点（C は緑の ▲）
 for mat in MATS:
     tr = mc.D[(mat, "5data")]
     te = mc.add_groups(tr, mc.D[(mat, "3data")])
@@ -95,7 +96,7 @@ for mat in MATS:
         panels.append((f"RMSE {side}", f"3data の{side}（{vs} mm/s。外挿）"))
     fig, axes = plt.subplots(1, len(panels), figsize=(7 * len(panels), 5.8), squeeze=False)
     for ax, (col, ttl) in zip(axes[0], panels):
-        for key, (mk, c) in zip(keys, MARKS[:len(keys) - 1] + [("^", "#2ca02c")]):
+        for key, (mk, c) in zip(keys, [MARKS[i % len(MARKS)] for i in range(len(keys) - 1)] + [("^", "#2ca02c")]):
             u = t[t["モデル"] == key]
             ax.scatter(u["LML"], u[col], marker=mk, s=110, color=c, alpha=0.75, edgecolors="k", linewidths=0.6, label=key)
         ax.set_xlabel("対数周辺尤度 LML（右ほど、データによく合う）")

@@ -40,6 +40,7 @@ MAT_JA = {"PP": "PP", "MIX": "粉砕材混合PP", "GPPS": "GPPS"}
 KEY = "B_Tff"
 MODE = "cond"            # 読むモデルの入力の取り方（報告書B・ポスターは条件平均の入力で作った。発表資料の make_slide_figs.py は "shot" に変えて使う）
 RES_SUFFIX = "_学習結果(5all学習データ)"   # 10-26 までの結果のフォルダの名前の末尾（<材料フォルダ> の後ろ。2026-11-02 に「_学習結果」から変えた）
+RES_PARENT = "_学習結果"                   # 10-26 までの結果のフォルダを入れたフォルダ（<材料フォルダ>/<番号>_学習結果/。<番号> は材料フォルダの先頭 2 桁。2026-11-03 のユーザーの整理〔a4ad4b8〕）
 POSTER = os.path.join(mc.DATA_ROOT, "学習結果報告書作成_261015", "ポスター")
 OUT = os.path.join(POSTER, "図")
 SAMPLE_PDF = os.path.join(POSTER, "報告書Aから作成2.pdf")
@@ -200,12 +201,12 @@ def fig_shift_concept():
 # ---------------------------------------------------------------- 学習結果の図
 def model_dir(mat):
     folder = mc.MAT_FOLDERS[mat]
-    return os.path.join(mc.DATA_ROOT, folder, f"{folder}{RES_SUFFIX}", mc.MODE_JA[MODE], KEY)
+    return os.path.join(mc.DATA_ROOT, folder, folder[:2] + RES_PARENT, f"{folder}{RES_SUFFIX}", mc.MODE_JA[MODE], KEY)
 
 
 def compare_dir(mat):
     folder = mc.MAT_FOLDERS[mat]
-    return os.path.join(mc.DATA_ROOT, folder, f"{folder}{RES_SUFFIX}", mc.MODE_JA[MODE], "比較")
+    return os.path.join(mc.DATA_ROOT, folder, folder[:2] + RES_PARENT, f"{folder}{RES_SUFFIX}", mc.MODE_JA[MODE], "比較")
 
 
 def log_axes(ax, xlim, ylim):

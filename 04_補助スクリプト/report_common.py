@@ -3,6 +3,8 @@
 
 - 数値の整形（負の数は数式モードにして、正しいマイナス記号にする）
 - ひな形 .tex の @@項目@@ を置き換え、_tmp/ で LuaLaTeX を2回動かし、できた PDF と tex を results/ に置く
+2026-11-03：LuaLaTeX の作業フォルダを、実行ごとに _tmp/report_<手順>/<日時>/ に新しく作る形にした（それまでは同じフォルダを使い、前回の補助ファイルを消していた。
+_tmp/ のファイルは消さず、上書きもしない決まりのため）。results/ の PDF と tex は上書きするので、作り直す前に、前の版を _to_delete/ へ移しておく。
 """
 import datetime
 import os
@@ -68,7 +70,7 @@ def build_pdf(step, step_dir, template, V, out_stem, extra_files=(), pdf_name=No
         tex = tex.replace(f"@@{key}@@", str(val))
     left = sorted(set(re.findall(r"@@([A-Za-z0-9_]+)@@", tex)))
     assert not left, f"置き換えていない項目: {left}"
-    out = os.path.join(W, "_tmp", f"report_{step}")
+    out = os.path.join(W, "_tmp", f"report_{step}", datetime.datetime.now().strftime("%Y%m%d_%H%M%S"))   # 実行ごとに新しいフォルダ（前の補助ファイルを消さず、上書きもしない。2026-11-03）
     os.makedirs(os.path.join(out, step_dir or ""), exist_ok=True)
     with open(os.path.join(out, f"{out_stem}.tex"), "w", encoding="utf-8", newline="\n") as f:
         f.write(tex)
@@ -78,10 +80,6 @@ def build_pdf(step, step_dir, template, V, out_stem, extra_files=(), pdf_name=No
             if fn.endswith(".png"):
                 shutil.copy2(os.path.join(src, fn), os.path.join(out, step_dir, fn))
     print("原稿を作成:", os.path.join(out, f"{out_stem}.tex"), f"（置き換え {len(V)} 項目）")
-    for ext in ("aux", "toc", "out"):                      # 前回の補助ファイルが残っていると、直した原稿でも前回のエラーを引きずる
-        p = os.path.join(out, f"{out_stem}.{ext}")
-        if os.path.exists(p):
-            os.remove(p)
     for i in range(2):
         r = subprocess.run([LUALATEX, "-interaction=nonstopmode", "-halt-on-error", f"{out_stem}.tex"], cwd=out, capture_output=True)
         if r.returncode != 0:

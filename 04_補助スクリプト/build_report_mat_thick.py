@@ -3,7 +3,7 @@
 
 使い方（リポジトリ直下から）: uv run python 04_補助スクリプト/build_report_mat_thick.py [--run-min 分]
 前提：ノート「材料別_温度シフトGPR_ARD対応Matern52＋線形＋ホワイトノイズ_厚みごとの比較.ipynb」を実行済みであること。
-各材料の <材料フォルダ>_学習結果(5all学習データ)/ショットごとの入力/厚みごとの比較/ の CSV から数値を取り出して report_mat_thick_template.tex に入れ、
+各材料の <材料フォルダ>/<番号>_学習結果/<材料フォルダ>_学習結果(5all学習データ)/ショットごとの入力/厚みごとの比較/ の CSV から数値を取り出して report_mat_thick_template.tex に入れ、
 05_材料ごとの機械学習データと予測検証データ/学習結果説明_厚みごとの温度シフト.tex を書き、そのフォルダで LuaLaTeX を2回動かす
 （補助ファイルは _tmp/report_mat_thick/ に出す）。図は、tex から相対パスで読む。
 2026-10-23：ユーザーの決定で、ショットごとの入力の結果を説明する版に変えた（条件平均の入力の結果は、参考として比べる）。
@@ -22,7 +22,8 @@ import report_common as rc
 ROOT = os.path.join(rc.W, "05_材料ごとの機械学習データと予測検証データ")
 FOLD = {"PP": "01_バージンPP再々実験", "MIX": "02_粉砕材混合PP実験", "GPPS": "03_GPPS実験"}
 RES_SUFFIX = "_学習結果(5all学習データ)"   # 10-26 までの結果のフォルダの名前の末尾（<材料フォルダ> の後ろ。2026-11-02 に「_学習結果」から変えた）
-JA = {"PP": "PP", "MIX": "粉砕材混合 PP", "GPPS": "GPPS"}
+RES_PARENT = "_学習結果"                   # 10-26 までの結果のフォルダを入れたフォルダ（<材料フォルダ>/<番号>_学習結果/。<番号> は材料フォルダの先頭 2 桁。2026-11-03 のユーザーの整理〔a4ad4b8〕）
+JA ={"PP": "PP", "MIX": "粉砕材混合 PP", "GPPS": "GPPS"}
 TNAME = {"PP": "PP", "MIX": "粉砕材混合PP", "GPPS": "GPPS"}           # CSV の「材料」列の名前
 MODE_DIR = "ショットごとの入力"                       # 説明する結果の入力の取り方（ユーザー決定、2026-10-23）
 REF_DIR = "条件平均の入力"                            # 参考に比べる結果（10-22 の版を、10-26 に今の判定の基準で実行し直したもの）
@@ -36,13 +37,18 @@ V = {}
 run_min = sys.argv[sys.argv.index("--run-min") + 1] if "--run-min" in sys.argv else "---"
 
 
+def res_parts(mat):
+    """10-26 までの結果のフォルダ（ROOT から）を、フォルダの名前の並びで"""
+    return [FOLD[mat], FOLD[mat][:2] + RES_PARENT, FOLD[mat] + RES_SUFFIX]
+
+
 def tdir(mat, mode=MODE_DIR):
-    return os.path.join(ROOT, FOLD[mat], f"{FOLD[mat]}{RES_SUFFIX}", mode, "厚みごとの比較")
+    return os.path.join(ROOT, *res_parts(mat), mode, "厚みごとの比較")
 
 
 def rel(mat, name):
     """tex から見た図の相対パス（ROOT から）"""
-    return "/".join([FOLD[mat], f"{FOLD[mat]}{RES_SUFFIX}", MODE_DIR, "厚みごとの比較", name])
+    return "/".join([*res_parts(mat), MODE_DIR, "厚みごとの比較", name])
 
 
 def rd(mat, name, mode=MODE_DIR):
@@ -51,7 +57,7 @@ def rd(mat, name, mode=MODE_DIR):
 
 def rcomp(mat, name, mode=MODE_DIR):
     """元のノートの比較の表（<入力>/比較/）"""
-    return pd.read_csv(os.path.join(ROOT, FOLD[mat], f"{FOLD[mat]}{RES_SUFFIX}", mode, "比較", name), encoding="utf-8-sig")
+    return pd.read_csv(os.path.join(ROOT, *res_parts(mat), mode, "比較", name), encoding="utf-8-sig")
 
 
 def esc(s):
@@ -405,12 +411,8 @@ left = sorted(set(re.findall(r"@@([A-Za-z0-9_]+)@@", tex)))
 assert not left, f"置き換えていない項目: {left}"
 with open(os.path.join(ROOT, f"{STEM}.tex"), "w", encoding="utf-8", newline="\n") as f:
     f.write(tex)
-out = os.path.join(rc.W, "_tmp", "report_mat_thick")
+out = os.path.join(rc.W, "_tmp", "report_mat_thick", rc.datetime.datetime.now().strftime("%Y%m%d_%H%M%S"))   # 実行ごとに新しいフォルダ（前の補助ファイルを消さず、上書きもしない。2026-11-03）
 os.makedirs(out, exist_ok=True)
-for ext in ("aux", "toc", "out"):
-    p = os.path.join(out, f"{STEM}.{ext}")
-    if os.path.exists(p):
-        os.remove(p)
 for i in range(2):
     r = subprocess.run([rc.LUALATEX, "-interaction=nonstopmode", "-halt-on-error", f"-output-directory={out}", f"{STEM}.tex"], cwd=ROOT, capture_output=True)
     if r.returncode != 0:

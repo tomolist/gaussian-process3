@@ -39,6 +39,7 @@ FIG_DPI = globals().get("FIG_DPI", 600)                     # 保存する図の
 SHOW_FIGS = globals().get("SHOW_FIGS", True)                # 図をノートに表示するか（False なら保存だけ）
 INPUT_MODE = globals().get("INPUT_MODE", "shot")            # "shot"：γ̇・P3_3・Tff をショットごとの値で入れる（6月のノートと同じ。既定）／"cond"：条件（設定温度・厚み・射出速度）ごとの平均で入れる（参考）
 MAX_REFINE = globals().get("MAX_REFINE", 4)                 # プロファイル尤度で、最良の点が細かい格子の端に当たったとき、その点を中心に細かい格子を取り直す回数の上限
+MAX_EXTEND = globals().get("MAX_EXTEND", 20)                # プロファイル尤度で、95% 区間の端が細かい格子の中で決まるまで、区間の外側に細かい格子の点を 1 列ずつ足す回数の上限（2026-11-03）
 FINE_B = globals().get("FINE_B", (4.0, 1.0))               # 構造 B の細かい格子：最良の点の ±4 を 1 刻み
 FINE_A = globals().get("FINE_A", (4.5, 0.5))                # 構造 A の細かい格子：最良の点の ±4.5 を 0.5 刻み（粗い格子の刻み 5 の、隣の点の手前まで。2026-11-02）
 OUTLIER_Z = globals().get("OUTLIER_Z", 3.5)                 # 規則 f：|z| がこれを超え、かつ |残差|（ln η）が次の値を超える条件
@@ -51,7 +52,8 @@ DATA_ROOT = os.path.join(REPO, "05_材料ごとの機械学習データと予測
 PROBLEM_CSV = os.path.join(DATA_ROOT, "問題データ一覧.csv")
 MAT_FOLDERS = globals().get("MAT_FOLDERS", {"PP": "01_バージンPP再々実験", "MIX": "02_粉砕材混合PP実験", "GPPS": "03_GPPS実験"})
 MAT_NAMES = {"PP": "PP", "MIX": "粉砕材混合PP", "GPPS": "GPPS"}     # 問題データ一覧の「材料」列の名前
-GROUP_DIRS = {"5data": "学習データ_*", "3data": "検証データ_*"}      # 材料フォルダの中の、学習データと検証データのフォルダ（CSV が 1 つずつ）
+DATA_SUB = "*_学習・検証データ"                                     # 材料フォルダの中の、学習データと検証データのフォルダをまとめたフォルダ（2026-11-03 のユーザーのフォルダの整理〔a4ad4b8〕で、01_学習・検証データ/ などができた）
+GROUP_DIRS = {"5data": "学習データ_*", "3data": "検証データ_*"}      # DATA_SUB の中の、学習データと検証データのフォルダ（CSV が 1 つずつ）
 COLS = {"元ファイル": "file", "キャビ厚": "H", "射出速度[mm/s]": "v", "樹脂粘度η34(Pa・s)": "eta", "せん断速度γ34(1/s)": "gd",
         "流動中樹脂圧力P3_1(MPa)": "P31", "流動中樹脂圧力P3_2(MPa)": "P32", "流動中樹脂圧力P3_3(MPa)": "P33",
         "加熱シリンダ温度[℃]": "Tset", "加熱シリンダ温度(℃)": "Tset", "流動中樹脂温度(℃)": "Tff"}
@@ -69,7 +71,7 @@ SOURCES = {}       # 材料 → {"5data": 学習データの CSV, "3data": 検�
 VERSION_DIRS = {"cond": "条件ごとの平均版", "shot": "全ショット版"}   # 学習結果フォルダの直下の分け方（入力の取り方 INPUT_MODE ごと）。図のタイトルと、表の「入力」の列にも使う
 THICK_TOTAL, THICK_EACH = "全厚み総合", "厚みごと"   # その下の分け方：全厚みの 5data で 1 つのモデルを学習した結果（学習用・シフトファクター検討用のノート）／厚みごとの比較のノートの結果
 STUDY_DIR = "シフトファクターの検討"                  # 全厚み総合/ の下の、シフトファクター検討用ノートの結果のフォルダ
-MODE_JA = {"shot": "ショットごとの入力", "cond": "条件平均の入力"}   # 10-26 までの結果のフォルダの名前（<材料フォルダ>_学習結果/ の下。その結果は、この構成のまま残す。発表資料・ポスターのスクリプトが読む）
+MODE_JA = {"shot": "ショットごとの入力", "cond": "条件平均の入力"}   # 10-26 までの結果のフォルダの名前（<材料フォルダ>/<番号>_学習結果/<材料フォルダ>_学習結果(5all学習データ)/ の下。その結果は、この構成のまま残す。発表資料・ポスターのスクリプトが読む）
 DATA_KINDS = {"5data": ("学習", "学習データ（5data）の CSV"), "3data": ("検証", "検証データ（3data）の CSV")}   # 組 → (設定 FILES での名前, ダイアログの説明)
 PATH_MAX = 260     # Windows のパスの長さの上限（文字）
 DEEPEST = 105      # 学習結果フォルダの下の、最も長いファイルの場所の長さ（文字）の目安（せん断速度_粘度_拡張版/ の英語の凡例の図など。2026-11-02 にモデルのフォルダの名前に型が入って長くなった）
@@ -179,12 +181,12 @@ def result_dir(mat, *parts, make=True):
 
 
 def path_of(mat, grp):
-    """読む CSV：choose_inputs で決めたもの。決めていなければ（ノートの外のスクリプト）、今までどおり 05 フォルダの材料フォルダから探す。
-    そのときは、名前に「温度適切」を含むフォルダ（2026-11-02 に増えた温度適切版）を除き、通常版（10-26 までの結果に使ったデータ）を使う"""
+    """読む CSV：choose_inputs で決めたもの。決めていなければ（ノートの外のスクリプト）、05 フォルダの材料フォルダの DATA_SUB の中から探す（2026-11-03 から。
+    それまでは材料フォルダの直下）。そのときは、名前に「温度適切」を含むフォルダ（2026-11-02 に増えた温度適切版）を除き、通常版（10-26 までの結果に使ったデータ）を使う"""
     if SOURCES.get(mat, {}).get(grp):
         return SOURCES[mat][grp]
-    fs = [f for f in sorted(glob.glob(os.path.join(DATA_ROOT, MAT_FOLDERS[mat], GROUP_DIRS[grp], "*.csv"))) if "温度適切" not in os.path.basename(os.path.dirname(f))]
-    assert len(fs) == 1, f"{MAT_FOLDERS[mat]}/{GROUP_DIRS[grp]} に CSV が 1 つだけあるはず（見つかったもの: {fs}）"
+    fs = [f for f in sorted(glob.glob(os.path.join(DATA_ROOT, MAT_FOLDERS[mat], DATA_SUB, GROUP_DIRS[grp], "*.csv"))) if "温度適切" not in os.path.basename(os.path.dirname(f))]
+    assert len(fs) == 1, f"{MAT_FOLDERS[mat]}/{DATA_SUB}/{GROUP_DIRS[grp]} に CSV が 1 つだけあるはず（見つかったもの: {fs}）"
     return fs[0]
 
 
@@ -519,82 +521,262 @@ def grid_of(lo, hi, step):
     return np.round(np.arange(lo, hi + step / 2.0, step), 6)
 
 
-def prof_chain(key, tr, cfg, points, restarts, mode):
+def fine_of(key, cfg):
+    """細かい格子 (±幅, 刻み)：型の設定に "fine" があればそれ、なければ構造 A は FINE_A、B は FINE_B"""
+    return cfg.get("fine") or (FINE_A if key.split("_")[0] == "A" else FINE_B)
+
+
+def prof_row(f, th, tv):
+    """格子の 1 点の結果（表の 1 行）。theta はその点で学習したカーネルの値（次の点や、最終モデルの学習の初期値に使う）"""
+    return {"th": float(th), "tv": float(tv), "LML": float(f["gp"].log_marginal_likelihood_value_),
+            "noise_sd": float(np.sqrt(f["gp"].kernel_.k2.noise_level)), "theta": f["gp"].kernel_.theta.tolist()}
+
+
+def prof_chain(key, tr, cfg, points, restarts, mode, theta0=None):
     """格子の点 points = [(θ_h, θ_v), …] を順に学習して LML を返す。前の点の解を初期値にする（局所解でがたつくのを減らす）。
-    theta はその点で学習したカーネルの値（最終モデルの学習の初期値に使う）"""
+    最初の点は theta0 から（None なら、カーネルの既定の初期値から）"""
     warnings.simplefilter("ignore")
-    out, theta = [], None
+    out, theta = [], theta0
     for th, tv in points:
         f = fit_gp(key, tr, cfg, th, tv, restarts, theta, mode=mode)
         theta = f["gp"].kernel_.theta
-        out.append({"th": float(th), "tv": float(tv), "LML": float(f["gp"].log_marginal_likelihood_value_),
-                    "noise_sd": float(np.sqrt(f["gp"].kernel_.k2.noise_level)), "theta": theta.tolist()})
+        out.append(prof_row(f, th, tv))
     return out
 
 
-def run_profile(key, tr, cfg, n_jobs=None, restarts=None, mode=None):
-    """粗い格子で全体を見て、最良の点の近くを細かい格子で計算し直す。構造 A は θ_h = 0 の 1 次元、B は (θ_h, θ_v) の 2 次元。
-    細かい格子は、最良の点を中心に取る。計算した結果、最良の点が動いたら（細かい格子の端に当たったとき）、新しい最良の点を中心に取り直す
-    （最良の点が動かなくなるか、MAX_REFINE 回まで。斜めの尾根の上では、尤度がほとんど変わらないまま最良の点が動くことがある）。
-    E_h ごとの列（chain）を並列に計算する。mode（既定 INPUT_MODE）は、並列の計算にも引数で渡す。
-    返すもの：(表, 収束したか)。表の列：th, tv, LML, noise_sd, theta（カーネルの値。CSV には入れない）, stage（粗い／細かい）。
-    収束したか：最良の点の周り（±細かい格子の幅）の点が、すべて計算済みか"""
+def prof_points(key, tr, cfg, items, mode):
+    """格子の点を 1 つずつ、決めた初期値から学習して LML を返す（見直しと、区間の延長に使う）。items = [(θ_h, θ_v, やり直しの回数, 初期値), …]"""
+    warnings.simplefilter("ignore")
+    return [prof_row(fit_gp(key, tr, cfg, th, tv, r, t0, mode=mode), th, tv) for th, tv, r, t0 in items]
+
+
+def interval_gaps(pts, key, cfg):
+    """LML が最大から 1.92 以内の点（おおよその 95% 区間）の隣（細かい格子の刻みだけ離れた点。粗い格子の範囲の中）のうち、まだ計算していない点。
+    返り値：{(θ_h, θ_v): 隣の計算済みの点の theta}。空なら、区間の端が、計算した点の中で決まっている（区間の外側の隣の点まで計算済み）"""
+    step = fine_of(key, cfg)[1]
+    hg, vg = grid_of(*cfg["h_grid"]), grid_of(*cfg["v_grid"])
+    is_b = key.split("_")[0] == "B"
+    have = set(zip(np.round(pts["th"], 6), np.round(pts["tv"], 6)))
+    dirs = [(0.0, step), (0.0, -step)] + ([(step, 0.0), (-step, 0.0)] if is_b else [])
+    need = {}
+    for r in pts[pts["LML"] >= pts["LML"].max() - 1.92].itertuples():
+        for dh, dv in dirs:
+            k = (round(float(r.th + dh), 6), round(float(r.tv + dv), 6))
+            inside_range = (hg.min() - 1e-9 <= k[0] <= hg.max() + 1e-9 if is_b else k[0] == 0.0) and vg.min() - 1e-9 <= k[1] <= vg.max() + 1e-9
+            if inside_range and k not in have and k not in need:
+                need[k] = getattr(r, "theta", None)
+    return need
+
+
+def run_profile(key, tr, cfg, n_jobs=None, restarts=None, mode=None, extend=True):
+    """θ の格子の各点で GPR を学習し、対数周辺尤度（LML）を求める（プロファイル尤度）。構造 A は θ_h = 0 の 1 次元、B は (θ_h, θ_v) の 2 次元。
+    1. 粗い格子で全体を見る（θ_h ごとの列を、θ_v の小さい順にたどり、前の点の解を初期値にする。列を並列に計算する）。
+    2. 最良の点を中心に、細かい格子を取る。新しい点は、θ_h ごとに、最良の点の θ_v から上と下へ（外へ向かって）たどり、最良の点の解から始める
+       （2026-11-03。それまでは、列の端から既定の初期値で始めていたので、最初の点がノイズの大きい悪い解に入り、それが列の中で引き継がれることがあった）。
+       最良の点が動いたら（細かい格子の端に当たったとき）、新しい最良の点を中心に取り直す（MAX_REFINE 回まで。斜めの尾根の上では、
+       尤度がほとんど変わらないまま最良の点が動くことがある）。
+    3. 見直し（2026-11-03）：すべての点を、最良の点の解を初期値にして最適化し直し（やり直しなし）、LML が上がった点は、その値に置き換える。
+       最良の点が動いたら 2 へ戻る。
+    4. 区間の延長（extend = True のとき。2026-11-03）：おおよその 95% 区間（最大から 1.92 以内）の点の隣に、まだ計算していない点があれば（interval_gaps）、
+       隣の点の解から計算し、見直しもして、区間の端が細かい格子の中で決まるまで 1 列ずつ足す（MAX_EXTEND 回まで。粗い格子の範囲の外には出ない）。
+       最良の点が動いたら 2 へ戻る。
+    mode（既定 INPUT_MODE）は、並列の計算にも引数で渡す。
+    返すもの：(表, 収束したか)。表の列：th, tv, LML, noise_sd, theta（カーネルの値。CSV には入れない）, stage（粗い／細かい／区間の延長）,
+    review_gain（見直しで LML が上がった量。上がらなければ 0）。
+    収束したか：最良の点の周り（±細かい格子の幅）の点がすべて計算済みで、見直しと区間の延長でも、最良の点が動かなかったか"""
     from joblib import Parallel, delayed
     n_jobs = N_JOBS if n_jobs is None else n_jobs
     restarts = PROFILE_RESTARTS if restarts is None else restarts
     mode = INPUT_MODE if mode is None else mode
     struct = key.split("_")[0]
     hg, vg = grid_of(*cfg["h_grid"]), grid_of(*cfg["v_grid"])
-    rng, step = cfg.get("fine") or (FINE_A if struct == "A" else FINE_B)
+    rng, step = fine_of(key, cfg)
+    P = {}                                                   # (θ_h, θ_v) → その点の結果（表の 1 行）
 
-    def run(points, stage):
+    def kp(th, tv):
+        return (round(float(th), 6), round(float(tv), 6))
+
+    def best():
+        return max(P.values(), key=lambda r: r["LML"])
+
+    def add(rows, stage):
+        for r in rows:
+            k = kp(r["th"], r["tv"])
+            P[k] = {**r, "th": k[0], "tv": k[1], "stage": stage, "review_gain": 0.0}
+
+    def chains(chs):
+        """列 chs = [(点の並び, 最初の点の初期値), …] を並列に計算する"""
+        res = Parallel(n_jobs=min(n_jobs, len(chs)))(delayed(prof_chain)(key, tr, cfg, ch, restarts, mode, t0) for ch, t0 in chs) if chs else []
+        return [r for rr in res for r in rr]
+
+    def points(items):
+        """点を 1 つずつ（items = [(θ_h, θ_v, やり直しの回数, 初期値), …]）、並列に計算する"""
+        n = min(n_jobs, len(items))
+        res = Parallel(n_jobs=n)(delayed(prof_points)(key, tr, cfg, items[i::n], mode) for i in range(n)) if items else []
+        return [r for rr in res for r in rr]
+
+    def outward(b, new):
+        """細かい格子の新しい点を、θ_h ごとに、最良の点の θ_v から上と下へ（外へ向かって）たどる列にする。どの列も、最良の点の解から始める"""
         by = {}
-        for th, tv in points:
-            by.setdefault(float(th), []).append(float(tv))
-        chs = [[(th, tv) for tv in sorted(tvs)] for th, tvs in sorted(by.items())]
-        res = Parallel(n_jobs=min(n_jobs, len(chs)))(delayed(prof_chain)(key, tr, cfg, ch, restarts, mode) for ch in chs)
-        t = pd.DataFrame([r for rr in res for r in rr])
-        t["stage"] = stage
-        return t
+        for th, tv in new:
+            by.setdefault((th, tv > b["tv"]), []).append((th, tv))
+        t0 = np.asarray(b["theta"], float)
+        return [(sorted(ps, key=lambda p: abs(p[1] - b["tv"])), t0) for _, ps in sorted(by.items())]
 
-    pts = run([(0.0, v) for v in vg] if struct == "A" else [(h, v) for h in hg for v in vg], "粗い")
-    converged = False
-    for _ in range(MAX_REFINE):
-        b = pts.loc[pts["LML"].idxmax()]
-        hs = [0.0] if struct == "A" else grid_of(b["th"] - rng, b["th"] + rng, step)
-        vs = grid_of(b["tv"] - rng, b["tv"] + rng, step)
-        have = set(zip(np.round(pts["th"], 6), np.round(pts["tv"], 6)))
-        new = [(h, v) for h in hs for v in vs if (round(float(h), 6), round(float(v), 6)) not in have]
-        if new:
-            pts = pd.concat([pts, run(new, "細かい")], ignore_index=True)
-        b2 = pts.loc[pts["LML"].idxmax()]
-        if (b2["th"], b2["tv"]) == (b["th"], b["tv"]):       # 最良の点が動かなかった：周りがすべて計算済みで、最良
-            converged = True
+    def review(keys):
+        """見直し：点 keys を、最良の点の解から最適化し直し（やり直しなし）、LML が上がった点を、その値に置き換える"""
+        b = best()
+        t0 = np.asarray(b["theta"], float)
+        for r in points([(P[k]["th"], P[k]["tv"], 0, t0) for k in keys if k != kp(b["th"], b["tv"])]):
+            q = P[kp(r["th"], r["tv"])]
+            if r["LML"] > q["LML"] + 1e-3:                    # 計算の誤差ほどの差は、置き換えない
+                q.update(LML=r["LML"], noise_sd=r["noise_sd"], theta=r["theta"], review_gain=q["review_gain"] + r["LML"] - q["LML"])
+
+    def same(a, b):
+        return kp(a["th"], a["tv"]) == kp(b["th"], b["tv"])
+
+    add(chains([([(float(h), float(v)) for v in vg], None) for h in ([0.0] if struct == "A" else hg)]), "粗い")   # 1. 粗い格子
+    refines, extends, converged = 0, 0, False
+    while True:
+        moved = True
+        while refines < MAX_REFINE:                          # 2. 細かい格子（最良の点が動かなくなるまで）
+            b = best()
+            hs = [0.0] if struct == "A" else grid_of(b["th"] - rng, b["th"] + rng, step)
+            new = [kp(h, v) for h in hs for v in grid_of(b["tv"] - rng, b["tv"] + rng, step) if kp(h, v) not in P]
+            if new:
+                add(chains(outward(b, new)), "細かい")
+            refines += 1
+            if same(best(), b):
+                moved = False
+                break
+        if moved:                                            # 取り直しの回数の上限まで、最良の点が動き続けた（収束せず）
             break
-    pts = pts.sort_values("LML", ascending=False).drop_duplicates(subset=["th", "tv"]).sort_values(["th", "tv"]).reset_index(drop=True)
+        b = best()
+        review(list(P))                                      # 3. 見直し
+        if not same(best(), b):
+            continue
+        while extend and extends < MAX_EXTEND:               # 4. 区間の延長
+            need = interval_gaps(pd.DataFrame(list(P.values())), key, cfg)
+            if not need:
+                break
+            add(points([(h, v, restarts, np.asarray(t, float)) for (h, v), t in need.items()]), "区間の延長")
+            review(list(need))
+            extends += 1
+            if not same(best(), b):
+                break
+        if not same(best(), b):
+            continue
+        converged = True
+        break
+    pts = pd.DataFrame(list(P.values())).sort_values(["th", "tv"]).reset_index(drop=True)
     return pts, converged
 
 
-# 尤度比検定の目安：2 つの係数（横・縦）を足したときの 5% 基準。2·ΔLML > 5.99（自由度 2 のカイ二乗分布の 95% 点）→ ΔLML > 3.0
+# 尤度比検定の目安（5% 基準）：θ = 0 との LML の差 ΔLML が、これ以上なら、足した係数の効果が認められる。
+# 係数 1 つ（構造 A。B と A の比べ方にも使う）：2·ΔLML > 3.84（自由度 1 のカイ二乗分布の 95% 点）→ ΔLML > 1.92（95% 区間〔最大から 1.92 以内〕と同じ値）。
+# 係数 2 つ（構造 B）：2·ΔLML > 5.99（自由度 2）→ ΔLML > 3.0
+LRT_DLML_1 = 1.92
 LRT_DLML = 3.0
+
+
+def lrt_limit(key):
+    """モデル key の、θ = 0 との LML の差 ΔLML の基準：構造 A（係数 1 つ）は LRT_DLML_1（1.92）、構造 B（係数 2 つ）は LRT_DLML（3.0）。
+    2026-11-03 のユーザー決定（それまでは A にも 3.0 を使っていて、A の 95% 区間が 0 を含まないのに「支持されない」ことがあった）"""
+    return LRT_DLML_1 if str(key).split("_")[0] == "A" else LRT_DLML
 
 
 def profile_best(pts, key, cfg, converged=True, lml_zero=None):
     """最良の θ と、LML が最大から 1.92 以内の範囲（おおよその 95% 区間）。at_edge：最良の点が粗い格子の端。refine_converged：細かい格子の取り直しが収束したか。
-    範囲は、計算した点の中だけで決まる（斜めの尾根の上では、実際の範囲はもっと長い）。尾根に沿った方向は決まりにくく、差 θ_v − θ_h（diff_*）が最もよく決まる"""
+    範囲は、計算した点の中だけで決まる（斜めの尾根の上では、実際の範囲はもっと長い）。尾根に沿った方向は決まりにくく、差 θ_v − θ_h（diff_*）が最もよく決まる。
+    interval_closed：範囲の点の隣（細かい格子の刻み）が、すべて計算済み（範囲の端が、細かい格子の中で決まった）。interval_at_range：範囲が粗い格子の範囲の端に届いた
+    （その外は計算しないので、範囲はもっと広いかもしれない）。n_review_up：見直しで LML が上がった点の数。review_gain_max：その上がり方の最大"""
     r = pts.loc[pts["LML"].idxmax()]
     inside = pts[pts["LML"] >= r["LML"] - 1.92]
     hg, vg = grid_of(*cfg["h_grid"]), grid_of(*cfg["v_grid"])
-    z = pts[(pts["th"] == 0.0) & (pts["tv"] == 0.0)]
+    z = pts[np.isclose(pts["th"], 0.0) & np.isclose(pts["tv"], 0.0)]
     lz = float(z["LML"].iloc[0]) if len(z) else (np.nan if lml_zero is None else lml_zero)
     diff = inside["tv"] - inside["th"]
     edge = bool(r["tv"] in (vg.min(), vg.max()) or (key.startswith("B") and r["th"] in (hg.min(), hg.max())))
+    rim = bool(np.isclose(inside["tv"], vg.min()).any() or np.isclose(inside["tv"], vg.max()).any()
+               or (key.startswith("B") and (np.isclose(inside["th"], hg.min()).any() or np.isclose(inside["th"], hg.max()).any())))
+    gain = pts["review_gain"] if "review_gain" in pts.columns else pd.Series(0.0, index=pts.index)
     return {"th_best": float(r["th"]), "tv_best": float(r["tv"]), "diff_best": float(r["tv"] - r["th"]), "LML_best": float(r["LML"]),
             "LML_at_0": lz, "dLML_vs_0": float(r["LML"]) - lz, "th_lo": float(inside["th"].min()), "th_hi": float(inside["th"].max()),
             "tv_lo": float(inside["tv"].min()), "tv_hi": float(inside["tv"].max()), "diff_lo": float(diff.min()), "diff_hi": float(diff.max()),
             "n_in_95": int(len(inside)), "n_points": int(len(pts)), "at_edge": edge, "refine_converged": bool(converged),
+            "interval_closed": not interval_gaps(pts, key, cfg), "interval_at_range": rim,
+            "n_review_up": int((gain > 0).sum()), "review_gain_max": float(gain.max()) if len(gain) else 0.0,
             "theta_best": np.asarray(r["theta"], float) if "theta" in pts.columns else None,
             "theta_zero": np.asarray(z["theta"].iloc[0], float) if (len(z) and "theta" in pts.columns) else None}
+
+
+def profile_careful(pts, b, key, cfg, fit_best, fit_zero):
+    """念入りな最適化（最良の θ と θ = 0 の 2 点。fit_best・fit_zero）の LML を、格子の表 pts に入れ（格子の値と大きいほうを残す）、
+    ΔLML と 95% 区間を、どちらもその表から出し直す（2026-11-03 のユーザー決定。それまでは、95% 区間は格子の値、ΔLML は念入りな最適化の値から出していて、
+    θ = 0 が区間の外なのに ΔLML が 1.92 未満、のような食い違いが起きることがあった）。
+    b：profile_best の結果（格子の値）。格子の値は LML_best_grid・LML_at_0_grid・dLML_vs_0_grid に残す。最良の点（th_best・tv_best）と theta_* は b のまま
+    （最良の θ の学習が、そのまま最終モデルになるため）。表の列 careful は、念入りな最適化の値に置き換えた点。返り値：(新しい表, 新しい b)"""
+    pts = pts.copy()
+    pts["careful"] = pts["careful"] if "careful" in pts.columns else False
+    lml = {}
+    for name, (th, tv), f in [("best", (b["th_best"], b["tv_best"]), fit_best), ("zero", (0.0, 0.0), fit_zero)]:
+        v, nz = float(f["gp"].log_marginal_likelihood_value_), float(np.sqrt(f["gp"].kernel_.k2.noise_level))
+        m = np.isclose(pts["th"], th) & np.isclose(pts["tv"], tv)
+        if not m.any():                                      # θ = 0 が格子にない（FORM_CFG の範囲に 0 を含めなかった）とき
+            pts = pd.concat([pts, pd.DataFrame([{"th": float(th), "tv": float(tv), "LML": v, "noise_sd": nz, "stage": "念入り", "careful": True}])], ignore_index=True)
+            m = np.isclose(pts["th"], th) & np.isclose(pts["tv"], tv)
+        up = m & (pts["LML"] < v)
+        pts.loc[up, "LML"], pts.loc[up, "noise_sd"], pts.loc[up, "careful"] = v, nz, True
+        lml[name] = float(pts.loc[m, "LML"].max())
+    nb = profile_best(pts, key, cfg, b["refine_converged"])
+    out = {**b, **{k: nb[k] for k in ("th_lo", "th_hi", "tv_lo", "tv_hi", "diff_lo", "diff_hi", "n_in_95", "n_points", "interval_closed", "interval_at_range")}}
+    out.update(LML_best_grid=b["LML_best"], LML_at_0_grid=b["LML_at_0"], dLML_vs_0_grid=b["dLML_vs_0"],
+               LML_best=lml["best"], LML_at_0=lml["zero"], dLML_vs_0=lml["best"] - lml["zero"])
+    return pts, out
+
+
+def shift_candidates(rows):
+    """シフトファクター検討用のノートのまとめで、1 つの材料の、学習用のノートの SHIFT_COL・SHIFT_STRUCT・SHIFT_FORM の候補を選ぶ（2026-11-03 のユーザー決定）。
+    rows：シフトのあるモデルごとの {"モデル", "LML", "dLML_vs_0"}（LML・ΔLML は念入りな最適化の値）。
+    1. 列（Tset・Tff）と型（Arr・WLF）の組ごとに：A が θ = 0 より基準 lrt_limit（1.92）以上大きければ、その組の温度シフトは支持される。
+       支持されたら、B が A より LRT_DLML_1（1.92）以上大きいときだけ B、そうでなければ A（B は A に横の係数を 1 つ足したもの。B − A が負になるのは、
+       B の格子が A より粗いためで、0 と同じ扱い）。A が支持されなくても、B が θ = 0 より LRT_DLML（3.0）以上大きければ、B が A より 1.92 以上大きいときは B、
+       そうでなければ ★（どちらとも決まらない）。A・B の片方だけを学習したときは、その片方だけで決める。
+    2. 残った組どうしは、LML の大きいものを選ぶ（θ = 0 のモデルが列ごとに違うので、ΔLML ではなく LML で比べる）。係数の数が違う（A と B の）組が残ったら ★。
+    3. どの組も残らなければ、None（シフトなしの C）。
+    返り値：(候補のモデルの記号〔None は C〕, 組ごとの表, 注意〔★ の理由。なければ空のリスト〕)"""
+    by = {}
+    for r in rows:
+        s, t = str(r["モデル"]).split("_")[:2]
+        by.setdefault((t, key_form(r["モデル"])), {})[s] = r
+    tab, keep, notes = [], [], []
+    for (t, form), g in by.items():
+        a, b = g.get("A"), g.get("B")
+        a_ok = a is not None and a["dLML_vs_0"] >= lrt_limit(a["モデル"])
+        b_ok = b is not None and b["dLML_vs_0"] >= lrt_limit(b["モデル"])
+        gain = (b["LML"] - a["LML"]) if (a is not None and b is not None) else np.nan
+        if a is not None and b is not None:
+            pick = (b if gain >= LRT_DLML_1 else a) if a_ok else ((b if gain >= LRT_DLML_1 else "★") if b_ok else None)
+        else:
+            pick = (a if a_ok else None) if a is not None else (b if b_ok else None)
+        name = f"{t}・{FORM_JA.get(form, form)}"
+        if pick == "★":
+            notes.append(f"{name}：B は θ = 0 より {b['dLML_vs_0']:.2f} 大きい（基準 {LRT_DLML:.1f} 以上）が、A は {a['dLML_vs_0']:.2f}（基準 {LRT_DLML_1:g} 未満）で、"
+                         f"B と A の差 {gain:.2f} も {LRT_DLML_1:g} 未満なので、A か B かが決まらない（この組は候補から外した）")
+        elif pick is not None:
+            keep.append(pick)
+        tab.append({"シフトに使う温度": t, "型": FORM_JA.get(form, form),
+                    "A の ΔLML": a["dLML_vs_0"] if a is not None else np.nan, f"A は支持（{LRT_DLML_1:g} 以上）": a_ok if a is not None else None,
+                    "B の ΔLML": b["dLML_vs_0"] if b is not None else np.nan, f"B は支持（{LRT_DLML:.1f} 以上）": b_ok if b is not None else None,
+                    "B − A の LML": gain, "この組の結論": "決まらない（★）" if pick == "★" else (pick["モデル"] if pick is not None else "支持されない")})
+    if not keep:
+        return None, pd.DataFrame(tab), notes
+    win = max(keep, key=lambda r: r["LML"])
+    n_coef = {str(r["モデル"]).split("_")[0] for r in keep}
+    if len(n_coef) > 1:
+        notes.append("係数の数が違うモデル（" + "、".join(f"{r['モデル']} LML {r['LML']:.1f}" for r in keep)
+                     + f"）が残った。LML の最も大きい {win['モデル']} を候補にしたが、係数の多い B は LML が大きく出やすいので、確かめる")
+    return win["モデル"], pd.DataFrame(tab), notes
 
 
 # ---------------------------------------------------------------- 評価

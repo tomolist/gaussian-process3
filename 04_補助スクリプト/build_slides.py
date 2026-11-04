@@ -42,6 +42,7 @@ pp.SYM = re.compile("(γ̇|η̂|ȳ|x̄|x′)")               # 上に点・山�
 MATS = [("PP", "PP", "PP"), ("MIX", "粉砕材混合PP", "粉砕材混合 PP"), ("GPPS", "GPPS", "GPPS")]   # (図の名前, 数値の表の名前, 本文の名前)
 MODE_DIR = "ショットごとの入力"                      # 読む結果の入力の取り方（make_slide_figs.py の mp.MODE と同じ。ユーザー決定、2026-10-23）
 RES_SUFFIX = "_学習結果(5all学習データ)"              # 10-26 までの結果のフォルダの名前の末尾（<材料フォルダ> の後ろ。2026-11-02 に「_学習結果」から変えた）
+RES_PARENT = "_学習結果"                              # 10-26 までの結果のフォルダを入れたフォルダ（<材料フォルダ>/<番号>_学習結果/。<番号> は材料フォルダの先頭 2 桁。2026-11-03 のユーザーの整理〔a4ad4b8〕）
 
 
 class Deck(pp.Poster):
@@ -816,7 +817,7 @@ WIN_FILL = {"Tff": "D3E0EC", "Tset": "F9D9BE", "差なし": "FFFFFF", "—": "F1
 
 def tcsv(mat, name):
     f = MAT_FOLDER[mat]
-    return pd.read_csv(os.path.join("05_材料ごとの機械学習データと予測検証データ", f, f"{f}{RES_SUFFIX}", MODE_DIR, "厚みごとの比較", name), encoding="utf-8-sig")
+    return pd.read_csv(os.path.join("05_材料ごとの機械学習データと予測検証データ", f, f[:2] + RES_PARENT, f"{f}{RES_SUFFIX}", MODE_DIR, "厚みごとの比較", name), encoding="utf-8-sig")
 
 
 def pe(v):

@@ -85,7 +85,8 @@ for mat in MATERIALS:
         PROF[(mat, key)] = pts
         BEST[(mat, key)] = b = profile_best(pts, key, kcfg(mat, key), conv)
         to_csv(pts.drop(columns="theta"), os.path.join(out_dir(mat, key), "プロファイル尤度_格子.csv"))
-        print(f"{MAT_NAMES[mat]} {key}：{len(pts)} 点、{time.time() - t0:.0f} 秒（細かい格子の取り直しが{'収束' if conv else '収束せず'}）。最良 {thn} = {b['th_best']:g}、{tvn} = {b['tv_best']:g} {un}"
+        print(f"{MAT_NAMES[mat]} {key}：{len(pts)} 点（うち区間の延長 {int((pts['stage'] == '区間の延長').sum())} 点）、{time.time() - t0:.0f} 秒（細かい格子の取り直しが{'収束' if conv else '収束せず'}。"
+              f"見直しで LML が上がった点 {b['n_review_up']}〔最大 +{b['review_gain_max']:.1f}〕）。最良 {thn} = {b['th_best']:g}、{tvn} = {b['tv_best']:g} {un}"
               f"（差 {tvn} − {thn} = {b['diff_best']:g}〔{b['diff_lo']:g}〜{b['diff_hi']:g}〕）、格子の LML {b['LML_best']:.1f}")
 print(f"合計 {(time.time() - t_all) / 60:.1f} 分" + ("" if SHIFT_KEYS else "（シフトのあるモデルがないので、計算なし）"))
 for mat in MATERIALS:
@@ -111,22 +112,26 @@ for (mat, key, kind), f in zip(jobs, res):
         ZERO[(mat, key)] = f
 print(f"念入りな最適化：{len(jobs)} 回、{(time.time() - t0) / 60:.1f} 分")
 for mat in (MATERIALS if SHIFT_KEYS else []):       # シフトのあるモデルがなければ（C だけなら）、飛ばす
-    for key in SHIFT_KEYS:
-        b = BEST[(mat, key)]
-        lml_b, lml_z = float(FITS[(mat, key)]["gp"].log_marginal_likelihood_value_), float(ZERO[(mat, key)]["gp"].log_marginal_likelihood_value_)
-        b["LML_best_grid"], b["LML_at_0_grid"], b["dLML_vs_0_grid"] = b["LML_best"], b["LML_at_0"], b["dLML_vs_0"]
-        b["LML_best"], b["LML_at_0"] = max(lml_b, b["LML_best_grid"]), max(lml_z, b["LML_at_0_grid"])
-        b["dLML_vs_0"] = b["LML_best"] - b["LML_at_0"]
+    for key in SHIFT_KEYS:                          # 念入りな最適化の LML を格子の表に入れ、ΔLML と 95% 区間を、どちらもその表から出し直す（2026-11-03）
+        PROF[(mat, key)], BEST[(mat, key)] = profile_careful(PROF[(mat, key)], BEST[(mat, key)], key, kcfg(mat, key), FITS[(mat, key)], ZERO[(mat, key)])
+        to_csv(PROF[(mat, key)].drop(columns="theta"), os.path.join(out_dir(mat, key), "プロファイル尤度_格子.csv"))
     t = pd.DataFrame([{"材料": MAT_NAMES[mat], "モデル": key, "入力": VERSION_DIRS[INPUT_MODE], "型": FORM_JA[kcfg(mat, key)["type"]],
-                       "θ の名前": "・".join(theta_names(kcfg(mat, key))[:2]), "単位": theta_names(kcfg(mat, key))[2],
+                       "θ の名前": "・".join(theta_names(kcfg(mat, key))[:2]), "単位": theta_names(kcfg(mat, key))[2], "支持の基準": lrt_limit(key),
                        **{k: v for k, v in BEST[(mat, key)].items() if k not in ("theta_best", "theta_zero")}} for key in SHIFT_KEYS])
     to_csv(t, os.path.join(out_dir(mat), "シフトファクターの推定.csv"))
-    display(t[["材料", "モデル", "型", "θ の名前", "単位", "th_best", "th_lo", "th_hi", "tv_best", "tv_lo", "tv_hi", "diff_best", "diff_lo", "diff_hi", "LML_best", "LML_at_0", "dLML_vs_0", "dLML_vs_0_grid", "at_edge", "refine_converged"]].round(2))
+    display(t[["材料", "モデル", "型", "θ の名前", "単位", "th_best", "th_lo", "th_hi", "tv_best", "tv_lo", "tv_hi", "diff_best", "diff_lo", "diff_hi", "LML_best", "LML_at_0", "dLML_vs_0", "支持の基準",
+               "dLML_vs_0_grid", "at_edge", "refine_converged", "interval_closed", "interval_at_range", "n_review_up"]].round(2))
     for key in SHIFT_KEYS:
         b = BEST[(mat, key)]
+        thn, tvn, un = theta_names(kcfg(mat, key))
         other = "Tff・P3_3" if layout(key)[1] == "Tset" else "Tset・P3_3"
-        print(f"{MAT_NAMES[mat]} {key}：念入りな最適化の LML {b['LML_best']:.1f}（格子 {b['LML_best_grid']:.1f}）、θ = 0 は {b['LML_at_0']:.1f}（格子 {b['LML_at_0_grid']:.1f}）→ ΔLML {b['dLML_vs_0']:+.1f}（格子では {b['dLML_vs_0_grid']:+.1f}）")
-        judge(b["dLML_vs_0"] >= LRT_DLML, f"{key}：温度のシフトが尤度で支持される（念入りに最適化した LML が、θ = 0〔{key.split('_')[1]} を使わない〕より {b['dLML_vs_0']:.1f} 大きい。基準 {LRT_DLML:g} 以上＝尤度比検定の 5% 基準）。小さければ、温度の効果はほかの入力（{other}）が担っている", mat, "尤度")'''
+        lim = lrt_limit(key)
+        span = (f"{thn} {b['th_lo']:g}〜{b['th_hi']:g}・" if key.startswith("B") else "") + f"{tvn} {b['tv_lo']:g}〜{b['tv_hi']:g} {un}"
+        print(f"{MAT_NAMES[mat]} {key}：念入りな最適化の LML {b['LML_best']:.1f}（格子 {b['LML_best_grid']:.1f}）、θ = 0 は {b['LML_at_0']:.1f}（格子 {b['LML_at_0_grid']:.1f}）→ ΔLML {b['dLML_vs_0']:+.2f}（格子では {b['dLML_vs_0_grid']:+.2f}）。95% 区間 {span}")
+        judge(b["dLML_vs_0"] >= lim, f"{key}：温度のシフトが尤度で支持される（念入りに最適化した LML が、θ = 0〔{key.split('_')[1]} を使わない〕より {b['dLML_vs_0']:.2f} 大きい。基準 {lim:g} 以上"
+              f"＝尤度比検定の 5% 基準〔係数 {1 if key.startswith('A') else 2} つ〕）。小さければ、温度の効果はほかの入力（{other}）が担っている", mat, "尤度")
+        judge(b["interval_closed"] and not b["interval_at_range"], f"{key}：95% 区間（{span}）の端が、細かい格子の中で決まった（区間の外側の隣の点まで計算した"
+              f"{'' if b['interval_closed'] else '。★ 計算していない隣の点が残った：MAX_EXTEND を増やす'}{'。★ 粗い格子の範囲の端に届いた：FORM_CFG の範囲を広げる' if b['interval_at_range'] else ''}）", mat, "尤度")'''
 
 # ---------------------------------------------------------------- 尤度の面
 SURFACE = r'''for mat in MATERIALS:

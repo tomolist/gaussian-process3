@@ -8,12 +8,15 @@ report_mat_nb_manual_template.tex の @@項目@@ に、mat_common の設定（�
 2026-10-28（ユーザー依頼）：このフォルダを初めて開いた人向けに、ノートの目的・調べること・使えるデータ・使い方を 1 冊にまとめた。
 列・フォルダの名前・材料をコードから取るので、mat_common.py を直したときは、これを実行し直す。
 2026-11-02：シフトファクターの型を材料ごとに分けなくなった（ユーザー決定）ので、材料の表は基準温度と WLF 型の Tg だけにし、モデルのフォルダの表は型の付いた記号と C にした。
+2026-11-03：LuaLaTeX の作業フォルダを、実行ごとに _tmp/report_mat_nb_manual/<日時>/ に新しく作る形にした（_tmp/ のファイルは消さず、上書きもしない決まりのため）。
+説明書の tex と PDF は上書きするので、作り直す前に、前の版を _to_delete/ へ移しておく。
 """
 import os
 import re
 import shutil
 import subprocess
 import sys
+import time
 
 import report_common as rc
 
@@ -91,12 +94,8 @@ left = sorted(set(re.findall(r"@@([A-Za-z0-9_]+)@@", tex)))
 assert not left, f"置き換えていない項目: {left}"
 with open(os.path.join(NB_ROOT, f"{STEM}.tex"), "w", encoding="utf-8", newline="\n") as f:
     f.write(tex)
-out = os.path.join(rc.W, "_tmp", "report_mat_nb_manual")
+out = os.path.join(rc.W, "_tmp", "report_mat_nb_manual", time.strftime("%Y%m%d_%H%M%S"))   # 実行ごとに新しいフォルダ（前の補助ファイルを消さず、上書きもしない。2026-11-03）
 os.makedirs(out, exist_ok=True)
-for ext in ("aux", "toc", "out"):                      # 前回の補助ファイルが残っていると、直した原稿でも前回のエラーを引きずる
-    p = os.path.join(out, f"{STEM}.{ext}")
-    if os.path.exists(p):
-        os.remove(p)
 for i in range(2):
     r = subprocess.run([rc.LUALATEX, "-interaction=nonstopmode", "-halt-on-error", f"-output-directory={out}", f"{STEM}.tex"], cwd=NB_ROOT, capture_output=True)
     if r.returncode != 0:

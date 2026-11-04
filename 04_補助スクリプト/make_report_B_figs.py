@@ -30,6 +30,7 @@ MATS = ["PP", "MIX", "GPPS"]
 KEY = "B_Tff"
 MODE_DIR = "条件平均の入力"
 RES_SUFFIX = "_学習結果(5all学習データ)"   # 10-26 までの結果のフォルダの名前の末尾（<材料フォルダ> の後ろ。2026-11-02 に「_学習結果」から変えた）
+RES_PARENT = "_学習結果"                   # 10-26 までの結果のフォルダを入れたフォルダ（<材料フォルダ>/<番号>_学習結果/。<番号> は材料フォルダの先頭 2 桁。2026-11-03 のユーザーの整理〔a4ad4b8〕）
 OUT =os.path.join(mc.DATA_ROOT, "学習結果報告書作成_261015", "図")
 PANEL = (2.15, 1.80)                      # 1 枚の大きさ（インチ）。報告書では 3 枚を横に並べる
 H_STYLE = {0.5: "#e8212b", 1.0: "#1f4fe0", 1.5: "#f2b705", 2.0: "#22c32e"}   # 厚みの色（報告書B の図4 と同じ並び：赤・青・黄・緑）
@@ -44,7 +45,7 @@ plt.rcParams.update({"font.family": "DejaVu Sans", "font.size": 7, "axes.labelsi
 
 def model_dir(mat):
     folder = mc.MAT_FOLDERS[mat]
-    return os.path.join(mc.DATA_ROOT, folder, f"{folder}{RES_SUFFIX}", MODE_DIR, KEY)
+    return os.path.join(mc.DATA_ROOT, folder, folder[:2] + RES_PARENT, f"{folder}{RES_SUFFIX}", MODE_DIR, KEY)
 
 
 def save(fig, stem):
@@ -113,7 +114,7 @@ def main():
         t0 = mc.shifted_cond_means(pool, None, cfg, 0.0, 0.0)
         t1 = mc.shifted_cond_means(pool, KEY, cfg, th, tv)
         r0, r1 = mc.superpose_rmse(t0), mc.superpose_rmse(t1)
-        ref = pd.read_csv(os.path.join(mc.DATA_ROOT, mc.MAT_FOLDERS[mat], f"{mc.MAT_FOLDERS[mat]}{RES_SUFFIX}", MODE_DIR, "比較",
+        ref = pd.read_csv(os.path.join(mc.DATA_ROOT, mc.MAT_FOLDERS[mat], mc.MAT_FOLDERS[mat][:2] + RES_PARENT, f"{mc.MAT_FOLDERS[mat]}{RES_SUFFIX}", MODE_DIR, "比較",
                                        "シフトファクターの倍率.csv"), encoding="utf-8-sig")
         ref = ref[ref["モデル"] == KEY].iloc[0]
         assert np.isclose(r0, ref["重ね合わせの残差（シフト前）"]) and np.isclose(r1, ref["重ね合わせの残差（シフト後）"]), \
