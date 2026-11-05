@@ -27,7 +27,7 @@ NB_ROOT = os.path.join(rc.W, "01_機械学習コードフォルダ", "材料別_
 DIR_TRAIN, DIR_STUDY = "材料別_温度シフト機械学習コード", "材料別_温度シフトファクター検討用コード"
 NB = {"TRAIN": (DIR_TRAIN, "材料別_温度シフトGPR_ARD対応Matern52＋線形＋ホワイトノイズ.ipynb"),
       "STUDY": (DIR_STUDY, "材料別_温度シフトファクターの検討_ARD対応Matern52＋線形＋ホワイトノイズ.ipynb"),
-      "THICK": (DIR_STUDY, "材料別_温度シフトGPR_ARD対応Matern52＋線形＋ホワイトノイズ_厚みごとの比較.ipynb")}
+      "THICK": (DIR_STUDY, "材料別_厚みごとの比較_温度シフトファクターの検討_ARD対応Matern52＋線形＋ホワイトノイズ.ipynb")}   # 名前は 2026-11-05 にユーザーが変えたもの
 STEM = "説明書_材料別温度シフトGPRのノート"
 COL_INFO = {      # 学習ファイルの列（mat_common.COLS の記号）→ (説明, 単位)
     "file": ("1 ショットの計測ファイルの名前（形式は 4.4 節）", "―"),

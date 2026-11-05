@@ -60,7 +60,7 @@
 \midrule
 \textbf{① シフトファクター検討用}\newline \file{@@NB_STUDY@@}\newline（\file{@@DIR_STUDY@@/}） & 温度の列（加熱シリンダ温度・流動中樹脂温度）ごとに温度のシフトファクターを推定して、シフトのないモデルと比べ、\textbf{どの列をシフトに使うのがよいか}を調べる。②で使う列の候補を出す & 約 2.5／5 時間 \\
 \textbf{② 学習用}\newline \file{@@NB_TRAIN@@}\newline（\file{@@DIR_TRAIN@@/}） & 設定で決めた 1 つの列でシフトする\textbf{モデルを学習して}、データの確認・図・表・学習済みモデルを一式作る（報告書・発表資料用の図を含む） & 約 25／45 分 \\
-\textbf{③ 厚みごとの比較}\newline \file{@@NB_THICK@@}\newline（\file{@@DIR_STUDY@@/}） & ①のモデルを\textbf{キャビティ厚みごとに}見直す。厚みごとにシフトが効いているか、どちらの温度が適するか、厚みごとに学習したモデルと全厚みのモデルのどちらがよいか & 約 10 分 \\
+\textbf{③ 厚みごとの比較}\newline \file{@@NB_THICK@@}\newline（\file{@@DIR_STUDY@@/}） & ①のモデルを\textbf{キャビティ厚みごとに}見直す。厚みごとにシフトが効いているか、どちらの温度が適するか、厚みごとに学習したモデルと全厚みのモデルのどちらがよいか & 約 45 分 \\
 \textbf{解説付きの版}（2 つ）\newline \file{解説付き_…ipynb}\newline（①・②と同じフォルダ） & ①・②と同じコードの各行に、Python 初心者向けの解説のコメントを付けたもの。実行すると①・②と同じ結果になる & ①・②と同じ \\
 \bottomrule
 \end{tabularx}
@@ -109,7 +109,7 @@ C（基準） & $\ln\eta=f(\ln\gd,\ \ln\PIII,\ \ln\Tff,\ \Tset)$。シフトの�
 A\_Tset\_Arr など & 縦だけずらす対案（$a_h=1$）。設定で選んだときだけ作る \\
 \midrule
 カーネル & 6月のノート（\file{01_機械学習コードフォルダ/原案_6月/GPR6月_ARD対応Matern52カーネル ＋ ホワイトノイズ.ipynb}）と同じ ARD Matern 5/2 ＋ ホワイトノイズに、線形項を足したもの（外挿で平均に戻らないように） \\
-シフトの式 & $a_h$（横）は「温度が変わると、同じ粘度になるせん断速度が $a_h$ 倍ずれる」、$a_v$（縦）は「同じせん断速度で、粘度が $a_v$ 倍になる」。基準温度 $T_{\mathrm{ref}}$ で 1。型は\textbf{アレニウス型}と \textbf{WLF 型}の 2 つで、\textbf{材料ごとに分けず、どの材料にも当てはめる}（①は両方を比べ、②③は設定で 1 つを選ぶ。2026 年 11 月 2 日のユーザーの決定。それまでは PP・粉砕材混合 PP がアレニウス型、GPPS が WLF 型）。WLF 型の $T_g$ は材料ごと（表 \ref{tab:mats}） \\
+シフトの式 & $a_h$（横）は「温度が変わると、同じ粘度になるせん断速度が $a_h$ 倍ずれる」、$a_v$（縦）は「同じせん断速度で、粘度が $a_v$ 倍になる」。基準温度 $T_{\mathrm{ref}}$ で 1。型は\textbf{アレニウス型}と \textbf{WLF 型}の 2 つで、\textbf{材料ごとに分けず、どの材料にも当てはめる}（①③は設定 \file{SHIFT_FORMS} の型をすべて〔既定は両方〕、②は設定で 1 つを選ぶ。2026 年 11 月 2 日のユーザーの決定。③は 2026 年 11 月 5 日から①と同じ。それまでは PP・粉砕材混合 PP がアレニウス型、GPPS が WLF 型）。WLF 型の $T_g$ は材料ごと（表 \ref{tab:mats}） \\
 係数の決め方 & シフトの係数（B は横と縦の 2 つ、A は縦の 1 つ）を格子の上で動かし、各点で GPR を学習して、データへの合い具合（対数周辺尤度 LML）が最大の点を採る（プロファイル尤度）。2026 年 11 月 3 日から、すべての点を最良の点の答えから計算し直し（見直し）、95\% 区間の端が決まるまで細かい格子を足す（局所解で区間が狭く出るのを防ぐため） \\
 \bottomrule
 \end{tabularx}
@@ -154,7 +154,7 @@ A\_Tset\_Arr など & 縦だけずらす対案（$a_h=1$）。設定で選んだ
 \begin{enumerate}[itemsep=0.4ex,topsep=0.5ex]
 \item \textbf{①シフトファクター検討用を実行する}。選んだすべての材料に、アレニウス型と WLF 型の両方を当てはめて比べます（設定 \file{SHIFT_FORMS}）。最後の「まとめ」に、材料ごとに「学習用のノートの \file{SHIFT_COL}・\file{SHIFT_STRUCT}・\file{SHIFT_FORM} の候補」が出ます（列と型の組ごとに、温度のシフトが支持されるか、A と B のどちらかを決め、残った組の LML が最も大きいもの。どれも支持されなければ、シフトなしの \file{None} も候補。選び方は 6.1 節の表 \ref{tab:study} の後）。
 \item \textbf{②学習用の設定 \file{SHIFT_COL}・\file{SHIFT_FORM} を決めて、実行する}。候補を参考に、3data の誤差なども見て、人が決めます。\file{SHIFT_FORM} の型は、選んだすべての材料に使います（材料で候補の型が違うときは、材料ごとに実行を分けるか、どちらかにそろえる）。決まっていれば、①を飛ばして②だけを実行してもかまいません（2026 年 10 月 23 日の結果では、全ショット版で B\_Tset が支持され、既定の \file{SHIFT_COL} は加熱シリンダ温度です。既定の \file{SHIFT_FORM} はアレニウス型）。
-\item \textbf{③厚みごとの比較は、①の後で実行する}（②とは独立）。①と同じ入力の取り方（\file{INPUT_MODE}）にし、①の比べる列（\file{SHIFT_COLS}）は既定のまま、型（\file{SHIFT_FORMS}）には③の設定 \file{SHIFT_FORM} の型を入れておきます（③は、その型の B\_Tset・B\_Tff と C の 3 つのモデルを読むため）。
+\item \textbf{③厚みごとの比較は、①の後で実行する}（②とは独立）。①と同じ入力の取り方（\file{INPUT_MODE}）にします。③の \file{SHIFT_COLS}・\file{STRUCTS}・\file{SHIFT_FORMS} は①と同じ書き方・同じ既定で、①で学習したモデルの中から選びます（どちらも既定なら、そのままでよい。③は、その組み合わせのモデルと C を読む。2026 年 11 月 5 日から）。
 \end{enumerate}
 解説付きの版は、元のノートと同じ動きをするので、どちらか一方を実行すれば十分です（同じ学習結果フォルダを選ぶと、結果は上書きされます）。
 
@@ -298,7 +298,7 @@ BOM なしの UTF-8 & そのまま読める \\
 \file{PROFILE_RESTARTS} & プロファイル尤度の格子の各点でのやり直し回数（1。0 にすると時間が約半分） \\
 \file{MAX_REFINE}・\file{MAX_EXTEND} & プロファイル尤度で、最良の点を中心に細かい格子を取り直す回数の上限（4）と、95\% 区間の端が決まるまで細かい格子を 1 列ずつ足す回数の上限（20。①②。2026 年 11 月 3 日から） \\
 \file{USE_EXCLUSIONS} & 問題データ一覧の「除外」を除くか（\file{True}） \\
-\file{SHIFT_FORMS}・\file{SHIFT_FORM} & シフトファクターの型（\file{"arrhenius"}・\file{"wlf"}）。①は \file{SHIFT_FORMS} で比べる型（既定は両方）、②③は \file{SHIFT_FORM} で 1 つ（既定はアレニウス型）。どれも、選んだすべての材料に同じ型を当てはめる \\
+\file{SHIFT_FORMS}・\file{SHIFT_FORM} & シフトファクターの型（\file{"arrhenius"}・\file{"wlf"}）。①③は \file{SHIFT_FORMS}（①は比べる型、③は読む型。既定は両方）、②は \file{SHIFT_FORM} で 1 つ（既定はアレニウス型）。どれも、選んだすべての材料に同じ型を当てはめる \\
 \file{SHIFT_CFG}・\file{FORM_CFG} & 材料ごとの基準温度と WLF 型の $T_g$（\file{SHIFT_CFG}）、型ごとの係数を調べる範囲と細かい格子（\file{FORM_CFG}）（①・②） \\
 \file{FIG_DPI}、\file{SHOW_FIGS} & 保存する図の解像度（600 dpi）、図をノートにも表示するか \\
 \file{N_JOBS} & 並列に計算する数（8。CPU の数に合わせる） \\
@@ -340,13 +340,12 @@ FILES = {"PP": {
 .5 \file{@@DIR_B_TFF_ARR@@}/.
 .5 \file{@@DIR_B_TFF_WLF@@}/.
 .5 \file{@@DIR_C@@}/.
-.3 @@THICK_EACH@@/\DTcomment{③厚みごとの比較}.
-.4 アレニウス型/\DTcomment{③の \file{SHIFT_FORM} の型ごと（WLF 型なら \file{WLF型/}）}.
-.5 学習結果グラフ/.
-.5 温度シフトの確認/.
-.5 シフトに使う温度/.
-.5 厚みごとのモデルと総合の比較/.
-.5 {判定の一覧.csv}.
+.3 @@THICK_EACH@@/\DTcomment{③厚みごとの比較（読んだすべてのモデル。組ごとの図は、名前に組を付ける）}.
+.4 学習結果グラフ/.
+.4 温度シフトの確認/.
+.4 シフトに使う温度/.
+.4 厚みごとのモデルと総合の比較/.
+.4 {判定の一覧.csv}.
 .2 @@V_COND@@/\DTcomment{\file{INPUT_MODE = "cond"}（同じ構成）}.
 }
 \caption{学習結果フォルダの中の構成}\label{fig:tree}
@@ -451,9 +450,9 @@ FILES = {"PP": {
 \begin{points}
 \pt{ファイル}\file{@@DIR_STUDY@@/@@NB_THICK@@}
 \pt{目的}①で全厚みのデータから学習したモデルを、\textbf{キャビティ厚みごとに}見直します。調べることは 3 つです：厚みごとに温度シフトが効いているか（4 節）、厚みごとにシフトに使う温度は $\Tff$ と $\Tset$ のどちらが適しているか（5〜8 節）、厚みごとに学習したモデルと全厚みのモデルのどちらがよいか（9 節）。
-\pt{前提}①を、同じ \file{INPUT_MODE} で、\file{SHIFT_COLS} を既定のまま、\file{SHIFT_FORMS} に③の \file{SHIFT_FORM} の型を入れて実行しておくこと。厚みが 2 水準以上あるデータを想定しています。
-\pt{主な設定}\file{SHIFT_FORM}（読むモデルの型。\file{"arrhenius"}〔既定〕か \file{"wlf"}。結果は \file{@@THICK_EACH@@/<型>/} に分けて保存）、\file{THICK_PROFILE}（厚みごとのプロファイル尤度と 9 節を行うか。\file{False} で速くなる）、\file{THICK_MODELS}（9 節）、差ありとする基準 \file{A_CLEAR}（0.5 ポイント）・\file{DL_CLEAR}（3.0）・\file{ERR_CLEAR}（1.0 ポイント）、学習結果グラフの点 \file{FLOW_POINTS}。
-\pt{時間}3 材料で約 10〜15 分（2026 年 11 月 3 日に、プロファイル尤度の見直しを足した後の見積もり）。
+\pt{前提}①を、同じ \file{INPUT_MODE} で実行しておくこと。③の \file{SHIFT_COLS}・\file{STRUCTS}・\file{SHIFT_FORMS} で選んだモデルを①で学習していないと、読み込みで止まります。厚みが 2 水準以上あるデータを想定しています。
+\pt{主な設定}\file{SHIFT_COLS}・\file{STRUCTS}・\file{SHIFT_FORMS}（読むモデル。①と同じ書き方・同じ既定。2026 年 11 月 5 日から。それまでは型 1 つの \file{SHIFT_FORM} と B の 2 つのモデルだけ）。シフトの形と型が同じで、シフトに使う温度だけが違うモデルを「組」（例：\file{B_Arr} は B\_Tset\_Arr と B\_Tff\_Arr）にまとめ、$\Tff$ か $\Tset$ かを組ごとに比べます。\file{MAIN_KEY}（その組の図をノートに表示）、\file{THICK_PROFILE}（厚みごとのプロファイル尤度と 9 節を行うか。\file{False} で速くなる）、\file{THICK_MODELS}（9 節）、差ありとする基準 \file{A_CLEAR}（0.5 ポイント）・\file{DL_CLEAR}（3.0）・\file{ERR_CLEAR}（1.0 ポイント）、学習結果グラフの点 \file{FLOW_POINTS}。
+\pt{時間}既定の設定（8 つのモデルと C）・全ショット版で、3 材料 約 45 分（2026 年 11 月 5 日に GPPS〔厚み 3 つ〕で計測した約 12 分からの見積もり。厚みが 4 つの PP・粉砕材混合 PP は約 16 分）。型を 1 つにするか、\file{STRUCTS = ["B"]} にすると短くなります。
 \end{points}
 \begin{table}[!htbp]
 \caption{③の節の流れ}\label{tab:thick}
@@ -463,11 +462,11 @@ FILES = {"PP": {
 節 & すること（主な判定） \\
 \midrule
 2. 読み込み & ①の学習済みモデルと 3data の予測値を読み、予測し直して一致するか（データとモデルの組み合わせが正しいか） \\
-3. 学習結果グラフ & 厚みごとのせん断速度 ― 粘度の図（B\_Tset と B\_Tff） \\
-4. シフトの確認 & 厚みごとに、温度の順序・温度による粘度の比・換算でずれが減るか。○・△・× で判定 \\
-5〜7. (a)(b)(c) & 厚みごとに、(a) 係数を決め直した重ね合わせのずれ、(b) 厚みごとの LML の差、(c) 3data の誤差で、$\Tff$ と $\Tset$ を比べる \\
-8. まとめ & (a)(b)(c) の多数決で、厚みごとに適した温度（$\Tff$・$\Tset$・差なし） \\
-9. 厚みごとと総合 & 厚みごとの 5data で学習したモデルと、全厚みのモデルの 3data の誤差の比較 \\
+3. 学習結果グラフ & 組ごと・厚みごとのせん断速度 ― 粘度の図（組の 2 つのモデルを並べる） \\
+4. シフトの確認 & モデルごと・厚みごとに、温度の順序・温度による粘度の比・換算でずれが減るか。○・△・× で判定 \\
+5〜7. (a)(b)(c) & 組ごと・厚みごとに、(a) 係数を決め直した重ね合わせのずれ、(b) 厚みごとの LML の差、(c) 3data の誤差で、$\Tff$ と $\Tset$ を比べる \\
+8. まとめ & (a)(b)(c) の多数決で、組ごと・厚みごとに適した温度（$\Tff$・$\Tset$・差なし） \\
+9. 厚みごとと総合 & モデルごとに、厚みごとの 5data で学習したモデルと、全厚みのモデルの 3data の誤差の比較 \\
 10. 判定の一覧 & すべての判定の表 \\
 \bottomrule
 \end{tabularx}
@@ -536,8 +535,8 @@ uv run python 04_補助スクリプト/build_mat_nb_manual.py
 \file{学習と検証で条件が重なっている} & 同じファイルを 2 回選んだか、ファイルの組が違う \\
 \file{KeyError}（材料の記号） & \file{MATERIALS} に表 \ref{tab:mats} にない記号を書いた \\
 \file{同じ学習結果フォルダが選ばれました} & 材料ごとに別のフォルダを選ぶ \\
-③で学習済みモデルが見つからない・材料が違う & 先に①を同じ \file{INPUT_MODE} で実行したか、①と同じ学習結果フォルダを選んだかを確かめる \\
-時間がかかりすぎる & \file{MATERIALS} を 1 つにする、\file{PROFILE_RESTARTS = 0} にする（③は \file{THICK_PROFILE = False}） \\
+③で学習済みモデルが見つからない・材料が違う & 先に①を同じ \file{INPUT_MODE} で実行したか、①と同じ学習結果フォルダを選んだか、③の \file{SHIFT_COLS}・\file{STRUCTS}・\file{SHIFT_FORMS} のモデルを①で学習したかを確かめる \\
+時間がかかりすぎる & \file{MATERIALS} を 1 つにする、\file{PROFILE_RESTARTS = 0} にする（③は \file{THICK_PROFILE = False}、または \file{SHIFT_FORMS}・\file{STRUCTS} を 1 つに） \\
 判定に ★ がたくさん出る & エラーではない。判定の文の基準を読み、結果の説明書（1 章）で意味を確かめる \\
 \bottomrule
 \end{tabularx}

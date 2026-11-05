@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """材料別の温度シフト GPR の「厚みごとの比較」の部品。
 
-ノート（01_機械学習コードフォルダ/材料別_温度シフトファクター検討/材料別_温度シフトファクター検討用コード/材料別_温度シフトGPR_ARD対応Matern52＋線形＋ホワイトノイズ_厚みごとの比較.ipynb）の
-「厚みごとの比較の部品」のセルに、この中身（下の import の行を除く）がそのまま入る。直すときは、このファイルを直して、
+ノート（01_機械学習コードフォルダ/材料別_温度シフトファクター検討/材料別_温度シフトファクター検討用コード/材料別_厚みごとの比較_温度シフトファクターの検討_ARD対応Matern52＋線形＋ホワイトノイズ.ipynb。
+2026-11-05 にユーザーが名前を変えた）の「厚みごとの比較の部品」のセルに、この中身（下の import の行を除く）がそのまま入る。直すときは、このファイルを直して、
 ノートを作り直す（04_補助スクリプト/build_mat_thick_nb.py）。ノートでは、この前のセルに mat_common の中身がある。
 モジュールとして import しても使える（mat_common の部品を、下の import で読み込む）。
 
@@ -13,15 +13,34 @@
   2. 厚みごとに、シフトに使う温度は、流動中樹脂温度 Tff と加熱シリンダ温度 Tset のどちらが適しているか
      (a) 厚みごとに係数を決め直したときの重ね合わせのずれ、(b) 厚みごとに学習した GPR の対数周辺尤度、(c) 検証データ（3data）の誤差
   3. 厚みごとに学習したモデルと、全厚みの総合データで学習したモデルの、検証データの誤差（学習 5data・検証 3data のまま）
+2026-11-05（ユーザー依頼）：読むモデルを、シフトファクター検討用のノートと同じ設定（SHIFT_COLS・STRUCTS・SHIFT_FORMS）で決める形にした。
+1〜3 の中身は変えず、モデルごとに行う。2 の「Tff か Tset か」は、シフトの形と型が同じで、シフトに使う温度だけが違うモデルの「組」（group_of。例：B_Arr）ごとに比べる。
+それまでは、構造 B の 2 つのモデル（B_Tset・B_Tff）と、型 1 つ（SHIFT_FORM）だけだった。
 """
 from mat_common import *  # noqa: F401,F403  （ノートに入れるときは、この行を除く）
 
-THICK_KEYS = ["B_Tset", "B_Tff"]                              # シフトに使う温度が違う 2 つのモデル
-TEMP_JA = {"B_Tset": "加熱シリンダ温度 Tset", "B_Tff": "流動中樹脂温度 Tff", None: "換算前"}
-TEMP_SHORT = {"B_Tset": "Tset", "B_Tff": "Tff"}
+TEMP_JA = {"Tset": "加熱シリンダ温度 Tset", "Tff": "流動中樹脂温度 Tff", None: "換算前"}   # シフトに使う温度（temp_of の値）の名前
+STRUCT_JA = {"B": "横・縦", "A": "縦だけ"}                     # シフトの形の名前
 A_CLEAR = globals().get("A_CLEAR", 0.5)                       # (a) 重ね合わせのずれ [%] の差が、これ以上なら「違う」（ノートの設定エリアの値があれば、それを使う）
 DL_CLEAR = globals().get("DL_CLEAR", 3.0)                     # (b) モデル間の対数周辺尤度の差が、これ以上なら「違う」
 ERR_CLEAR = globals().get("ERR_CLEAR", 1.0)                   # (c)・3：予測誤差 [%] の差が、これ以上なら「違う」
+
+
+def temp_of(key):
+    """モデルの記号 → シフトに使う温度（"Tset"・"Tff"）。C と換算前（None）は None"""
+    return None if key in (None, "C") else str(key).split("_")[1]
+
+
+def group_of(key):
+    """シフトのあるモデルの記号 → 組の名前（シフトの形と型。例：B_Tset_Arr → "B_Arr"）。同じ組のモデルは、シフトに使う温度だけが違う（2026-11-05）"""
+    p = str(key).split("_")
+    return f"{p[0]}_{p[2]}"
+
+
+def group_ja(g):
+    """組の名前 → 説明（例："B_Arr" → "構造 B（横・縦のシフト）・アレニウス型"）"""
+    s, f = g.split("_")
+    return f"構造 {s}（{STRUCT_JA[s]}のシフト）・" + next(FORM_JA[k] for k, v in FORMS.items() if v == f)
 
 
 def pct_err(rmse):
@@ -61,10 +80,12 @@ def superpose_by_h(t):
 
 def best_superpose(pool_h, key, cfg, fine=None, max_refine=None):
     """(a) 1 つの厚みのデータ（pool_h。5data＋3data）で、重ね合わせのずれが最小になる係数（横・縦）を、シフトファクター検討用のノートのプロファイル尤度と同じ格子で探す
-    （粗い格子 → 最良の点の周りの細かい格子〔材料の設定に "fine" があればそれ、なければ FINE_B〕 → 最良の点が動いたら取り直す）。at_edge：最良の点が粗い格子の端"""
-    fine = fine or cfg.get("fine") or FINE_B
+    （粗い格子 → 最良の点の周りの細かい格子〔fine_of：型の設定に "fine" があればそれ、なければ構造 A は FINE_A、B は FINE_B〕 → 最良の点が動いたら取り直す）。
+    構造 A（縦だけ）は、横の係数を 0 のまま、縦の係数だけを探す（2026-11-05）。at_edge：最良の点が粗い格子の端"""
+    fine = fine or fine_of(key, cfg)
     max_refine = MAX_REFINE if max_refine is None else max_refine
-    hg, vg = grid_of(*cfg["h_grid"]), grid_of(*cfg["v_grid"])
+    is_b = key.split("_")[0] == "B"
+    hg, vg = (grid_of(*cfg["h_grid"]) if is_b else np.array([0.0])), grid_of(*cfg["v_grid"])
     vals = {}
 
     def ev(points):
@@ -76,12 +97,13 @@ def best_superpose(pool_h, key, cfg, fine=None, max_refine=None):
     ev([(a, b) for a in hg for b in vg])
     for _ in range(max_refine):
         b = min(vals, key=vals.get)
-        ev([(a, c) for a in grid_of(b[0] - fine[0], b[0] + fine[0], fine[1]) for c in grid_of(b[1] - fine[0], b[1] + fine[0], fine[1])])
+        hs = grid_of(b[0] - fine[0], b[0] + fine[0], fine[1]) if is_b else [0.0]
+        ev([(a, c) for a in hs for c in grid_of(b[1] - fine[0], b[1] + fine[0], fine[1])])
         if min(vals, key=vals.get) == b:
             break
     b = min(vals, key=vals.get)
     return {"th": b[0], "tv": b[1], "rmse": vals[b], "rmse_0": cubic_rmse(shifted_cond_means(pool_h, None, cfg, 0.0, 0.0)),
-            "at_edge": bool(b[0] in (hg.min(), hg.max()) or b[1] in (vg.min(), vg.max())), "n_points": len(vals)}
+            "at_edge": bool((is_b and b[0] in (hg.min(), hg.max())) or b[1] in (vg.min(), vg.max())), "n_points": len(vals)}
 
 
 # ---------------------------------------------------------------- 1. 温度シフトの確認（学習済みのモデル）
@@ -111,7 +133,7 @@ def thick_check(fit, pool):
     """1 の表：厚みごとに、温度による粘度の比 R（実測・予測）、温度の順序、学習済みの係数で換算する前後のずれ、判定（○・△・×）。
     ○：順序が一致し、|ln R_予測 − ln R_実測| がショット間の標準偏差（純粋誤差、shot_sd）以内で、換算後のずれ < 換算前。×：予測の順序が実測と逆。△：それ以外"""
     key, cfg = fit["key"], fit["cfg"]
-    name = key.rsplit("_", 1)[0] if key_form(key) else key     # 表のモデルの名前：このノートの中の呼び名（型を付けない B_Tset・B_Tff。学習済みモデルの記号は B_Tset_Arr など。2026-11-02）
+    name = key                                                 # 表のモデルの名前：学習済みモデルの記号のまま（B_Tset_Arr など。2026-11-05 から。11-02〜11-04 は型を外した B_Tset・B_Tff）
     noise_sd = float(np.sqrt(fit["gp"].kernel_.k2.noise_level))
     tol = shot_sd(pool)
     before = superpose_by_h(shifted_cond_means(pool, None, cfg, 0.0, 0.0))
@@ -150,6 +172,12 @@ def thick_model(key, tr, te, cfg, h, best=None, restarts=None, mode="shot"):
     return fit, teh.assign(予測_ln_eta=mu, 予測標準偏差=sd, 潜在関数の標準偏差=sdf)
 
 
+def thick_model_job(key, tr, te, cfg, h, best, restarts, mode):
+    """thick_model を並列に動かすための仕事（joblib から呼ぶ。設定は引数で渡す）。返すのは予測の表だけ（2026-11-05。モデルが増えたので、9 節を並列にした）"""
+    warnings.simplefilter("ignore")
+    return thick_model(key, tr, te, cfg, h, best, restarts, mode)[1]
+
+
 def err_rows(pred, labels):
     """予測の表（ln_eta・予測_ln_eta・予測標準偏差・group）から、全体・低速側・高速側の指標（RMSE、誤差 %、95% 予測区間に入った割合）"""
     rows = []
@@ -172,9 +200,18 @@ def decide(v_ff, v_set, clear, larger_is_better):
     return "Tff" if d >= clear else ("Tset" if d <= -clear else "差なし")
 
 
+def decide_temps(vals, clear, larger_is_better):
+    """1 つの組の、シフトに使う温度ごとの値 vals = {"Tset": …, "Tff": …} から、適した温度を返す（decide。どちらかの温度のモデルがなければ「—」）"""
+    if "Tff" not in vals or "Tset" not in vals:
+        return "—"
+    return decide(vals["Tff"], vals["Tset"], clear, larger_is_better)
+
+
 def majority(votes):
-    """基準ごとの判定の多数決（「—」は数えない）。同数なら「差なし」"""
+    """基準ごとの判定の多数決（「—」は数えない）。同数なら「差なし」。数える判定が 1 つもなければ「—」（比べる相手の温度がないとき。2026-11-05）"""
     v = [x for x in votes if x in ("Tff", "Tset", "差なし")]
+    if not v:
+        return "—"
     n_ff, n_set = v.count("Tff"), v.count("Tset")
     return "Tff" if n_ff > n_set and n_ff >= len(v) / 2 else ("Tset" if n_set > n_ff and n_set >= len(v) / 2 else "差なし")
 
@@ -209,30 +246,33 @@ def _flow_axes(ax, fit, pool_h, train_conds, h, points="shot", extend=1.3, n=200
     ax.set_xlabel(r"せん断速度 $\dot{\gamma}$ (1/s)")
 
 
-def thick_flow_pair(fits, mat, pool, train_conds, h, out_dir, points="shot"):
-    """厚みごとの学習結果を、モデルごと（B_Tset・B_Tff）に左右に並べる。塗り＝学習（5data）、白抜き＝検証（3data）。
-    points："shot"＝ショットごとの計測値の点（既定）／"cond"＝成形条件ごとの平均の点"""
+def thick_flow_pair(fits, mat, pool, train_conds, h, out_dir, points="shot", tag="", show=None):
+    """厚みごとの学習結果を、モデルごと（fits の順。1 つの組の、シフトに使う温度が違うモデル）に左右に並べる。塗り＝学習（5data）、白抜き＝検証（3data）。
+    points："shot"＝ショットごとの計測値の点（既定）／"cond"＝成形条件ごとの平均の点。tag：組の名前（図の題とファイルの名前に入れる。2026-11-05）。
+    show：図をノートにも表示するか（None なら SHOW_FIGS）"""
     import matplotlib.pyplot as plt
-    keys = [k for k in THICK_KEYS if k in fits]
+    keys = list(fits)
     fig, axes = plt.subplots(1, len(keys), figsize=(7.2 * len(keys), 6.2), sharey=True)
     axes = np.atleast_1d(axes)
     for ax, k in zip(axes, keys):
         _flow_axes(ax, fits[k], sub_h(pool, h), train_conds, h, points=points)
-        ax.set_title(f"{k}（{TEMP_JA[k]} でシフト）", fontsize=14)
+        ax.set_title(f"{k}（{TEMP_JA[temp_of(k)]} で{'横・縦に' if k.startswith('B') else '縦だけ'}シフト）", fontsize=14)
     axes[0].set_ylabel(r"樹脂粘度 $\eta$ (Pa·s)")
     axes[-1].legend(title="加熱シリンダ温度", loc="upper right", fontsize=11, title_fontsize=11)
     ptxt = "成形条件ごとの平均" if points == "cond" else "ショットごとの計測値"
-    fig.suptitle(f"{MAT_NAMES[mat]}　厚み {h:g} mm の学習結果（点：{ptxt}。塗り＝学習、白抜き＝検証）", fontsize=14)
+    fig.suptitle(f"{MAT_NAMES[mat]}　厚み {h:g} mm の学習結果（{group_ja(tag) + '。' if tag else ''}点：{ptxt}。塗り＝学習、白抜き＝検証）", fontsize=14)
     fig.tight_layout()
-    return save_fig(fig, out_dir, f"学習結果_厚み{h:g}mm")
+    return save_fig(fig, out_dir, f"学習結果_{tag}_厚み{h:g}mm" if tag else f"学習結果_厚み{h:g}mm", show=show)
 
 
-def thick_master(mat, pool, cfg, h, thetas, out_dir, stem):
-    """1 つの厚みの重ね合わせ：換算前・加熱シリンダ温度で換算・流動中樹脂温度で換算の 3 枚。thetas：{key: (th, tv)}。破線は当てはめた 3 次式"""
+def thick_master(mat, pool, cfg, h, thetas, out_dir, stem, show=None):
+    """1 つの厚みの重ね合わせ：換算前と、thetas のモデルごと（1 つの組の、シフトに使う温度が違うモデル）に換算した図を並べる。thetas：{key: (th, tv)}。
+    破線は当てはめた 3 次式。cfg は、その組の型の設定。show：図をノートにも表示するか（None なら SHOW_FIGS）"""
     import matplotlib.pyplot as plt
     ph = sub_h(pool, h)
     ts = t_style(ph["Tset"].unique())
-    cases = [(None, 0.0, 0.0)] + [(k, *thetas[k]) for k in THICK_KEYS if k in thetas]
+    cases = [(None, 0.0, 0.0)] + [(k, *thetas[k]) for k in thetas]
+    groups = {group_of(k) for k in thetas}
     fig, axes = plt.subplots(1, len(cases), figsize=(5.6 * len(cases), 5.0))
     for ax, (k, th, tv) in zip(axes, cases):
         t = shifted_cond_means(ph, k, cfg, th, tv)
@@ -245,24 +285,29 @@ def thick_master(mat, pool, cfg, h, thetas, out_dir, stem):
         ax.set_yscale("log")
         log_ticks(ax)
         ax.grid(True, which="major", ls="-", lw=0.6, color="0.8")
-        sub = "" if k is None else f"（係数 {th:g}, {tv:g}）"
-        ax.set_title(f"{TEMP_JA[k]}{'で換算' if k else ''}{sub}\nずれ {pct_err(cubic_rmse(t)):.1f}%", fontsize=12)
+        sub = "" if k is None else f"（{k}。係数 {th:g}, {tv:g}）"
+        ax.set_title(f"{TEMP_JA[temp_of(k)]}{'で換算' if k else ''}{sub}\nずれ {pct_err(cubic_rmse(t)):.1f}%", fontsize=12)
         ax.set_xlabel(r"換算せん断速度 (1/s)" if k else r"せん断速度 $\dot{\gamma}$ (1/s)")
     axes[0].set_ylabel(r"樹脂粘度（換算後は換算粘度）(Pa·s)")
     axes[0].legend(fontsize=10, loc="lower left")
-    fig.suptitle(f"{MAT_NAMES[mat]}　厚み {h:g} mm の重ね合わせ", fontsize=13)
+    gtxt = f"（{group_ja(next(iter(groups)))}）" if len(groups) == 1 else ""
+    fig.suptitle(f"{MAT_NAMES[mat]}　厚み {h:g} mm の重ね合わせ{gtxt}", fontsize=13)
     fig.tight_layout()
-    return save_fig(fig, out_dir, f"{stem}_厚み{h:g}mm")
+    return save_fig(fig, out_dir, f"{stem}_厚み{h:g}mm", show=show)
 
 
-def thick_bars(df, value, labels, title, ylabel, out_dir, stem, fmt="{:.1f}", hline=None):
-    """厚みごとの棒グラフ：df の列「厚み」ごとに、labels（{列名: 凡例}）の列を並べる"""
+def thick_bars(df, value, labels, title, ylabel, out_dir, stem, fmt="{:.1f}", hline=None, show=None):
+    """厚みごとの棒グラフ：df の列「厚み」ごとに、labels（{列名: 凡例}）の列を並べる。show：図をノートにも表示するか（None なら SHOW_FIGS）。
+    凡例（グラフの下）の列の数は、凡例の文字が図の幅に収まるように決める（最大 3。2026-11-05 に、凡例にモデルの名前を入れて長くなったため）"""
     import matplotlib.pyplot as plt
     hs = df["厚み"].tolist()
     cols = list(labels)
     w = 0.8 / len(cols)
     colors = ["#B8C0C8", "#1f77b4", "#d62728", "#2ca02c", "#9467bd"]
-    fig, ax = plt.subplots(figsize=(1.6 + 1.9 * len(hs), 4.6))
+    fig_w = 1.6 + 1.9 * len(hs)
+    col_w = max(sum(0.125 if ord(ch) > 0x2E7F else 0.07 for ch in labels[c]) for c in cols) + 0.6   # 凡例の 1 列の幅の目安 [インチ]（9 pt：全角 0.125、半角 0.07 ＋ 記号と間）
+    ncol = max(1, min(len(cols), 3, int((fig_w - 0.3) // col_w)))
+    fig, ax = plt.subplots(figsize=(fig_w, 4.6))
     x = np.arange(len(hs))
     for i, c in enumerate(cols):
         v = df[c].to_numpy(float)
@@ -277,8 +322,8 @@ def thick_bars(df, value, labels, title, ylabel, out_dir, stem, fmt="{:.1f}", hl
     ax.set_xlabel("キャビティ厚み")
     ax.set_ylabel(ylabel)
     ax.set_title(title, fontsize=12)
-    ax.legend(fontsize=9, ncol=min(len(cols), 3), loc="upper left", bbox_to_anchor=(0, -0.18))
+    ax.legend(fontsize=9, ncol=ncol, loc="upper left", bbox_to_anchor=(0, -0.18))
     ax.grid(True, axis="y", lw=0.5, color="0.85")
     ax.set_axisbelow(True)
     fig.tight_layout()
-    return save_fig(fig, out_dir, stem)
+    return save_fig(fig, out_dir, stem, show=show)
