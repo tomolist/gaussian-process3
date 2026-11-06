@@ -1,0 +1,803 @@
+\documentclass[paper=a4paper,landscape,fontsize=10pt,line_length=62zw,number_of_lines=34]{jlreq}
+\usepackage[haranoaji]{luatexja-preset}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{float}
+\usepackage[hidelinks,bookmarksnumbered]{hyperref}
+\newcommand{\file}[1]{\texttt{\detokenize{#1}}}
+\newcommand{\mdl}[1]{\texttt{\detokenize{#1}}}
+\let\origtextbf\textbf
+\renewcommand{\textbf}[1]{\origtextbf{\gtfamily #1}}   % 日本語の強調はゴシック体（明朝の太字の書体がないため）
+\renewcommand{\arraystretch}{1.15}
+\setlength{\tabcolsep}{3pt}
+\title{材料別の温度シフト GPR\\本番学習の設定の根拠（ランキング表）}
+\author{シフトファクター検討用のノート（11 月 4 日実行）と厚みごとの比較のノート（11 月 5 日実行）の結果から}
+\date{2026年11月6日}
+\begin{document}
+\maketitle
+
+\section*{この資料について}
+\begin{itemize}[itemsep=0.2ex,topsep=0.3ex]
+\item 「本番学習の設定の決定.pdf」の根拠を、\textbf{材料 × 学習データ（通常版・温度適切版）ごとに、すべてのモデルのランキング表}にしたものです（2026 年 11 月 6 日のユーザー依頼）。1 章に、流動中樹脂温度 Tff を GP の入力に使ったほうがよいかの表も載せました。
+\item 数値は、検討結果フォルダの CSV から、生成スクリプト \texttt{04\_\allowbreak{}補助スクリプト/\allowbreak{}build\_\allowbreak{}report\_\allowbreak{}mat\_\allowbreak{}ranking.py} が読んだものです（学習はしていません）。読んだフォルダは付録の表~\ref{tab:files}。
+\item \textbf{LML（対数周辺尤度）は、同じ材料・同じ学習データ（・同じ厚み）の中でだけ比べます}。材料や学習データが違うと、LML の大きさは、データの行数とばらつきで決まるためです。順位も、その中だけのものです。
+\item パラメータの数（表の「数」）が多いモデルほど、LML は大きく出やすくなります。そのため、差には基準を当てます。係数 1 つで 1.92、2 つで 3.0 です（\textbf{$\Delta$LML} は、シフトの係数を 0 にしたモデルとの LML の差）。本番のモデルは、LML の順位だけでなく、この基準と「候補の選び方」（2026 年 11 月 3 日のユーザー決定）で決めています。そのため、LML が 1 位でないモデルが本番になることがあります。
+\item モデルの記号は「構造\_シフトに使う温度\_型」です。構造 A は縦だけ、B は横・縦のシフト、温度は Tset（加熱シリンダ温度）・Tff（流動中樹脂温度）、型は Arr（アレニウス型）・WLF（WLF 型）。C はシフトなしで、4 変数（$\ln\dot\gamma$・$\ln$ P3\_3・$\ln$ Tff・Tset）を並べた通常の GPR。\texttt{C\_\allowbreak{}noTff} は C から Tff を外したもの（入力 $\ln\dot\gamma$・$\ln$ P3\_3・Tset）で、A\_Tff・B\_Tff の係数を 0 にしたものと同じモデルです。
+\item {}†：\texttt{C\_\allowbreak{}noTff} の 3data の誤差は、2026 年 11 月 6 日の確かめの実行（\texttt{\_\allowbreak{}tmp/\allowbreak{}tff\_\allowbreak{}input/\allowbreak{}run3/\allowbreak{}}。Tff の入力の有無の比較のノート）の値です。同じノートを本物の学習結果フォルダで実行すれば、同じ値になります。LML は、検討の結果の \texttt{LML\_\allowbreak{}at\_\allowbreak{}0} から取りました（確かめの実行の値と一致）。
+\end{itemize}
+
+\section{流動中樹脂温度 Tff を GP の入力に使ったほうがよいか}\label{sec:tff}
+\begin{table}[H]\centering\scriptsize
+\caption{Tff を入力に使うかの根拠（全厚み）。太字は基準を超えたもの}\label{tab:tff}
+\begin{tabular}{llrrrrrrlllrrr}
+\toprule
+ & & \multicolumn{3}{c}{LML} & \multicolumn{3}{c}{3data の RMSE（全体）} & & \multicolumn{3}{c}{本番のモデル} & & \\
+\cmidrule(lr){3-5}\cmidrule(lr){6-8}\cmidrule(lr){10-12}
+学習データ & 材料 & C & \texttt{C\_\allowbreak{}noTff} & 差 & C & \texttt{C\_\allowbreak{}noTff} & 比 & C の結論 & モデル & \texttt{C\_\allowbreak{}noTff} との差 & 基準 & Tff の長さスケール & Tff だけ − Tset だけ \\
+\midrule
+通常版 & PP & 1,271.40 & 1,274.26 & $-2.86$ & 0.2524 & 0.2586\textsuperscript{†} & 1.025 & どちらでもよい & \texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr} & $-0.76$ & 1.92 & 13.3 & $-4.04$ \\
+通常版 & 粉砕材混合 PP & 1,322.20 & 1,323.12 & $-0.92$ & 0.1840 & 0.1963\textsuperscript{†} & 1.067 & どちらでもよい & \texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr} & 1.38 & 1.92 & 15.4 & $-8.24$ \\
+通常版 & GPPS & 929.80 & 929.09 & 0.71 & 0.1286 & 0.1310\textsuperscript{†} & 1.018 & どちらでもよい & \texttt{B\_\allowbreak{}Tset\_\allowbreak{}Arr} & 7.11 & 3 & 12.8 & $-15.46$ \\
+温度適切版 & PP & 625.20 & 628.14 & $-2.94$ & 0.0451 & 0.0463\textsuperscript{†} & 1.027 & どちらでもよい & \texttt{C} & --- & --- & 100.0 & $-2.14$ \\
+温度適切版 & 粉砕材混合 PP & 690.80 & 692.54 & $-1.74$ & 0.0387 & 0.0261\textsuperscript{†} & \textbf{0.675} & 外したほうがよい & \texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr} & 0.66 & 1.92 & 20.0 & $-4.69$ \\
+温度適切版 & GPPS & 442.20 & 444.25 & $-2.05$ & 0.0469 & 0.0465\textsuperscript{†} & 0.991 & どちらでもよい & \texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr} & 2.05 & 1.92 & 8.4 & $-7.85$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+\begin{itemize}[itemsep=0.2ex,topsep=0.3ex]
+\item \textbf{C（シフトなし）}：Tff を入力に足しても、6 つとも LML は基準（$+1.92$）まで上がりません（差 $= $ LML(C) $-$ LML(\texttt{C\_\allowbreak{}noTff})）。3data の誤差は 5 つで同等（比が 1/1.1〜1.1）です。温度適切版の粉砕材混合 PP だけ、Tff を外したほうが誤差が小さくなります（比 0.68。検証は高速側だけ）。
+\item \textbf{Tff でシフトするモデル（A\_Tff・B\_Tff）}：Tff は入力ではなく、シフトに使います（GP の入力は $\ln\dot\gamma$・$\ln$ P3\_3・Tset）。そのシフトは、6 つとも支持されません（2 章の表）。係数 0 では \texttt{C\_\allowbreak{}noTff} と同じモデルです。
+\item \textbf{Tset でシフトするモデル（A\_Tset・B\_Tset。本番の 5 つ）}：Tff を GP の入力に使います。\textbf{Tff だけを外した同じ構造のモデル（Tset のシフト ＋ $f(\ln\dot\gamma, \ln$ P3\_3$)$）は計算していないので、直接の答えはありません}。手がかりは 3 つです。① Tff の長さスケールは 8〜32 と長く（入力は標準化していて、データの幅は約 $\pm2$）、GP の Matern の部分は Tff の向きにほとんど変わりません。② Tff だけを入力にしたモデル（A\_Tset の係数 0）は、Tset だけを入力にしたモデル（\texttt{C\_\allowbreak{}noTff}）より LML が 2〜16 低く、温度の情報は Tset が持っています（表の右端）。③ 本番のモデルが \texttt{C\_\allowbreak{}noTff} より基準以上大きいのは、GPPS の 2 つだけで、これは Tset のシフトの効果です。
+\item \textbf{まとめ}：今の結果には、Tff を入力に入れて良くなったという結果は、どの材料・学習データ・モデルにもありません。C では、入れなくてよい（温度適切版の粉砕材混合 PP は、外したほうがよい）と言えます。Tset でシフトするモデルは、上の①〜③から入れなくてよい見込みですが、確かめるには、Tff の入力の有無の比較のノートに「Tset のシフトのモデルから Tff を外したもの」を足して計算する必要があります。Tff はユーザー指定の説明変数なので、外すかはユーザーが決めます。
+\end{itemize}
+
+\begin{table}[H]\centering\footnotesize
+\caption{厚みごと：Tff だけを入力にしたモデル（A\_Tset・B\_Tset の係数 0）と、Tset だけを入力にしたモデル（A\_Tff・B\_Tff の係数 0 ＝ \texttt{C\_\allowbreak{}noTff}）の LML の差（厚みごとのプロファイル尤度の値から。負なら Tset のほうがよく説明する）}\label{tab:tffthick}
+\begin{tabular}{llrrrr}
+\toprule
+学習データ & 材料 & 0.5 mm & 1 mm & 1.5 mm & 2 mm \\
+\midrule
+通常版 & PP & $-8.16$ & $-1.76$ & $-0.84$ & $-0.23$ \\
+通常版 & 粉砕材混合 PP & $-9.86$ & $-0.51$ & $-1.25$ & $-1.59$ \\
+通常版 & GPPS & --- & $-8.60$ & $-5.18$ & 0.93 \\
+温度適切版 & PP & $-0.39$ & $-1.15$ & $-0.56$ & $-0.84$ \\
+温度適切版 & 粉砕材混合 PP & $-2.03$ & $-0.54$ & $-5.46$ & 0.13 \\
+温度適切版 & GPPS & --- & $-3.76$ & $-4.71$ & $-2.30$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+厚みごとの C の LML は、厚みごとの比較のノートが残していないので、厚みごとの「C $-$ \texttt{C\_\allowbreak{}noTff}」は出せません。また、厚みごとの係数 0 の LML は、同じモデルでも、A・B・型のどの格子から取るかで最大 5.9 違います（44 組のうち 8 組で 1 以上。厚みごとのプロファイル尤度は格子の各点で最適化のやり直しが 1 回なので、局所解に止まった点があるため）。この表と 3 章の \texttt{C\_\allowbreak{}noTff} の LML は、その中の最大の値を使いました。厚みごとの LML の差は、この大きさの不確かさを含みます。
+
+\clearpage
+\section{全厚みの根拠（ランキング表）}\label{sec:total}
+\begin{itemize}[itemsep=0.2ex,topsep=0.3ex]
+\item 読んだ CSV：\texttt{まとめ.csv}（LML・$\Delta$LML・基準・支持・3data の RMSE・被覆率・係数）、\texttt{候補の選び方.csv}（候補の選び方での扱い）。LML の大きい順。本番のモデルは太字。
+\item 列：「数」はパラメータの数（\texttt{C\_\allowbreak{}noTff} 7、C・A 8、B 9）。「支持」は $\Delta$LML が基準以上なら ○。「候補の選び方での扱い」は、列と型の組ごとの結論（本番／組で残ったが LML で負け／組では別の構造〔A か B〕／支持されない）。「RMSE 順位」は 3data の RMSE（全体）の小さい順。被覆率は 3data が 95\% 予測区間に入った割合（全体）。温度適切版の検証データは高速側だけなので、低速側は「---」。
+\end{itemize}
+\subsection{通常版・PP（本番：\texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr}）}
+\begin{table}[H]\centering\footnotesize
+\caption{全厚みのランキング：通常版・PP（LML の大きい順。\texttt{05\_\allowbreak{}…/\allowbreak{}01\_\allowbreak{}バージンPP再々実験/\allowbreak{}01\_\allowbreak{}検討結果/\allowbreak{}01\_\allowbreak{}バージンPP再々実験\_\allowbreak{}シフト検討結果(5all学習データ)/\allowbreak{}全ショット版/\allowbreak{}全厚み総合/\allowbreak{}シフトファクターの検討/\allowbreak{}}）}
+\begin{tabular}{rlrp{12\zw}rrrrcp{8.5\zw}rrrrr}
+\toprule
+順位 & モデル & 数 & 係数（最良［95\% 区間］） & LML & 最大との差 & $\Delta$LML & 基準 & 支持 & 候補の選び方での扱い & RMSE 全体 & 低速側 & 高速側 & RMSE 順位 & 被覆率 \\
+\midrule
+1 & \texttt{B\_\allowbreak{}Tff\_\allowbreak{}Arr} & 9 & $E_h$ 0［0〜0］・$E_v$ 4［$-1$〜8］ kJ/mol & 1,275.30 & 0.00 & 1.07 & 3 & × & 支持されない & 0.2549 & 0.4645 & 0.0571 & 8 & 0.87 \\
+1 & \texttt{A\_\allowbreak{}Tff\_\allowbreak{}Arr} & 8 & $E_v$ 4［$-1$〜8.5］ kJ/mol & 1,275.30 & 0.00 & 1.07 & 1.92 & × & 支持されない & 0.2549 & 0.4645 & 0.0571 & 8 & 0.87 \\
+3 & \texttt{B\_\allowbreak{}Tff\_\allowbreak{}WLF} & 9 & $A_{1,h}$ 0［$-0.5$〜0.25］・$A_{1,v}$ 2.25［$-1.25$〜5.25］ & 1,275.20 & $-0.10$ & 0.94 & 3 & × & 支持されない & 0.2514 & 0.4582 & 0.0563 & 5 & 0.87 \\
+3 & \texttt{A\_\allowbreak{}Tff\_\allowbreak{}WLF} & 8 & $A_{1,v}$ 2.25［$-0.75$〜5.25］ & 1,275.20 & $-0.10$ & 0.94 & 1.92 & × & 支持されない & 0.2514 & 0.4582 & 0.0563 & 5 & 0.87 \\
+5 & \texttt{C\_\allowbreak{}noTff} & 7 & --- & 1,274.26 & $-1.04$ & --- & --- & --- & 参考（Tff を使わない） & 0.2586\textsuperscript{†} & 0.4715\textsuperscript{†} & 0.0575\textsuperscript{†} & 10 & 0.86\textsuperscript{†} \\
+6 & \textbf{\texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr}} & 8 & $E_v$ 3.5［1〜5.5］ kJ/mol & 1,273.50 & $-1.80$ & 3.30 & 1.92 & ○ & \textbf{本番} & 0.2464 & 0.4484 & 0.0574 & 3 & 0.86 \\
+7 & \texttt{B\_\allowbreak{}Tset\_\allowbreak{}Arr} & 9 & $E_h$ 0［0〜0］・$E_v$ 3［1〜5］ kJ/mol & 1,273.40 & $-1.90$ & 3.23 & 3 & ○ & 組では \texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr} & 0.2472 & 0.4498 & 0.0576 & 4 & 0.86 \\
+8 & \texttt{B\_\allowbreak{}Tset\_\allowbreak{}WLF} & 9 & $A_{1,h}$ 0［$-0.25$〜0.25］・$A_{1,v}$ 1.75［0.25〜3.25］ & 1,272.30 & $-3.00$ & 2.06 & 3 & × & 組では \texttt{A\_\allowbreak{}Tset\_\allowbreak{}WLF} & 0.2462 & 0.4483 & 0.0566 & 1 & 0.86 \\
+8 & \texttt{A\_\allowbreak{}Tset\_\allowbreak{}WLF} & 8 & $A_{1,v}$ 1.75［0.25〜3.25］ & 1,272.30 & $-3.00$ & 2.06 & 1.92 & ○ & 組で残る（LML で負け） & 0.2462 & 0.4483 & 0.0566 & 1 & 0.86 \\
+10 & \texttt{C} & 8 & --- & 1,271.40 & $-3.90$ & --- & --- & --- & 基準（シフトなし） & 0.2524 & 0.4597 & 0.0578 & 7 & 0.86 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{通常版・粉砕材混合 PP（本番：\texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr}）}
+\begin{table}[H]\centering\footnotesize
+\caption{全厚みのランキング：通常版・粉砕材混合 PP（LML の大きい順。\texttt{05\_\allowbreak{}…/\allowbreak{}02\_\allowbreak{}粉砕材混合PP実験/\allowbreak{}02\_\allowbreak{}検討結果/\allowbreak{}02\_\allowbreak{}粉砕材混合PP実験\_\allowbreak{}検討結果(5all学習データ)/\allowbreak{}全ショット版/\allowbreak{}全厚み総合/\allowbreak{}シフトファクターの検討/\allowbreak{}}）}
+\begin{tabular}{rlrp{12\zw}rrrrcp{8.5\zw}rrrrr}
+\toprule
+順位 & モデル & 数 & 係数（最良［95\% 区間］） & LML & 最大との差 & $\Delta$LML & 基準 & 支持 & 候補の選び方での扱い & RMSE 全体 & 低速側 & 高速側 & RMSE 順位 & 被覆率 \\
+\midrule
+1 & \texttt{B\_\allowbreak{}Tset\_\allowbreak{}Arr} & 9 & $E_h$ 0［$-1$〜0］・$E_v$ 6［3〜8］ kJ/mol & 1,324.50 & 0.00 & 9.64 & 3 & ○ & 組では \texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr} & 0.1935 & 0.3314 & 0.0478 & 4 & 0.92 \\
+1 & \textbf{\texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr}} & 8 & $E_v$ 5.5［3.5〜8］ kJ/mol & 1,324.50 & 0.00 & 9.65 & 1.92 & ○ & \textbf{本番} & 0.1958 & 0.3359 & 0.0467 & 7 & 0.92 \\
+3 & \texttt{B\_\allowbreak{}Tff\_\allowbreak{}WLF} & 9 & $A_{1,h}$ $-0.25$［$-0.75$〜0.25］・$A_{1,v}$ $-1.25$［$-3.5$〜1］ & 1,323.70 & $-0.80$ & 0.62 & 3 & × & 支持されない & 0.1909 & 0.3310 & 0.0307 & 2 & 0.91 \\
+4 & \texttt{A\_\allowbreak{}Tff\_\allowbreak{}Arr} & 8 & $E_v$ $-1.5$［$-4$〜1.5］ kJ/mol & 1,323.50 & $-1.00$ & 0.35 & 1.92 & × & 支持されない & 0.1919 & 0.3317 & 0.0358 & 3 & 0.91 \\
+5 & \texttt{B\_\allowbreak{}Tff\_\allowbreak{}Arr} & 9 & $E_h$ 0［$-1$〜0］・$E_v$ $-1$［$-5$〜1］ kJ/mol & 1,323.40 & $-1.10$ & 0.33 & 3 & × & 支持されない & 0.1935 & 0.3347 & 0.0353 & 4 & 0.91 \\
+5 & \texttt{A\_\allowbreak{}Tff\_\allowbreak{}WLF} & 8 & $A_{1,v}$ $-0.75$［$-2.75$〜1.25］ & 1,323.40 & $-1.10$ & 0.24 & 1.92 & × & 支持されない & 0.1936 & 0.3349 & 0.0351 & 6 & 0.91 \\
+7 & \texttt{C\_\allowbreak{}noTff} & 7 & --- & 1,323.12 & $-1.38$ & --- & --- & --- & 参考（Tff を使わない） & 0.1963\textsuperscript{†} & 0.3399\textsuperscript{†} & 0.0343\textsuperscript{†} & 8 & 0.91\textsuperscript{†} \\
+8 & \texttt{B\_\allowbreak{}Tset\_\allowbreak{}WLF} & 9 & $A_{1,h}$ $-0.25$［$-0.75$〜0.25］・$A_{1,v}$ 2.75［0.75〜4.5］ & 1,322.20 & $-2.30$ & 7.34 & 3 & ○ & 組では \texttt{A\_\allowbreak{}Tset\_\allowbreak{}WLF} & 0.2031 & 0.3501 & 0.0427 & 9 & 0.93 \\
+8 & \texttt{C} & 8 & --- & 1,322.20 & $-2.30$ & --- & --- & --- & 基準（シフトなし） & 0.1840 & 0.3159 & 0.0427 & 1 & 0.92 \\
+10 & \texttt{A\_\allowbreak{}Tset\_\allowbreak{}WLF} & 8 & $A_{1,v}$ 3.25［1.75〜4.75］ & 1,321.80 & $-2.70$ & 6.98 & 1.92 & ○ & 組で残る（LML で負け） & 0.2056 & 0.3531 & 0.0479 & 10 & 0.91 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{通常版・GPPS（本番：\texttt{B\_\allowbreak{}Tset\_\allowbreak{}Arr}）}
+\begin{table}[H]\centering\footnotesize
+\caption{全厚みのランキング：通常版・GPPS（LML の大きい順。\texttt{05\_\allowbreak{}…/\allowbreak{}03\_\allowbreak{}GPPS実験/\allowbreak{}03\_\allowbreak{}検討結果/\allowbreak{}03\_\allowbreak{}GPPS実験\_\allowbreak{}検討結果(5all学習データ)/\allowbreak{}全ショット版/\allowbreak{}全厚み総合/\allowbreak{}シフトファクターの検討/\allowbreak{}}）}
+\begin{tabular}{rlrp{12\zw}rrrrcp{8.5\zw}rrrrr}
+\toprule
+順位 & モデル & 数 & 係数（最良［95\% 区間］） & LML & 最大との差 & $\Delta$LML & 基準 & 支持 & 候補の選び方での扱い & RMSE 全体 & 低速側 & 高速側 & RMSE 順位 & 被覆率 \\
+\midrule
+1 & \textbf{\texttt{B\_\allowbreak{}Tset\_\allowbreak{}Arr}} & 9 & $E_h$ 1［1〜1］・$E_v$ 9［7〜11］ kJ/mol & 936.20 & 0.00 & 22.58 & 3 & ○ & \textbf{本番} & 0.1213 & 0.1758 & 0.0668 & 3 & 0.82 \\
+2 & \texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr} & 8 & $E_v$ 7.5［5.5〜9.5］ kJ/mol & 934.00 & $-2.20$ & 20.33 & 1.92 & ○ & 組では \texttt{B\_\allowbreak{}Tset\_\allowbreak{}Arr} & 0.1239 & 0.1808 & 0.0663 & 4 & 0.82 \\
+3 & \texttt{B\_\allowbreak{}Tset\_\allowbreak{}WLF} & 9 & $A_{1,h}$ 0.25［0.25〜0.5］・$A_{1,v}$ 2［1.5〜2.5］ & 933.20 & $-3.00$ & 19.53 & 3 & ○ & 組で残る（LML で負け） & 0.1117 & 0.1594 & 0.0656 & 1 & 0.82 \\
+4 & \texttt{B\_\allowbreak{}Tff\_\allowbreak{}Arr} & 9 & $E_h$ 1［1〜2］・$E_v$ 0［$-3$〜4］ kJ/mol & 931.60 & $-4.60$ & 2.51 & 3 & × & 支持されない & 0.1339 & 0.2001 & 0.0629 & 9 & 0.86 \\
+5 & \texttt{B\_\allowbreak{}Tff\_\allowbreak{}WLF} & 9 & $A_{1,h}$ 0.25［0.25〜0.5］・$A_{1,v}$ 0.5［$-0.25$〜1.5］ & 931.30 & $-4.90$ & 2.19 & 3 & × & 支持されない & 0.1290 & 0.1905 & 0.0649 & 6 & 0.82 \\
+6 & \texttt{A\_\allowbreak{}Tset\_\allowbreak{}WLF} & 8 & $A_{1,v}$ 1.5［1.25〜2］ & 930.80 & $-5.40$ & 17.21 & 1.92 & ○ & 組では \texttt{B\_\allowbreak{}Tset\_\allowbreak{}WLF} & 0.1127 & 0.1610 & 0.0658 & 2 & 0.82 \\
+7 & \texttt{C} & 8 & --- & 929.80 & $-6.40$ & --- & --- & --- & 基準（シフトなし） & 0.1286 & 0.1894 & 0.0656 & 5 & 0.84 \\
+8 & \texttt{A\_\allowbreak{}Tff\_\allowbreak{}Arr} & 8 & $E_v$ $-2$［$-5.5$〜1.5］ kJ/mol & 929.60 & $-6.60$ & 0.53 & 1.92 & × & 支持されない & 0.1360 & 0.2035 & 0.0634 & 10 & 0.85 \\
+9 & \texttt{A\_\allowbreak{}Tff\_\allowbreak{}WLF} & 8 & $A_{1,v}$ 0［$-0.75$〜0.75］ & 929.10 & $-7.10$ & 0.00 & 1.92 & × & 支持されない & 0.1310 & 0.1938 & 0.0651 & 8 & 0.82 \\
+10 & \texttt{C\_\allowbreak{}noTff} & 7 & --- & 929.09 & $-7.11$ & --- & --- & --- & 参考（Tff を使わない） & 0.1310\textsuperscript{†} & 0.1938\textsuperscript{†} & 0.0651\textsuperscript{†} & 7 & 0.82\textsuperscript{†} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{温度適切版・PP（本番：\texttt{C}）}
+\begin{table}[H]\centering\footnotesize
+\caption{全厚みのランキング：温度適切版・PP（LML の大きい順。\texttt{05\_\allowbreak{}…/\allowbreak{}01\_\allowbreak{}バージンPP再々実験/\allowbreak{}01\_\allowbreak{}検討結果/\allowbreak{}01\_\allowbreak{}バージンPP再々実験\_\allowbreak{}シフト検討結果(5適切学習データ)/\allowbreak{}全ショット版/\allowbreak{}全厚み総合/\allowbreak{}シフトファクターの検討/\allowbreak{}}）}
+\begin{tabular}{rlrp{12\zw}rrrrcp{8.5\zw}rrrrr}
+\toprule
+順位 & モデル & 数 & 係数（最良［95\% 区間］） & LML & 最大との差 & $\Delta$LML & 基準 & 支持 & 候補の選び方での扱い & RMSE 全体 & 低速側 & 高速側 & RMSE 順位 & 被覆率 \\
+\midrule
+1 & \texttt{B\_\allowbreak{}Tff\_\allowbreak{}Arr} & 9 & $E_h$ 0［$-1$〜0］・$E_v$ $-1$［$-7$〜4］ kJ/mol & 628.20 & 0.00 & 0.07 & 3 & × & 支持されない & 0.0468 & --- & 0.0468 & 5 & 0.82 \\
+1 & \texttt{B\_\allowbreak{}Tff\_\allowbreak{}WLF} & 9 & $A_{1,h}$ 0［$-0.75$〜0.5］・$A_{1,v}$ $-0.75$［$-5.75$〜3.25］ & 628.20 & 0.00 & 0.07 & 3 & × & 支持されない & 0.0468 & --- & 0.0468 & 5 & 0.82 \\
+1 & \texttt{A\_\allowbreak{}Tff\_\allowbreak{}Arr} & 8 & $E_v$ $-1$［$-7.5$〜4.5］ kJ/mol & 628.20 & 0.00 & 0.07 & 1.92 & × & 支持されない & 0.0468 & --- & 0.0468 & 5 & 0.82 \\
+1 & \texttt{A\_\allowbreak{}Tff\_\allowbreak{}WLF} & 8 & $A_{1,v}$ $-0.75$［$-5.25$〜3.25］ & 628.20 & 0.00 & 0.07 & 1.92 & × & 支持されない & 0.0468 & --- & 0.0468 & 5 & 0.82 \\
+5 & \texttt{C\_\allowbreak{}noTff} & 7 & --- & 628.14 & $-0.06$ & --- & --- & --- & 参考（Tff を使わない） & 0.0463\textsuperscript{†} & --- & 0.0463\textsuperscript{†} & 2 & 0.82\textsuperscript{†} \\
+6 & \texttt{B\_\allowbreak{}Tset\_\allowbreak{}Arr} & 9 & $E_h$ 0［0〜0］・$E_v$ 3［$-1$〜8］ kJ/mol & 626.80 & $-1.40$ & 0.78 & 3 & × & 支持されない & 0.0463 & --- & 0.0463 & 3 & 0.82 \\
+6 & \texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr} & 8 & $E_v$ 3［$-1.5$〜8］ kJ/mol & 626.80 & $-1.40$ & 0.78 & 1.92 & × & 支持されない & 0.0463 & --- & 0.0463 & 3 & 0.82 \\
+8 & \texttt{B\_\allowbreak{}Tset\_\allowbreak{}WLF} & 9 & $A_{1,h}$ 0［$-0.5$〜0.5］・$A_{1,v}$ 1［$-2$〜4］ & 626.30 & $-1.90$ & 0.32 & 3 & × & 支持されない & 0.0473 & --- & 0.0473 & 9 & 0.82 \\
+8 & \texttt{A\_\allowbreak{}Tset\_\allowbreak{}WLF} & 8 & $A_{1,v}$ 1［$-1.5$〜3.75］ & 626.30 & $-1.90$ & 0.32 & 1.92 & × & 支持されない & 0.0473 & --- & 0.0473 & 9 & 0.82 \\
+10 & \textbf{\texttt{C}} & 8 & --- & 625.20 & $-3.00$ & --- & --- & --- & \textbf{本番（どのシフトも支持されない）} & 0.0451 & --- & 0.0451 & 1 & 0.82 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{温度適切版・粉砕材混合 PP（本番：\texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr}）}
+\begin{table}[H]\centering\footnotesize
+\caption{全厚みのランキング：温度適切版・粉砕材混合 PP（LML の大きい順。\texttt{05\_\allowbreak{}…/\allowbreak{}02\_\allowbreak{}粉砕材混合PP実験/\allowbreak{}02\_\allowbreak{}検討結果/\allowbreak{}02\_\allowbreak{}粉砕材混合PP実験\_\allowbreak{}検討結果(5適切学習データ)/\allowbreak{}全ショット版/\allowbreak{}全厚み総合/\allowbreak{}シフトファクターの検討/\allowbreak{}}）}
+\begin{tabular}{rlrp{12\zw}rrrrcp{8.5\zw}rrrrr}
+\toprule
+順位 & モデル & 数 & 係数（最良［95\% 区間］） & LML & 最大との差 & $\Delta$LML & 基準 & 支持 & 候補の選び方での扱い & RMSE 全体 & 低速側 & 高速側 & RMSE 順位 & 被覆率 \\
+\midrule
+1 & \texttt{B\_\allowbreak{}Tset\_\allowbreak{}Arr} & 9 & $E_h$ 0［$-1$〜0］・$E_v$ 5［1〜9］ kJ/mol & 693.20 & 0.00 & 5.31 & 3 & ○ & 組では \texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr} & 0.0361 & --- & 0.0361 & 8 & 0.94 \\
+1 & \texttt{B\_\allowbreak{}Tff\_\allowbreak{}Arr} & 9 & $E_h$ 0［$-1$〜0］・$E_v$ $-2$［$-7$〜1］ kJ/mol & 693.20 & 0.00 & 0.65 & 3 & × & 支持されない & 0.0297 & --- & 0.0297 & 5 & 0.91 \\
+1 & \texttt{B\_\allowbreak{}Tff\_\allowbreak{}WLF} & 9 & $A_{1,h}$ $-0.25$［$-0.75$〜0.25］・$A_{1,v}$ $-1.25$［$-4.75$〜1］ & 693.20 & 0.00 & 0.69 & 3 & × & 支持されない & 0.0266 & --- & 0.0266 & 2 & 0.93 \\
+1 & \textbf{\texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr}} & 8 & $E_v$ 5.5［2.5〜9］ kJ/mol & 693.20 & 0.00 & 5.34 & 1.92 & ○ & \textbf{本番} & 0.0377 & --- & 0.0377 & 9 & 0.94 \\
+1 & \texttt{A\_\allowbreak{}Tff\_\allowbreak{}Arr} & 8 & $E_v$ $-2.5$［$-7$〜1］ kJ/mol & 693.20 & 0.00 & 0.65 & 1.92 & × & 支持されない & 0.0320 & --- & 0.0320 & 7 & 0.94 \\
+6 & \texttt{A\_\allowbreak{}Tff\_\allowbreak{}WLF} & 8 & $A_{1,v}$ $-1$［$-4$〜1］ & 692.80 & $-0.40$ & 0.30 & 1.92 & × & 支持されない & 0.0283 & --- & 0.0283 & 3 & 0.91 \\
+7 & \texttt{C\_\allowbreak{}noTff} & 7 & --- & 692.54 & $-0.66$ & --- & --- & --- & 参考（Tff を使わない） & 0.0261\textsuperscript{†} & --- & 0.0261\textsuperscript{†} & 1 & 0.94\textsuperscript{†} \\
+8 & \texttt{B\_\allowbreak{}Tset\_\allowbreak{}WLF} & 9 & $A_{1,h}$ $-0.25$［$-0.75$〜0.25］・$A_{1,v}$ 1.75［$-0.75$〜4.5］ & 691.40 & $-1.80$ & 3.58 & 3 & ○ & 組では \texttt{A\_\allowbreak{}Tset\_\allowbreak{}WLF} & 0.0294 & --- & 0.0294 & 4 & 0.96 \\
+9 & \texttt{A\_\allowbreak{}Tset\_\allowbreak{}WLF} & 8 & $A_{1,v}$ 2.5［0.75〜5］ & 690.90 & $-2.30$ & 3.08 & 1.92 & ○ & 組で残る（LML で負け） & 0.0317 & --- & 0.0317 & 6 & 0.94 \\
+10 & \texttt{C} & 8 & --- & 690.80 & $-2.40$ & --- & --- & --- & 基準（シフトなし） & 0.0387 & --- & 0.0387 & 10 & 0.97 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{温度適切版・GPPS（本番：\texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr}）}
+\begin{table}[H]\centering\footnotesize
+\caption{全厚みのランキング：温度適切版・GPPS（LML の大きい順。\texttt{05\_\allowbreak{}…/\allowbreak{}03\_\allowbreak{}GPPS実験/\allowbreak{}03\_\allowbreak{}検討結果/\allowbreak{}03\_\allowbreak{}GPPS実験\_\allowbreak{}検討結果(5適切学習データ)/\allowbreak{}全ショット版/\allowbreak{}全厚み総合/\allowbreak{}シフトファクターの検討/\allowbreak{}}）}
+\begin{tabular}{rlrp{12\zw}rrrrcp{8.5\zw}rrrrr}
+\toprule
+順位 & モデル & 数 & 係数（最良［95\% 区間］） & LML & 最大との差 & $\Delta$LML & 基準 & 支持 & 候補の選び方での扱い & RMSE 全体 & 低速側 & 高速側 & RMSE 順位 & 被覆率 \\
+\midrule
+1 & \texttt{B\_\allowbreak{}Tset\_\allowbreak{}Arr} & 9 & $E_h$ 1［0〜2］・$E_v$ 8［6〜12］ kJ/mol & 447.70 & 0.00 & 11.27 & 3 & ○ & 組では \texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr} & 0.0474 & --- & 0.0474 & 8 & 0.78 \\
+2 & \texttt{B\_\allowbreak{}Tset\_\allowbreak{}WLF} & 9 & $A_{1,h}$ 0.25［0〜0.5］・$A_{1,v}$ 1.75［1.25〜2.75］ & 446.80 & $-0.90$ & 10.43 & 3 & ○ & 組では \texttt{A\_\allowbreak{}Tset\_\allowbreak{}WLF} & 0.0482 & --- & 0.0482 & 10 & 0.73 \\
+3 & \textbf{\texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr}} & 8 & $E_v$ 6.5［4〜9.5］ kJ/mol & 446.30 & $-1.40$ & 9.87 & 1.92 & ○ & \textbf{本番} & 0.0469 & --- & 0.0469 & 6 & 0.76 \\
+4 & \texttt{B\_\allowbreak{}Tff\_\allowbreak{}Arr} & 9 & $E_h$ 1［0〜2］・$E_v$ $-1$［$-6$〜5］ kJ/mol & 446.20 & $-1.50$ & 1.96 & 3 & × & 支持されない & 0.0459 & --- & 0.0459 & 3 & 0.82 \\
+5 & \texttt{B\_\allowbreak{}Tff\_\allowbreak{}WLF} & 9 & $A_{1,h}$ 0.25［0〜0.75］・$A_{1,v}$ 0［$-1.25$〜1.75］ & 445.50 & $-2.20$ & 1.26 & 3 & × & 支持されない & 0.0461 & --- & 0.0461 & 4 & 0.82 \\
+6 & \texttt{A\_\allowbreak{}Tset\_\allowbreak{}WLF} & 8 & $A_{1,v}$ 1.25［0.75〜1.75］ & 445.30 & $-2.40$ & 8.95 & 1.92 & ○ & 組で残る（LML で負け） & 0.0477 & --- & 0.0477 & 9 & 0.76 \\
+7 & \texttt{A\_\allowbreak{}Tff\_\allowbreak{}Arr} & 8 & $E_v$ $-3.5$［$-8.5$〜1.5］ kJ/mol & 445.20 & $-2.50$ & 0.92 & 1.92 & × & 支持されない & 0.0454 & --- & 0.0454 & 1 & 0.78 \\
+8 & \texttt{A\_\allowbreak{}Tff\_\allowbreak{}WLF} & 8 & $A_{1,v}$ $-0.5$［$-1.75$〜0.75］ & 444.50 & $-3.20$ & 0.21 & 1.92 & × & 支持されない & 0.0456 & --- & 0.0456 & 2 & 0.82 \\
+9 & \texttt{C\_\allowbreak{}noTff} & 7 & --- & 444.25 & $-3.45$ & --- & --- & --- & 参考（Tff を使わない） & 0.0465\textsuperscript{†} & --- & 0.0465\textsuperscript{†} & 5 & 0.80\textsuperscript{†} \\
+10 & \texttt{C} & 8 & --- & 442.20 & $-5.50$ & --- & --- & --- & 基準（シフトなし） & 0.0469 & --- & 0.0469 & 6 & 0.78 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+\clearpage
+\section{厚みごとの根拠（ランキング表）}\label{sec:thick}
+\begin{itemize}[itemsep=0.2ex,topsep=0.3ex]
+\item 読んだ CSV（厚みごとの比較のノート）：\texttt{プロファイル尤度\_\allowbreak{}厚みごと.csv}（その厚みの 5data だけで係数を決め直したときの LML・係数・$\Delta$LML・取り直しが収束したか）、\texttt{温度シフトの確認\_\allowbreak{}厚みごと.csv}（全厚みのモデルで見た、その厚みの温度シフトの判定 ○・△・×）、\texttt{厚みごとと総合の比較.csv}（3data のその厚みの誤差〔粘度の \%〕。「厚みごと」はその厚みだけで学習したモデル、「総合」は全厚みのモデル）、\texttt{厚みごとの比較\_\allowbreak{}まとめ.csv}（組ごとの Tff か Tset か）。
+\item LML は、その厚みの中だけで比べます。C の厚みごとの LML は残っていないので「---」です。\texttt{C\_\allowbreak{}noTff} の LML は、A\_Tff・B\_Tff の係数 0 の値です（LML $-$ $\Delta$LML の最大）。厚みごとの LML は、局所解のため最大 5.9 ほどの不確かさを含みます（1 章の表~\ref{tab:tffthick} の下）。差が 1〜3 程度の順位の入れ替わりは、意味のある差とは言えません。
+\item 「印」：本番＝全厚みで選んだモデル（厚みごとの学習にも、このモデルを使う）。厚みの規則＝その厚みのプロファイル尤度に「候補の選び方」を当てたときの候補（参考）。§：縦の係数が負（低温ほど粘度が低いという、逆の向き）。
+\item 「確認」：○＝温度の順序と温度による粘度の比が実測と合い、換算でずれが減る。×＝予測の温度の順序が実測と逆。△＝それ以外。
+\end{itemize}
+\subsection{通常版・PP（本番：\texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr}）}
+\begin{table}[H]\centering\footnotesize
+\caption{厚みごとのランキング：通常版・PP・厚み 0.5 mm（学習の条件 21。LML の大きい順）}
+\begin{tabular}{rlp{11\zw}rrrrccc rrrl}
+\toprule
+順位 & モデル & 係数（厚みごと） & LML & 最大との差 & $\Delta$LML & 基準 & 支持 & 取り直し & 確認 & 誤差 厚みごと & 誤差 総合 & 誤差順位 & 印 \\
+\midrule
+1 & \texttt{B\_\allowbreak{}Tset\_\allowbreak{}WLF} & 横 2.5・縦 9 & 268.91 & 0.00 & 8.89 & 3 & ○ & 収束 & ○ & 1.9 & 6.5 & 4 &  \\
+2 & \texttt{B\_\allowbreak{}Tff\_\allowbreak{}WLF} & 横 1.75・縦 3.75 & 268.67 & $-0.24$ & 0.49 & 3 & × & 収束 & ○ & 1.9 & 6.4 & 5 &  \\
+3 & \texttt{B\_\allowbreak{}Tff\_\allowbreak{}Arr} & 横 2・縦 4 kJ/mol & 268.64 & $-0.27$ & 0.46 & 3 & × & 収束 & ○ & 1.9 & 6.4 & 6 &  \\
+4 & \texttt{C\_\allowbreak{}noTff} & --- & 268.18 & $-0.72$ & --- & --- & --- & --- & --- & --- & --- &  &  \\
+5 & \texttt{A\_\allowbreak{}Tset\_\allowbreak{}WLF} & 縦 4.75 & 267.74 & $-1.17$ & 7.72 & 1.92 & ○ & 収束 & ○ & 2.0 & 6.5 & 9 & 厚みの規則 \\
+6 & \texttt{B\_\allowbreak{}Tset\_\allowbreak{}Arr} & 横 5・縦 17 kJ/mol & 267.31 & $-1.60$ & 9.22 & 3 & ○ & 収束 & ○ & 1.9 & 6.5 & 1 &  \\
+7 & \textbf{\texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr}} & 縦 7.5 kJ/mol & 265.51 & $-3.39$ & 7.43 & 1.92 & ○ & 収束 & ○ & 1.9 & 6.5 & 8 & \textbf{本番} \\
+8 & \texttt{A\_\allowbreak{}Tff\_\allowbreak{}Arr} & 縦 0 kJ/mol & 265.32 & $-3.58$ & 0.00 & 1.92 & × & 収束 & ○ & 1.9 & 6.4 & 2 &  \\
+8 & \texttt{A\_\allowbreak{}Tff\_\allowbreak{}WLF} & 縦 0 & 265.32 & $-3.58$ & 0.00 & 1.92 & × & 収束 & ○ & 1.9 & 6.4 & 2 &  \\
+ & \texttt{C} & --- & --- & --- & --- & --- & --- & --- & --- & 1.9 & 6.4 & 7 &  \\
+\bottomrule
+\end{tabular}
+\end{table}
+\begin{table}[H]\centering\footnotesize
+\caption{厚みごとのランキング：通常版・PP・厚み 1 mm（学習の条件 24。LML の大きい順）}
+\begin{tabular}{rlp{11\zw}rrrrccc rrrl}
+\toprule
+順位 & モデル & 係数（厚みごと） & LML & 最大との差 & $\Delta$LML & 基準 & 支持 & 取り直し & 確認 & 誤差 厚みごと & 誤差 総合 & 誤差順位 & 印 \\
+\midrule
+1 & \texttt{B\_\allowbreak{}Tff\_\allowbreak{}Arr} & 横 3・縦 $-21$ kJ/mol\textsuperscript{§} & 344.95 & 0.00 & 4.71 & 3 & ○ & 収束 & ○ & 1.0 & 5.5 & 3 & 厚みの規則 \\
+2 & \texttt{B\_\allowbreak{}Tff\_\allowbreak{}WLF} & 横 1.25・縦 12 & 344.83 & $-0.12$ & 4.59 & 3 & ○ & 収束 & ○ & 2.0 & 5.3 & 7 &  \\
+3 & \texttt{B\_\allowbreak{}Tset\_\allowbreak{}Arr} & 横 6・縦 22 kJ/mol & 344.64 & $-0.31$ & 6.17 & 3 & ○ & 収束 & ○ & 1.0 & 5.7 & 1 &  \\
+4 & \texttt{A\_\allowbreak{}Tff\_\allowbreak{}WLF} & 縦 13.75 & 342.82 & $-2.13$ & 2.58 & 1.92 & ○ & 収束 & ○ & 3.2 & 5.3 & 9 &  \\
+5 & \texttt{B\_\allowbreak{}Tset\_\allowbreak{}WLF} & 横 4・縦 11.75 & 342.79 & $-2.16$ & 9.56 & 3 & ○ & 収束 & ○ & 1.0 & 5.5 & 2 &  \\
+6 & \texttt{A\_\allowbreak{}Tff\_\allowbreak{}Arr} & 縦 $-29$ kJ/mol\textsuperscript{§} & 342.78 & $-2.17$ & 2.54 & 1.92 & ○ & 収束 & ○ & 1.5 & 5.5 & 5 &  \\
+7 & \textbf{\texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr}} & 縦 6.5 kJ/mol & 341.16 & $-3.79$ & 2.68 & 1.92 & ○ & 収束 & ○ & 1.8 & 5.6 & 6 & \textbf{本番} \\
+8 & \texttt{A\_\allowbreak{}Tset\_\allowbreak{}WLF} & 縦 2.75 & 340.85 & $-4.11$ & 2.37 & 1.92 & ○ & 収束 & ○ & 2.1 & 5.5 & 8 &  \\
+9 & \texttt{C\_\allowbreak{}noTff} & --- & 340.24 & $-4.71$ & --- & --- & --- & --- & --- & --- & --- &  &  \\
+ & \texttt{C} & --- & --- & --- & --- & --- & --- & --- & --- & 1.5 & 5.5 & 4 &  \\
+\bottomrule
+\end{tabular}
+\end{table}
+\begin{table}[H]\centering\footnotesize
+\caption{厚みごとのランキング：通常版・PP・厚み 1.5 mm（学習の条件 24。LML の大きい順）}
+\begin{tabular}{rlp{11\zw}rrrrccc rrrl}
+\toprule
+順位 & モデル & 係数（厚みごと） & LML & 最大との差 & $\Delta$LML & 基準 & 支持 & 取り直し & 確認 & 誤差 厚みごと & 誤差 総合 & 誤差順位 & 印 \\
+\midrule
+1 & \textbf{\texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr}} & 縦 4.5 kJ/mol & 385.18 & 0.00 & 1.82 & 1.92 & × & 収束 & ○ & 10.8 & 16.4 & 7 & \textbf{本番} \\
+2 & \texttt{B\_\allowbreak{}Tset\_\allowbreak{}Arr} & 横 0・縦 4 kJ/mol & 385.16 & $-0.02$ & 1.79 & 3 & × & 収束 & ○ & 10.7 & 16.5 & 6 &  \\
+3 & \texttt{B\_\allowbreak{}Tset\_\allowbreak{}WLF} & 横 0・縦 2 & 384.85 & $-0.33$ & 1.48 & 3 & × & 収束 & ○ & 11.0 & 16.5 & 8 &  \\
+3 & \texttt{A\_\allowbreak{}Tset\_\allowbreak{}WLF} & 縦 2 & 384.85 & $-0.33$ & 1.48 & 1.92 & × & 収束 & ○ & 11.0 & 16.5 & 8 &  \\
+5 & \texttt{A\_\allowbreak{}Tff\_\allowbreak{}Arr} & 縦 $-7$ kJ/mol\textsuperscript{§} & 384.78 & $-0.40$ & 0.57 & 1.92 & × & 収束 & ○ & 9.3 & 16.7 & 3 &  \\
+6 & \texttt{B\_\allowbreak{}Tff\_\allowbreak{}Arr} & 横 0・縦 $-7$ kJ/mol\textsuperscript{§} & 384.78 & $-0.40$ & 0.57 & 3 & × & 収束 & ○ & 9.3 & 16.7 & 3 &  \\
+7 & \texttt{B\_\allowbreak{}Tff\_\allowbreak{}WLF} & 横 0・縦 $-0.25$\textsuperscript{§} & 384.21 & $-0.97$ & 0.01 & 3 & × & 収束 & ○ & 9.1 & 16.6 & 1 &  \\
+7 & \texttt{A\_\allowbreak{}Tff\_\allowbreak{}WLF} & 縦 $-0.25$\textsuperscript{§} & 384.21 & $-0.97$ & 0.01 & 1.92 & × & 収束 & ○ & 9.1 & 16.6 & 1 &  \\
+9 & \texttt{C\_\allowbreak{}noTff} & --- & 384.20 & $-0.98$ & --- & --- & --- & --- & --- & --- & --- &  &  \\
+ & \texttt{C} & --- & --- & --- & --- & --- & --- & --- & --- & 9.4 & 16.6 & 5 & 厚みの規則 \\
+\bottomrule
+\end{tabular}
+\end{table}
+\begin{table}[H]\centering\footnotesize
+\caption{厚みごとのランキング：通常版・PP・厚み 2 mm（学習の条件 24。LML の大きい順）}
+\begin{tabular}{rlp{11\zw}rrrrccc rrrl}
+\toprule
+順位 & モデル & 係数（厚みごと） & LML & 最大との差 & $\Delta$LML & 基準 & 支持 & 取り直し & 確認 & 誤差 厚みごと & 誤差 総合 & 誤差順位 & 印 \\
+\midrule
+1 & \textbf{\texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr}} & 縦 $-12.5$ kJ/mol\textsuperscript{§} & 359.37 & 0.00 & 3.26 & 1.92 & ○ & 収束 & ○ & 25.4 & 46.2 & 8 & \textbf{本番}・厚みの規則 \\
+2 & \texttt{B\_\allowbreak{}Tset\_\allowbreak{}Arr} & 横 0・縦 $-13$ kJ/mol\textsuperscript{§} & 359.36 & 0.00 & 3.26 & 3 & ○ & 収束 & ○ & 25.6 & 46.4 & 9 &  \\
+3 & \texttt{B\_\allowbreak{}Tset\_\allowbreak{}WLF} & 横 0.25・縦 $-3.5$\textsuperscript{§} & 358.56 & $-0.80$ & 2.46 & 3 & × & 収束 & ○ & 22.1 & 46.2 & 4 &  \\
+4 & \texttt{A\_\allowbreak{}Tset\_\allowbreak{}WLF} & 縦 $-4.25$\textsuperscript{§} & 358.28 & $-1.09$ & 2.17 & 1.92 & ○ & 収束 & ○ & 21.9 & 46.2 & 2 &  \\
+5 & \texttt{B\_\allowbreak{}Tff\_\allowbreak{}WLF} & 横 0.5・縦 0.75 & 356.78 & $-2.59$ & 0.45 & 3 & × & 収束 & ○ & 22.2 & 47.5 & 5 &  \\
+6 & \texttt{B\_\allowbreak{}Tff\_\allowbreak{}Arr} & 横 1・縦 4 kJ/mol & 356.51 & $-2.86$ & 0.17 & 3 & × & 収束 & ○ & 23.0 & 48.3 & 6 &  \\
+7 & \texttt{A\_\allowbreak{}Tff\_\allowbreak{}Arr} & 縦 2 kJ/mol & 356.44 & $-2.93$ & 0.10 & 1.92 & × & 収束 & ○ & 22.0 & 48.3 & 3 &  \\
+8 & \texttt{C\_\allowbreak{}noTff} & --- & 356.33 & $-3.04$ & --- & --- & --- & --- & --- & --- & --- &  &  \\
+9 & \texttt{A\_\allowbreak{}Tff\_\allowbreak{}WLF} & 縦 0 & 356.33 & $-3.04$ & 0.00 & 1.92 & × & 収束 & ○ & 21.6 & 47.5 & 1 &  \\
+ & \texttt{C} & --- & --- & --- & --- & --- & --- & --- & --- & 23.9 & 47.8 & 7 &  \\
+\bottomrule
+\end{tabular}
+\end{table}
+\begin{table}[H]\centering\footnotesize
+\caption{Tff か Tset か（組ごと・厚みごと）：通常版・PP（厚みごとの比較のノートの 5〜8 節。\texttt{05\_\allowbreak{}…/\allowbreak{}01\_\allowbreak{}バージンPP再々実験/\allowbreak{}01\_\allowbreak{}検討結果/\allowbreak{}01\_\allowbreak{}バージンPP再々実験\_\allowbreak{}シフト検討結果(5all学習データ)/\allowbreak{}全ショット版/\allowbreak{}厚みごと/\allowbreak{}シフトに使う温度/\allowbreak{}厚みごとの比較\_\allowbreak{}まとめ.csv}）}
+\begin{tabular}{llrrlrlrrll}
+\toprule
+厚み & 組 & (a) ずれ Tset \% & ずれ Tff \% & (a) & (b) $\Delta L$（Tff − Tset） & (b) & (c) 誤差 Tset \% & 誤差 Tff \% & (c) & 多数決 \\
+\midrule
+0.5 mm & \texttt{B\_\allowbreak{}Arr} & 1.8 & 1.3 & Tff & 1.33 & 差なし & 6.5 & 6.4 & 差なし & 差なし \\
+0.5 mm & \texttt{B\_\allowbreak{}WLF} & 1.9 & 1.3 & Tff & $-0.24$ & 差なし & 6.5 & 6.4 & 差なし & 差なし \\
+0.5 mm & \texttt{A\_\allowbreak{}Arr} & 2.3 & 2.1 & 差なし & $-0.19$ & 差なし & 6.5 & 6.4 & 差なし & 差なし \\
+0.5 mm & \texttt{A\_\allowbreak{}WLF} & 2.3 & 2.1 & 差なし & $-2.42$ & 差なし & 6.5 & 6.4 & 差なし & 差なし \\
+1 mm & \texttt{B\_\allowbreak{}Arr} & 1.6 & 1.2 & 差なし & 0.31 & 差なし & 5.7 & 5.5 & 差なし & 差なし \\
+1 mm & \texttt{B\_\allowbreak{}WLF} & 1.5 & 1.1 & 差なし & 2.04 & 差なし & 5.5 & 5.3 & 差なし & 差なし \\
+1 mm & \texttt{A\_\allowbreak{}Arr} & 2.8 & 2.2 & Tff & 1.62 & 差なし & 5.6 & 5.5 & 差なし & 差なし \\
+1 mm & \texttt{A\_\allowbreak{}WLF} & 2.8 & 2.0 & Tff & 1.97 & 差なし & 5.5 & 5.3 & 差なし & 差なし \\
+1.5 mm & \texttt{B\_\allowbreak{}Arr} & 1.8 & 2.0 & 差なし & $-0.38$ & 差なし & 16.5 & 16.7 & 差なし & 差なし \\
+1.5 mm & \texttt{B\_\allowbreak{}WLF} & 1.8 & 2.0 & 差なし & $-0.64$ & 差なし & 16.5 & 16.6 & 差なし & 差なし \\
+1.5 mm & \texttt{A\_\allowbreak{}Arr} & 3.0 & 2.8 & 差なし & $-0.40$ & 差なし & 16.4 & 16.7 & 差なし & 差なし \\
+1.5 mm & \texttt{A\_\allowbreak{}WLF} & 3.0 & 2.7 & 差なし & $-0.64$ & 差なし & 16.5 & 16.6 & 差なし & 差なし \\
+2 mm & \texttt{B\_\allowbreak{}Arr} & 4.3 & 4.5 & 差なし & $-2.86$ & 差なし & 46.4 & 48.3 & Tset & 差なし \\
+2 mm & \texttt{B\_\allowbreak{}WLF} & 4.3 & 4.5 & 差なし & $-1.78$ & 差なし & 46.2 & 47.5 & Tset & 差なし \\
+2 mm & \texttt{A\_\allowbreak{}Arr} & 4.7 & 5.0 & 差なし & $-2.93$ & 差なし & 46.2 & 48.3 & Tset & 差なし \\
+2 mm & \texttt{A\_\allowbreak{}WLF} & 4.7 & 5.0 & 差なし & $-1.95$ & 差なし & 46.2 & 47.5 & Tset & 差なし \\
+\bottomrule
+\end{tabular}
+\end{table}
+\clearpage
+\subsection{通常版・粉砕材混合 PP（本番：\texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr}）}
+\begin{table}[H]\centering\footnotesize
+\caption{厚みごとのランキング：通常版・粉砕材混合 PP・厚み 0.5 mm（学習の条件 21。LML の大きい順）}
+\begin{tabular}{rlp{11\zw}rrrrccc rrrl}
+\toprule
+順位 & モデル & 係数（厚みごと） & LML & 最大との差 & $\Delta$LML & 基準 & 支持 & 取り直し & 確認 & 誤差 厚みごと & 誤差 総合 & 誤差順位 & 印 \\
+\midrule
+1 & \texttt{B\_\allowbreak{}Tset\_\allowbreak{}Arr} & 横 2・縦 12 kJ/mol & 297.09 & 0.00 & 12.80 & 3 & ○ & 収束 & ○ & 0.9 & 1.3 & 3 &  \\
+2 & \textbf{\texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr}} & 縦 8 kJ/mol & 296.52 & $-0.57$ & 12.23 & 1.92 & ○ & 収束 & ○ & 1.0 & 1.3 & 6 & \textbf{本番}・厚みの規則 \\
+3 & \texttt{B\_\allowbreak{}Tset\_\allowbreak{}WLF} & 横 1.75・縦 8.75 & 296.28 & $-0.80$ & 12.00 & 3 & ○ & 収束 & ○ & 1.0 & 1.4 & 8 &  \\
+4 & \texttt{A\_\allowbreak{}Tset\_\allowbreak{}WLF} & 縦 5.75 & 295.55 & $-1.53$ & 11.27 & 1.92 & ○ & 収束 & ○ & 1.0 & 1.3 & 9 &  \\
+5 & \texttt{B\_\allowbreak{}Tff\_\allowbreak{}Arr} & 横 2・縦 2 kJ/mol & 295.09 & $-1.99$ & 0.96 & 3 & × & 収束 & △ & 0.9 & 1.4 & 2 &  \\
+6 & \texttt{B\_\allowbreak{}Tff\_\allowbreak{}WLF} & 横 1.75・縦 2.25 & 294.81 & $-2.28$ & 3.02 & 3 & ○ & \textbf{未収束} & △ & 0.9 & 1.4 & 1 &  \\
+7 & \texttt{A\_\allowbreak{}Tff\_\allowbreak{}Arr} & 縦 $-2.5$ kJ/mol\textsuperscript{§} & 294.78 & $-2.30$ & 0.64 & 1.92 & × & 収束 & △ & 1.0 & 1.4 & 7 &  \\
+8 & \texttt{C\_\allowbreak{}noTff} & --- & 294.14 & $-2.95$ & --- & --- & --- & --- & --- & --- & --- &  &  \\
+9 & \texttt{A\_\allowbreak{}Tff\_\allowbreak{}WLF} & 縦 $-2.25$\textsuperscript{§} & 292.84 & $-4.25$ & 1.05 & 1.92 & × & 収束 & △ & 0.9 & 1.4 & 4 &  \\
+ & \texttt{C} & --- & --- & --- & --- & --- & --- & --- & --- & 0.9 & 1.4 & 5 &  \\
+\bottomrule
+\end{tabular}
+\end{table}
+\begin{table}[H]\centering\footnotesize
+\caption{厚みごとのランキング：通常版・粉砕材混合 PP・厚み 1 mm（学習の条件 24。LML の大きい順）}
+\begin{tabular}{rlp{11\zw}rrrrccc rrrl}
+\toprule
+順位 & モデル & 係数（厚みごと） & LML & 最大との差 & $\Delta$LML & 基準 & 支持 & 取り直し & 確認 & 誤差 厚みごと & 誤差 総合 & 誤差順位 & 印 \\
+\midrule
+1 & \texttt{B\_\allowbreak{}Tset\_\allowbreak{}Arr} & 横 0・縦 4 kJ/mol & 346.00 & 0.00 & 0.94 & 3 & × & 収束 & ○ & 4.0 & 2.8 & 3 &  \\
+1 & \textbf{\texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr}} & 縦 4 kJ/mol & 346.00 & 0.00 & 0.94 & 1.92 & × & 収束 & ○ & 4.0 & 2.8 & 3 & \textbf{本番} \\
+3 & \texttt{B\_\allowbreak{}Tset\_\allowbreak{}WLF} & 横 $-0.25$・縦 1.25 & 345.86 & $-0.13$ & 0.80 & 3 & × & 収束 & ○ & 3.9 & 2.7 & 1 &  \\
+4 & \texttt{B\_\allowbreak{}Tff\_\allowbreak{}WLF} & 横 $-0.25$・縦 $-2$\textsuperscript{§} & 345.75 & $-0.25$ & 0.18 & 3 & × & 収束 & △ & 4.1 & 2.9 & 6 &  \\
+5 & \texttt{A\_\allowbreak{}Tff\_\allowbreak{}WLF} & 縦 $-1.5$\textsuperscript{§} & 345.75 & $-0.25$ & 0.18 & 1.92 & × & 収束 & △ & 4.2 & 3.0 & 9 &  \\
+6 & \texttt{A\_\allowbreak{}Tset\_\allowbreak{}WLF} & 縦 2 & 345.71 & $-0.29$ & 0.64 & 1.92 & × & 収束 & ○ & 4.1 & 2.9 & 5 &  \\
+7 & \texttt{A\_\allowbreak{}Tff\_\allowbreak{}Arr} & 縦 $-1.5$ kJ/mol\textsuperscript{§} & 345.63 & $-0.36$ & 0.07 & 1.92 & × & 収束 & △ & 4.2 & 3.0 & 7 &  \\
+8 & \texttt{B\_\allowbreak{}Tff\_\allowbreak{}Arr} & 横 0・縦 $-1$ kJ/mol\textsuperscript{§} & 345.63 & $-0.37$ & 0.06 & 3 & × & 収束 & △ & 4.2 & 3.0 & 8 &  \\
+9 & \texttt{C\_\allowbreak{}noTff} & --- & 345.57 & $-0.43$ & --- & --- & --- & --- & --- & --- & --- &  &  \\
+ & \texttt{C} & --- & --- & --- & --- & --- & --- & --- & --- & 4.0 & 2.7 & 2 & 厚みの規則 \\
+\bottomrule
+\end{tabular}
+\end{table}
+\begin{table}[H]\centering\footnotesize
+\caption{厚みごとのランキング：通常版・粉砕材混合 PP・厚み 1.5 mm（学習の条件 24。LML の大きい順）}
+\begin{tabular}{rlp{11\zw}rrrrccc rrrl}
+\toprule
+順位 & モデル & 係数（厚みごと） & LML & 最大との差 & $\Delta$LML & 基準 & 支持 & 取り直し & 確認 & 誤差 厚みごと & 誤差 総合 & 誤差順位 & 印 \\
+\midrule
+1 & \texttt{B\_\allowbreak{}Tff\_\allowbreak{}Arr} & 横 0・縦 $-7$ kJ/mol\textsuperscript{§} & 363.13 & 0.00 & 0.73 & 3 & × & 収束 & △ & 9.6 & 19.1 & 8 &  \\
+1 & \texttt{A\_\allowbreak{}Tff\_\allowbreak{}Arr} & 縦 $-7$ kJ/mol\textsuperscript{§} & 363.13 & 0.00 & 0.73 & 1.92 & × & 収束 & △ & 9.6 & 18.8 & 8 &  \\
+3 & \texttt{B\_\allowbreak{}Tff\_\allowbreak{}WLF} & 横 0・縦 $-2$\textsuperscript{§} & 362.65 & $-0.48$ & 0.26 & 3 & × & 収束 & △ & 7.3 & 18.6 & 5 &  \\
+3 & \texttt{A\_\allowbreak{}Tff\_\allowbreak{}WLF} & 縦 $-2$\textsuperscript{§} & 362.65 & $-0.48$ & 0.26 & 1.92 & × & 収束 & △ & 7.3 & 19.1 & 5 &  \\
+5 & \texttt{C\_\allowbreak{}noTff} & --- & 362.39 & $-0.73$ & --- & --- & --- & --- & --- & --- & --- &  &  \\
+6 & \textbf{\texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr}} & 縦 4.5 kJ/mol & 362.35 & $-0.77$ & 1.22 & 1.92 & × & 収束 & ○ & 5.9 & 20.1 & 1 & \textbf{本番} \\
+7 & \texttt{B\_\allowbreak{}Tset\_\allowbreak{}Arr} & 横 0・縦 4 kJ/mol & 362.35 & $-0.78$ & 1.21 & 3 & × & 収束 & ○ & 6.0 & 19.6 & 2 &  \\
+8 & \texttt{B\_\allowbreak{}Tset\_\allowbreak{}WLF} & 横 0.25・縦 2.25 & 361.88 & $-1.24$ & 0.74 & 3 & × & 収束 & ○ & 6.4 & 21.4 & 3 &  \\
+9 & \texttt{A\_\allowbreak{}Tset\_\allowbreak{}WLF} & 縦 1.75 & 361.87 & $-1.26$ & 0.73 & 1.92 & × & 収束 & ○ & 6.5 & 21.7 & 4 &  \\
+ & \texttt{C} & --- & --- & --- & --- & --- & --- & --- & --- & 9.2 & 18.2 & 7 & 厚みの規則 \\
+\bottomrule
+\end{tabular}
+\end{table}
+\begin{table}[H]\centering\footnotesize
+\caption{厚みごとのランキング：通常版・粉砕材混合 PP・厚み 2 mm（学習の条件 24。LML の大きい順）}
+\begin{tabular}{rlp{11\zw}rrrrccc rrrl}
+\toprule
+順位 & モデル & 係数（厚みごと） & LML & 最大との差 & $\Delta$LML & 基準 & 支持 & 取り直し & 確認 & 誤差 厚みごと & 誤差 総合 & 誤差順位 & 印 \\
+\midrule
+1 & \texttt{B\_\allowbreak{}Tff\_\allowbreak{}WLF} & 横 $-0.5$・縦 $-4.25$\textsuperscript{§} & 384.59 & 0.00 & 5.26 & 3 & ○ & 収束 & △ & 16.1 & 32.5 & 3 &  \\
+2 & \texttt{A\_\allowbreak{}Tff\_\allowbreak{}WLF} & 縦 $-3.5$\textsuperscript{§} & 383.73 & $-0.87$ & 4.39 & 1.92 & ○ & 収束 & △ & 15.4 & 32.9 & 1 & 厚みの規則 \\
+3 & \texttt{B\_\allowbreak{}Tff\_\allowbreak{}Arr} & 横 $-1$・縦 $-7$ kJ/mol\textsuperscript{§} & 383.17 & $-1.42$ & 3.84 & 3 & ○ & 収束 & △ & 16.6 & 32.9 & 7 &  \\
+4 & \texttt{A\_\allowbreak{}Tff\_\allowbreak{}Arr} & 縦 $-5$ kJ/mol\textsuperscript{§} & 382.52 & $-2.07$ & 3.18 & 1.92 & ○ & 収束 & △ & 15.8 & 32.6 & 2 &  \\
+5 & \texttt{C\_\allowbreak{}noTff} & --- & 379.33 & $-5.26$ & --- & --- & --- & --- & --- & --- & --- &  &  \\
+6 & \texttt{B\_\allowbreak{}Tset\_\allowbreak{}Arr} & 横 $-1$・縦 1 kJ/mol & 378.59 & $-6.00$ & 0.84 & 3 & × & 収束 & ○ & 16.2 & 32.5 & 5 &  \\
+7 & \textbf{\texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr}} & 縦 3 kJ/mol & 378.41 & $-6.18$ & 0.66 & 1.92 & × & 収束 & ○ & 16.2 & 32.8 & 6 & \textbf{本番} \\
+8 & \texttt{B\_\allowbreak{}Tset\_\allowbreak{}WLF} & 横 $-0.5$・縦 $-0.75$\textsuperscript{§} & 378.19 & $-6.40$ & 0.45 & 3 & × & 収束 & ○ & 17.4 & 33.8 & 9 &  \\
+9 & \texttt{A\_\allowbreak{}Tset\_\allowbreak{}WLF} & 縦 0.25 & 377.75 & $-6.84$ & 0.00 & 1.92 & × & 収束 & ○ & 17.4 & 34.2 & 8 &  \\
+ & \texttt{C} & --- & --- & --- & --- & --- & --- & --- & --- & 16.1 & 30.9 & 4 &  \\
+\bottomrule
+\end{tabular}
+\end{table}
+\begin{table}[H]\centering\footnotesize
+\caption{Tff か Tset か（組ごと・厚みごと）：通常版・粉砕材混合 PP（厚みごとの比較のノートの 5〜8 節。\texttt{05\_\allowbreak{}…/\allowbreak{}02\_\allowbreak{}粉砕材混合PP実験/\allowbreak{}02\_\allowbreak{}検討結果/\allowbreak{}02\_\allowbreak{}粉砕材混合PP実験\_\allowbreak{}検討結果(5all学習データ)/\allowbreak{}全ショット版/\allowbreak{}厚みごと/\allowbreak{}シフトに使う温度/\allowbreak{}厚みごとの比較\_\allowbreak{}まとめ.csv}）}
+\begin{tabular}{llrrlrlrrll}
+\toprule
+厚み & 組 & (a) ずれ Tset \% & ずれ Tff \% & (a) & (b) $\Delta L$（Tff − Tset） & (b) & (c) 誤差 Tset \% & 誤差 Tff \% & (c) & 多数決 \\
+\midrule
+0.5 mm & \texttt{B\_\allowbreak{}Arr} & 1.7 & 1.1 & Tff & $-1.99$ & 差なし & 1.3 & 1.4 & 差なし & 差なし \\
+0.5 mm & \texttt{B\_\allowbreak{}WLF} & 1.7 & 1.1 & Tff & $-1.47$ & 差なし & 1.4 & 1.4 & 差なし & 差なし \\
+0.5 mm & \texttt{A\_\allowbreak{}Arr} & 2.1 & 1.8 & 差なし & $-1.73$ & 差なし & 1.3 & 1.4 & 差なし & 差なし \\
+0.5 mm & \texttt{A\_\allowbreak{}WLF} & 2.1 & 1.7 & 差なし & $-2.71$ & 差なし & 1.3 & 1.4 & 差なし & 差なし \\
+1 mm & \texttt{B\_\allowbreak{}Arr} & 1.8 & 1.5 & 差なし & $-0.37$ & 差なし & 2.8 & 3.0 & 差なし & 差なし \\
+1 mm & \texttt{B\_\allowbreak{}WLF} & 1.8 & 1.5 & 差なし & $-0.11$ & 差なし & 2.7 & 2.9 & 差なし & 差なし \\
+1 mm & \texttt{A\_\allowbreak{}Arr} & 2.5 & 2.1 & 差なし & $-0.36$ & 差なし & 2.8 & 3.0 & 差なし & 差なし \\
+1 mm & \texttt{A\_\allowbreak{}WLF} & 2.5 & 2.0 & Tff & 0.04 & 差なし & 2.9 & 3.0 & 差なし & 差なし \\
+1.5 mm & \texttt{B\_\allowbreak{}Arr} & 3.7 & 4.1 & 差なし & 0.78 & 差なし & 19.6 & 19.1 & 差なし & 差なし \\
+1.5 mm & \texttt{B\_\allowbreak{}WLF} & 3.7 & 4.2 & 差なし & 0.77 & 差なし & 21.4 & 18.6 & Tff & 差なし \\
+1.5 mm & \texttt{A\_\allowbreak{}Arr} & 4.7 & 4.9 & 差なし & 0.77 & 差なし & 20.1 & 18.8 & Tff & 差なし \\
+1.5 mm & \texttt{A\_\allowbreak{}WLF} & 4.7 & 5.0 & 差なし & 0.78 & 差なし & 21.7 & 19.1 & Tff & 差なし \\
+2 mm & \texttt{B\_\allowbreak{}Arr} & 4.8 & 4.8 & 差なし & 4.58 & Tff & 32.5 & 32.9 & 差なし & 差なし \\
+2 mm & \texttt{B\_\allowbreak{}WLF} & 4.8 & 4.8 & 差なし & 6.40 & Tff & 33.8 & 32.5 & Tff & \textbf{Tff} \\
+2 mm & \texttt{A\_\allowbreak{}Arr} & 5.2 & 5.5 & 差なし & 4.11 & Tff & 32.8 & 32.6 & 差なし & 差なし \\
+2 mm & \texttt{A\_\allowbreak{}WLF} & 5.2 & 5.5 & 差なし & 5.98 & Tff & 34.2 & 32.9 & Tff & \textbf{Tff} \\
+\bottomrule
+\end{tabular}
+\end{table}
+\clearpage
+\subsection{通常版・GPPS（本番：\texttt{B\_\allowbreak{}Tset\_\allowbreak{}Arr}）}
+\begin{table}[H]\centering\footnotesize
+\caption{厚みごとのランキング：通常版・GPPS・厚み 1 mm（学習の条件 24。LML の大きい順）}
+\begin{tabular}{rlp{11\zw}rrrrccc rrrl}
+\toprule
+順位 & モデル & 係数（厚みごと） & LML & 最大との差 & $\Delta$LML & 基準 & 支持 & 取り直し & 確認 & 誤差 厚みごと & 誤差 総合 & 誤差順位 & 印 \\
+\midrule
+1 & \textbf{\texttt{B\_\allowbreak{}Tset\_\allowbreak{}Arr}} & 横 5・縦 16 kJ/mol & 323.54 & 0.00 & 11.44 & 3 & ○ & 収束 & ○ & 2.3 & 9.0 & 2 & \textbf{本番}・厚みの規則 \\
+2 & \texttt{B\_\allowbreak{}Tff\_\allowbreak{}WLF} & 横 1.5・縦 3 & 323.51 & $-0.04$ & 2.80 & 3 & × & 収束 & ○ & 2.4 & 9.0 & 3 &  \\
+3 & \texttt{B\_\allowbreak{}Tff\_\allowbreak{}Arr} & 横 6・縦 13 kJ/mol & 323.44 & $-0.10$ & 2.73 & 3 & × & 収束 & △ & 2.2 & 8.6 & 1 &  \\
+4 & \texttt{B\_\allowbreak{}Tset\_\allowbreak{}WLF} & 横 1.5・縦 4.25 & 322.10 & $-1.45$ & 9.99 & 3 & ○ & 収束 & ○ & 2.6 & 9.0 & 4 &  \\
+5 & \texttt{A\_\allowbreak{}Tff\_\allowbreak{}WLF} & 縦 $-0.25$\textsuperscript{§} & 320.77 & $-2.78$ & 0.06 & 1.92 & × & 収束 & △ & 3.0 & 9.2 & 5 &  \\
+6 & \texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr} & 縦 6.5 kJ/mol & 320.76 & $-2.79$ & 8.65 & 1.92 & ○ & 収束 & ○ & 3.3 & 9.2 & 8 &  \\
+7 & \texttt{A\_\allowbreak{}Tff\_\allowbreak{}Arr} & 縦 0 kJ/mol & 320.71 & $-2.83$ & 0.00 & 1.92 & × & 収束 & △ & 3.0 & 8.8 & 6 &  \\
+7 & \texttt{C\_\allowbreak{}noTff} & --- & 320.71 & $-2.83$ & --- & --- & --- & --- & --- & --- & --- &  &  \\
+9 & \texttt{A\_\allowbreak{}Tset\_\allowbreak{}WLF} & 縦 1.25 & 319.13 & $-4.41$ & 7.02 & 1.92 & ○ & 収束 & ○ & 3.4 & 9.3 & 9 &  \\
+ & \texttt{C} & --- & --- & --- & --- & --- & --- & --- & --- & 3.2 & 8.9 & 7 &  \\
+\bottomrule
+\end{tabular}
+\end{table}
+\begin{table}[H]\centering\footnotesize
+\caption{厚みごとのランキング：通常版・GPPS・厚み 1.5 mm（学習の条件 24。LML の大きい順）}
+\begin{tabular}{rlp{11\zw}rrrrccc rrrl}
+\toprule
+順位 & モデル & 係数（厚みごと） & LML & 最大との差 & $\Delta$LML & 基準 & 支持 & 取り直し & 確認 & 誤差 厚みごと & 誤差 総合 & 誤差順位 & 印 \\
+\midrule
+1 & \texttt{B\_\allowbreak{}Tset\_\allowbreak{}WLF} & 横 0.5・縦 2.75 & 308.54 & 0.00 & 13.47 & 3 & ○ & 収束 & ○ & 22.7 & 9.8 & 8 & 厚みの規則 \\
+2 & \textbf{\texttt{B\_\allowbreak{}Tset\_\allowbreak{}Arr}} & 横 2・縦 12 kJ/mol & 307.67 & $-0.88$ & 12.59 & 3 & ○ & 収束 & ○ & 20.5 & 9.3 & 6 & \textbf{本番} \\
+3 & \texttt{A\_\allowbreak{}Tset\_\allowbreak{}WLF} & 縦 1.75 & 306.42 & $-2.12$ & 11.34 & 1.92 & ○ & 収束 & ○ & 23.1 & 9.2 & 9 &  \\
+4 & \texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr} & 縦 9.5 kJ/mol & 305.78 & $-2.76$ & 10.71 & 1.92 & ○ & 収束 & ○ & 20.5 & 8.9 & 5 &  \\
+5 & \texttt{B\_\allowbreak{}Tff\_\allowbreak{}Arr} & 横 2・縦 1 kJ/mol & 302.80 & $-5.74$ & 2.54 & 3 & × & 収束 & △ & 20.3 & 9.6 & 4 &  \\
+6 & \texttt{B\_\allowbreak{}Tff\_\allowbreak{}WLF} & 横 0.75・縦 1.75 & 302.41 & $-6.13$ & 2.15 & 3 & × & 収束 & ○ & 19.1 & 9.3 & 1 &  \\
+7 & \texttt{A\_\allowbreak{}Tff\_\allowbreak{}Arr} & 縦 $-4$ kJ/mol\textsuperscript{§} & 301.14 & $-7.41$ & 0.88 & 1.92 & × & 収束 & △ & 20.9 & 9.7 & 7 &  \\
+8 & \texttt{A\_\allowbreak{}Tff\_\allowbreak{}WLF} & 縦 0 & 300.26 & $-8.29$ & 0.00 & 1.92 & × & 収束 & △ & 19.4 & 9.4 & 2 &  \\
+8 & \texttt{C\_\allowbreak{}noTff} & --- & 300.26 & $-8.29$ & --- & --- & --- & --- & --- & --- & --- &  &  \\
+ & \texttt{C} & --- & --- & --- & --- & --- & --- & --- & --- & 19.8 & 9.7 & 3 &  \\
+\bottomrule
+\end{tabular}
+\end{table}
+\begin{table}[H]\centering\footnotesize
+\caption{厚みごとのランキング：通常版・GPPS・厚み 2 mm（学習の条件 24。LML の大きい順）}
+\begin{tabular}{rlp{11\zw}rrrrccc rrrl}
+\toprule
+順位 & モデル & 係数（厚みごと） & LML & 最大との差 & $\Delta$LML & 基準 & 支持 & 取り直し & 確認 & 誤差 厚みごと & 誤差 総合 & 誤差順位 & 印 \\
+\midrule
+1 & \texttt{B\_\allowbreak{}Tset\_\allowbreak{}WLF} & 横 0・縦 1.25 & 308.61 & 0.00 & 3.84 & 3 & ○ & 収束 & ○ & 19.7 & 14.9 & 3 &  \\
+1 & \texttt{A\_\allowbreak{}Tset\_\allowbreak{}WLF} & 縦 1.25 & 308.61 & 0.00 & 3.84 & 1.92 & ○ & 収束 & ○ & 19.7 & 15.4 & 3 & 厚みの規則 \\
+3 & \texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr} & 縦 6.5 kJ/mol & 307.50 & $-1.10$ & 2.73 & 1.92 & ○ & 収束 & ○ & 20.0 & 18.2 & 6 &  \\
+4 & \textbf{\texttt{B\_\allowbreak{}Tset\_\allowbreak{}Arr}} & 横 0・縦 6 kJ/mol & 307.49 & $-1.11$ & 2.72 & 3 & × & 収束 & ○ & 19.9 & 17.4 & 5 & \textbf{本番} \\
+5 & \texttt{B\_\allowbreak{}Tff\_\allowbreak{}WLF} & 横 0・縦 1.5 & 306.50 & $-2.11$ & 2.66 & 3 & × & 収束 & ○ & 19.6 & 19.2 & 1 &  \\
+5 & \texttt{A\_\allowbreak{}Tff\_\allowbreak{}WLF} & 縦 1.5 & 306.50 & $-2.11$ & 2.66 & 1.92 & ○ & 収束 & △ & 19.6 & 19.5 & 1 &  \\
+7 & \texttt{A\_\allowbreak{}Tff\_\allowbreak{}Arr} & 縦 4.5 kJ/mol & 304.64 & $-3.97$ & 0.80 & 1.92 & × & 収束 & △ & 20.6 & 20.6 & 9 &  \\
+8 & \texttt{B\_\allowbreak{}Tff\_\allowbreak{}Arr} & 横 0・縦 5 kJ/mol & 304.64 & $-3.97$ & 0.80 & 3 & × & 収束 & △ & 20.3 & 20.2 & 7 &  \\
+9 & \texttt{C\_\allowbreak{}noTff} & --- & 303.84 & $-4.77$ & --- & --- & --- & --- & --- & --- & --- &  &  \\
+ & \texttt{C} & --- & --- & --- & --- & --- & --- & --- & --- & 20.4 & 18.9 & 8 &  \\
+\bottomrule
+\end{tabular}
+\end{table}
+\begin{table}[H]\centering\footnotesize
+\caption{Tff か Tset か（組ごと・厚みごと）：通常版・GPPS（厚みごとの比較のノートの 5〜8 節。\texttt{05\_\allowbreak{}…/\allowbreak{}03\_\allowbreak{}GPPS実験/\allowbreak{}03\_\allowbreak{}検討結果/\allowbreak{}03\_\allowbreak{}GPPS実験\_\allowbreak{}検討結果(5all学習データ)/\allowbreak{}全ショット版/\allowbreak{}厚みごと/\allowbreak{}シフトに使う温度/\allowbreak{}厚みごとの比較\_\allowbreak{}まとめ.csv}）}
+\begin{tabular}{llrrlrlrrll}
+\toprule
+厚み & 組 & (a) ずれ Tset \% & ずれ Tff \% & (a) & (b) $\Delta L$（Tff − Tset） & (b) & (c) 誤差 Tset \% & 誤差 Tff \% & (c) & 多数決 \\
+\midrule
+1 mm & \texttt{B\_\allowbreak{}Arr} & 2.2 & 1.9 & 差なし & $-0.10$ & 差なし & 9.0 & 8.6 & 差なし & 差なし \\
+1 mm & \texttt{B\_\allowbreak{}WLF} & 2.2 & 1.8 & 差なし & 1.41 & 差なし & 9.0 & 9.0 & 差なし & 差なし \\
+1 mm & \texttt{A\_\allowbreak{}Arr} & 4.9 & 3.3 & Tff & $-0.05$ & 差なし & 9.2 & 8.8 & 差なし & 差なし \\
+1 mm & \texttt{A\_\allowbreak{}WLF} & 4.9 & 2.8 & Tff & 1.64 & 差なし & 9.3 & 9.2 & 差なし & 差なし \\
+1.5 mm & \texttt{B\_\allowbreak{}Arr} & 5.4 & 5.2 & 差なし & $-4.87$ & Tset & 9.3 & 9.6 & 差なし & 差なし \\
+1.5 mm & \texttt{B\_\allowbreak{}WLF} & 5.4 & 5.0 & 差なし & $-6.13$ & Tset & 9.8 & 9.3 & 差なし & 差なし \\
+1.5 mm & \texttt{A\_\allowbreak{}Arr} & 6.1 & 5.8 & 差なし & $-4.65$ & Tset & 8.9 & 9.7 & 差なし & 差なし \\
+1.5 mm & \texttt{A\_\allowbreak{}WLF} & 6.1 & 5.6 & Tff & $-6.16$ & Tset & 9.2 & 9.4 & 差なし & 差なし \\
+2 mm & \texttt{B\_\allowbreak{}Arr} & 5.6 & 5.4 & 差なし & $-2.86$ & 差なし & 17.4 & 20.2 & Tset & 差なし \\
+2 mm & \texttt{B\_\allowbreak{}WLF} & 5.6 & 5.3 & 差なし & $-2.11$ & 差なし & 14.9 & 19.2 & Tset & 差なし \\
+2 mm & \texttt{A\_\allowbreak{}Arr} & 5.8 & 5.9 & 差なし & $-2.87$ & 差なし & 18.2 & 20.6 & Tset & 差なし \\
+2 mm & \texttt{A\_\allowbreak{}WLF} & 5.8 & 5.9 & 差なし & $-2.11$ & 差なし & 15.4 & 19.5 & Tset & 差なし \\
+\bottomrule
+\end{tabular}
+\end{table}
+\clearpage
+\subsection{温度適切版・PP（本番：\texttt{C}）}
+\begin{table}[H]\centering\footnotesize
+\caption{厚みごとのランキング：温度適切版・PP・厚み 0.5 mm（学習の条件 12。LML の大きい順）}
+\begin{tabular}{rlp{11\zw}rrrrccc rrrl}
+\toprule
+順位 & モデル & 係数（厚みごと） & LML & 最大との差 & $\Delta$LML & 基準 & 支持 & 取り直し & 確認 & 誤差 厚みごと & 誤差 総合 & 誤差順位 & 印 \\
+\midrule
+1 & \texttt{B\_\allowbreak{}Tset\_\allowbreak{}WLF} & 横 17.5・縦 45.25 & 141.56 & 0.00 & 1.12 & 3 & × & 収束 & ○ & 1.9 & 5.4 & 3 &  \\
+2 & \texttt{B\_\allowbreak{}Tff\_\allowbreak{}WLF} & 横 18・縦 42.5 & 141.24 & $-0.32$ & 0.41 & 3 & × & \textbf{未収束} & △ & 1.8 & 5.3 & 1 &  \\
+3 & \texttt{B\_\allowbreak{}Tff\_\allowbreak{}Arr} & 横 25・縦 59 kJ/mol & 141.19 & $-0.36$ & 0.37 & 3 & × & 収束 & △ & 1.8 & 5.3 & 2 &  \\
+4 & \texttt{B\_\allowbreak{}Tset\_\allowbreak{}Arr} & 横 1・縦 9 kJ/mol & 140.99 & $-0.56$ & 2.37 & 3 & × & \textbf{未収束} & ○ & 1.9 & 5.4 & 5 &  \\
+5 & \texttt{A\_\allowbreak{}Tff\_\allowbreak{}Arr} & 縦 0 kJ/mol & 140.83 & $-0.73$ & 0.00 & 1.92 & × & 収束 & △ & 1.9 & 5.3 & 7 &  \\
+5 & \texttt{C\_\allowbreak{}noTff} & --- & 140.83 & $-0.73$ & --- & --- & --- & --- & --- & --- & --- &  &  \\
+7 & \texttt{A\_\allowbreak{}Tff\_\allowbreak{}WLF} & 縦 0 & 140.83 & $-0.73$ & 0.00 & 1.92 & × & 収束 & △ & 1.9 & 5.3 & 7 &  \\
+8 & \texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr} & 縦 5.5 kJ/mol & 140.19 & $-1.37$ & 0.24 & 1.92 & × & 収束 & ○ & 1.9 & 5.4 & 6 &  \\
+9 & \texttt{A\_\allowbreak{}Tset\_\allowbreak{}WLF} & 縦 2.5 & 140.09 & $-1.47$ & 0.14 & 1.92 & × & 収束 & ○ & 1.9 & 5.4 & 9 &  \\
+ & \textbf{\texttt{C}} & --- & --- & --- & --- & --- & --- & --- & --- & 1.9 & 5.2 & 4 & \textbf{本番}・厚みの規則 \\
+\bottomrule
+\end{tabular}
+\end{table}
+\begin{table}[H]\centering\footnotesize
+\caption{厚みごとのランキング：温度適切版・PP・厚み 1 mm（学習の条件 12。LML の大きい順）}
+\begin{tabular}{rlp{11\zw}rrrrccc rrrl}
+\toprule
+順位 & モデル & 係数（厚みごと） & LML & 最大との差 & $\Delta$LML & 基準 & 支持 & 取り直し & 確認 & 誤差 厚みごと & 誤差 総合 & 誤差順位 & 印 \\
+\midrule
+1 & \texttt{B\_\allowbreak{}Tff\_\allowbreak{}Arr} & 横 22・縦 22 kJ/mol & 168.37 & 0.00 & 4.32 & 3 & ○ & 収束 & △ & 1.0 & 3.2 & 1 &  \\
+2 & \texttt{B\_\allowbreak{}Tset\_\allowbreak{}Arr} & 横 22・縦 76 kJ/mol & 167.54 & $-0.83$ & 4.64 & 3 & ○ & \textbf{未収束} & ○ & 1.2 & 3.2 & 5 &  \\
+3 & \texttt{A\_\allowbreak{}Tff\_\allowbreak{}Arr} & 縦 $-33$ kJ/mol\textsuperscript{§} & 167.05 & $-1.32$ & 3.00 & 1.92 & ○ & 収束 & △ & 1.1 & 3.2 & 4 & 厚みの規則 \\
+4 & \texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr} & 縦 33 kJ/mol & 166.86 & $-1.51$ & 3.96 & 1.92 & ○ & 収束 & ○ & 1.4 & 3.2 & 9 &  \\
+5 & \texttt{A\_\allowbreak{}Tff\_\allowbreak{}WLF} & 縦 $-24.75$\textsuperscript{§} & 166.66 & $-1.71$ & 2.61 & 1.92 & ○ & 収束 & △ & 1.1 & 3.1 & 3 &  \\
+6 & \texttt{B\_\allowbreak{}Tff\_\allowbreak{}WLF} & 横 0.5・縦 $-23$\textsuperscript{§} & 166.65 & $-1.72$ & 2.59 & 3 & × & \textbf{未収束} & △ & 1.1 & 3.1 & 2 &  \\
+7 & \texttt{B\_\allowbreak{}Tset\_\allowbreak{}WLF} & 横 12.25・縦 48 & 166.16 & $-2.21$ & 8.21 & 3 & ○ & \textbf{未収束} & ○ & 1.2 & 3.3 & 6 &  \\
+8 & \texttt{A\_\allowbreak{}Tset\_\allowbreak{}WLF} & 縦 23.25 & 165.51 & $-2.86$ & 3.22 & 1.92 & ○ & 収束 & ○ & 1.3 & 3.3 & 8 &  \\
+9 & \texttt{C\_\allowbreak{}noTff} & --- & 164.05 & $-4.32$ & --- & --- & --- & --- & --- & --- & --- &  &  \\
+ & \textbf{\texttt{C}} & --- & --- & --- & --- & --- & --- & --- & --- & 1.3 & 2.9 & 7 & \textbf{本番} \\
+\bottomrule
+\end{tabular}
+\end{table}
+\begin{table}[H]\centering\footnotesize
+\caption{厚みごとのランキング：温度適切版・PP・厚み 1.5 mm（学習の条件 12。LML の大きい順）}
+\begin{tabular}{rlp{11\zw}rrrrccc rrrl}
+\toprule
+順位 & モデル & 係数（厚みごと） & LML & 最大との差 & $\Delta$LML & 基準 & 支持 & 取り直し & 確認 & 誤差 厚みごと & 誤差 総合 & 誤差順位 & 印 \\
+\midrule
+1 & \texttt{B\_\allowbreak{}Tset\_\allowbreak{}Arr} & 横 $-1$・縦 5 kJ/mol & 189.25 & 0.00 & 1.67 & 3 & × & 収束 & ○ & 4.3 & 6.1 & 4 &  \\
+2 & \texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr} & 縦 6 kJ/mol & 189.25 & 0.00 & 1.67 & 1.92 & × & 収束 & ○ & 4.7 & 6.1 & 7 &  \\
+3 & \texttt{B\_\allowbreak{}Tff\_\allowbreak{}WLF} & 横 $-0.5$・縦 $-0.5$\textsuperscript{§} & 188.21 & $-1.04$ & 0.07 & 3 & × & 収束 & △ & 4.1 & 6.3 & 1 &  \\
+4 & \texttt{B\_\allowbreak{}Tff\_\allowbreak{}Arr} & 横 $-1$・縦 $-2$ kJ/mol\textsuperscript{§} & 188.16 & $-1.09$ & 0.02 & 3 & × & 収束 & △ & 4.2 & 6.3 & 2 &  \\
+5 & \texttt{A\_\allowbreak{}Tff\_\allowbreak{}WLF} & 縦 0.25 & 188.15 & $-1.10$ & 0.01 & 1.92 & × & 収束 & △ & 4.4 & 6.3 & 6 &  \\
+6 & \texttt{A\_\allowbreak{}Tff\_\allowbreak{}Arr} & 縦 $-0.5$ kJ/mol\textsuperscript{§} & 188.15 & $-1.10$ & 0.01 & 1.92 & × & 収束 & △ & 4.7 & 6.3 & 8 &  \\
+7 & \texttt{C\_\allowbreak{}noTff} & --- & 188.14 & $-1.11$ & --- & --- & --- & --- & --- & --- & --- &  &  \\
+8 & \texttt{B\_\allowbreak{}Tset\_\allowbreak{}WLF} & 横 $-23.5$・縦 $-28$\textsuperscript{§} & 183.24 & $-6.01$ & 1.61 & 3 & × & \textbf{未収束} & ○ & 5.1 & 6.2 & 9 &  \\
+9 & \texttt{A\_\allowbreak{}Tset\_\allowbreak{}WLF} & 縦 12.75 & 183.04 & $-6.21$ & 1.40 & 1.92 & × & 収束 & ○ & 4.2 & 6.2 & 3 &  \\
+ & \textbf{\texttt{C}} & --- & --- & --- & --- & --- & --- & --- & --- & 4.3 & 6.1 & 5 & \textbf{本番}・厚みの規則 \\
+\bottomrule
+\end{tabular}
+\end{table}
+\begin{table}[H]\centering\footnotesize
+\caption{厚みごとのランキング：温度適切版・PP・厚み 2 mm（学習の条件 12。LML の大きい順）}
+\begin{tabular}{rlp{11\zw}rrrrccc rrrl}
+\toprule
+順位 & モデル & 係数（厚みごと） & LML & 最大との差 & $\Delta$LML & 基準 & 支持 & 取り直し & 確認 & 誤差 厚みごと & 誤差 総合 & 誤差順位 & 印 \\
+\midrule
+1 & \texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr} & 縦 $-12.5$ kJ/mol\textsuperscript{§} & 177.27 & 0.00 & 2.85 & 1.92 & ○ & 収束 & ○ & 10.9 & 3.5 & 3 & 厚みの規則 \\
+2 & \texttt{B\_\allowbreak{}Tset\_\allowbreak{}Arr} & 横 0・縦 $-12$ kJ/mol\textsuperscript{§} & 177.26 & 0.00 & 2.84 & 3 & × & 収束 & ○ & 11.0 & 3.5 & 4 &  \\
+3 & \texttt{B\_\allowbreak{}Tset\_\allowbreak{}WLF} & 横 0.25・縦 $-3.75$\textsuperscript{§} & 176.47 & $-0.80$ & 2.05 & 3 & × & 収束 & ○ & 11.1 & 3.8 & 8 &  \\
+4 & \texttt{A\_\allowbreak{}Tset\_\allowbreak{}WLF} & 縦 $-4.25$\textsuperscript{§} & 176.24 & $-1.02$ & 1.83 & 1.92 & × & 収束 & ○ & 11.0 & 3.8 & 5 &  \\
+5 & \texttt{B\_\allowbreak{}Tff\_\allowbreak{}Arr} & 横 1・縦 2 kJ/mol & 175.80 & $-1.46$ & 0.55 & 3 & × & 収束 & △ & 11.1 & 3.7 & 6 &  \\
+6 & \texttt{B\_\allowbreak{}Tff\_\allowbreak{}WLF} & 横 0.75・縦 1.25 & 175.78 & $-1.48$ & 0.53 & 3 & × & 収束 & △ & 11.2 & 3.7 & 9 &  \\
+7 & \texttt{A\_\allowbreak{}Tff\_\allowbreak{}Arr} & 縦 1.5 kJ/mol & 175.38 & $-1.89$ & 0.12 & 1.92 & × & 収束 & △ & 10.7 & 3.7 & 1 &  \\
+8 & \texttt{A\_\allowbreak{}Tff\_\allowbreak{}WLF} & 縦 0.25 & 175.27 & $-2.00$ & 0.01 & 1.92 & × & 収束 & △ & 11.1 & 3.7 & 7 &  \\
+9 & \texttt{C\_\allowbreak{}noTff} & --- & 175.26 & $-2.01$ & --- & --- & --- & --- & --- & --- & --- &  &  \\
+ & \textbf{\texttt{C}} & --- & --- & --- & --- & --- & --- & --- & --- & 10.9 & 3.3 & 2 & \textbf{本番} \\
+\bottomrule
+\end{tabular}
+\end{table}
+\begin{table}[H]\centering\footnotesize
+\caption{Tff か Tset か（組ごと・厚みごと）：温度適切版・PP（厚みごとの比較のノートの 5〜8 節。\texttt{05\_\allowbreak{}…/\allowbreak{}01\_\allowbreak{}バージンPP再々実験/\allowbreak{}01\_\allowbreak{}検討結果/\allowbreak{}01\_\allowbreak{}バージンPP再々実験\_\allowbreak{}シフト検討結果(5適切学習データ)/\allowbreak{}全ショット版/\allowbreak{}厚みごと/\allowbreak{}シフトに使う温度/\allowbreak{}厚みごとの比較\_\allowbreak{}まとめ.csv}）}
+\begin{tabular}{llrrlrlrrll}
+\toprule
+厚み & 組 & (a) ずれ Tset \% & ずれ Tff \% & (a) & (b) $\Delta L$（Tff − Tset） & (b) & (c) 誤差 Tset \% & 誤差 Tff \% & (c) & 多数決 \\
+\midrule
+0.5 mm & \texttt{B\_\allowbreak{}Arr} & 0.6 & 0.7 & 差なし & 0.20 & 差なし & 5.4 & 5.3 & 差なし & 差なし \\
+0.5 mm & \texttt{B\_\allowbreak{}WLF} & 0.6 & 0.8 & 差なし & $-0.32$ & 差なし & 5.4 & 5.3 & 差なし & 差なし \\
+0.5 mm & \texttt{A\_\allowbreak{}Arr} & 1.0 & 1.1 & 差なし & 0.64 & 差なし & 5.4 & 5.3 & 差なし & 差なし \\
+0.5 mm & \texttt{A\_\allowbreak{}WLF} & 1.0 & 1.1 & 差なし & 0.74 & 差なし & 5.4 & 5.3 & 差なし & 差なし \\
+1 mm & \texttt{B\_\allowbreak{}Arr} & 0.3 & 0.3 & 差なし & 0.83 & 差なし & 3.2 & 3.2 & 差なし & 差なし \\
+1 mm & \texttt{B\_\allowbreak{}WLF} & 0.6 & 0.3 & 差なし & 0.48 & 差なし & 3.3 & 3.1 & 差なし & 差なし \\
+1 mm & \texttt{A\_\allowbreak{}Arr} & 0.7 & 0.6 & 差なし & 0.19 & 差なし & 3.2 & 3.2 & 差なし & 差なし \\
+1 mm & \texttt{A\_\allowbreak{}WLF} & 0.7 & 0.6 & 差なし & 1.15 & 差なし & 3.3 & 3.1 & 差なし & 差なし \\
+1.5 mm & \texttt{B\_\allowbreak{}Arr} & 0.5 & 0.5 & 差なし & $-1.09$ & 差なし & 6.1 & 6.3 & 差なし & 差なし \\
+1.5 mm & \texttt{B\_\allowbreak{}WLF} & 1.0 & 0.5 & 差なし & 4.97 & Tff & 6.2 & 6.3 & 差なし & 差なし \\
+1.5 mm & \texttt{A\_\allowbreak{}Arr} & 1.3 & 1.1 & 差なし & $-1.10$ & 差なし & 6.1 & 6.3 & 差なし & 差なし \\
+1.5 mm & \texttt{A\_\allowbreak{}WLF} & 1.3 & 1.1 & 差なし & 5.12 & Tff & 6.2 & 6.3 & 差なし & 差なし \\
+2 mm & \texttt{B\_\allowbreak{}Arr} & 0.7 & 0.7 & 差なし & $-1.46$ & 差なし & 3.5 & 3.7 & 差なし & 差なし \\
+2 mm & \texttt{B\_\allowbreak{}WLF} & 0.7 & 0.7 & 差なし & $-0.69$ & 差なし & 3.8 & 3.7 & 差なし & 差なし \\
+2 mm & \texttt{A\_\allowbreak{}Arr} & 1.4 & 1.2 & 差なし & $-1.89$ & 差なし & 3.5 & 3.7 & 差なし & 差なし \\
+2 mm & \texttt{A\_\allowbreak{}WLF} & 1.4 & 1.2 & 差なし & $-0.98$ & 差なし & 3.8 & 3.7 & 差なし & 差なし \\
+\bottomrule
+\end{tabular}
+\end{table}
+\clearpage
+\subsection{温度適切版・粉砕材混合 PP（本番：\texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr}）}
+\begin{table}[H]\centering\footnotesize
+\caption{厚みごとのランキング：温度適切版・粉砕材混合 PP・厚み 0.5 mm（学習の条件 12。LML の大きい順）}
+\begin{tabular}{rlp{11\zw}rrrrccc rrrl}
+\toprule
+順位 & モデル & 係数（厚みごと） & LML & 最大との差 & $\Delta$LML & 基準 & 支持 & 取り直し & 確認 & 誤差 厚みごと & 誤差 総合 & 誤差順位 & 印 \\
+\midrule
+1 & \texttt{B\_\allowbreak{}Tset\_\allowbreak{}WLF} & 横 9・縦 28.5 & 172.72 & 0.00 & 5.26 & 3 & ○ & 収束 & ○ & 1.1 & 1.9 & 6 &  \\
+2 & \texttt{A\_\allowbreak{}Tset\_\allowbreak{}WLF} & 縦 10 & 172.62 & $-0.10$ & 5.16 & 1.92 & ○ & 収束 & ○ & 1.3 & 1.8 & 8 & 厚みの規則 \\
+3 & \texttt{B\_\allowbreak{}Tset\_\allowbreak{}Arr} & 横 13・縦 39 kJ/mol & 172.58 & $-0.14$ & 5.11 & 3 & ○ & 収束 & ○ & 1.1 & 1.7 & 3 &  \\
+4 & \textbf{\texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr}} & 縦 13 kJ/mol & 171.75 & $-0.97$ & 4.28 & 1.92 & ○ & 収束 & ○ & 1.3 & 1.6 & 7 & \textbf{本番} \\
+5 & \texttt{B\_\allowbreak{}Tff\_\allowbreak{}WLF} & 横 15.25・縦 34.75 & 171.64 & $-1.08$ & 2.15 & 3 & × & 収束 & △ & 1.1 & 1.9 & 5 &  \\
+6 & \texttt{B\_\allowbreak{}Tff\_\allowbreak{}Arr} & 横 19・縦 43 kJ/mol & 171.60 & $-1.12$ & 2.10 & 3 & × & 収束 & △ & 1.1 & 1.9 & 4 &  \\
+7 & \texttt{A\_\allowbreak{}Tff\_\allowbreak{}Arr} & 縦 $-1$ kJ/mol\textsuperscript{§} & 169.57 & $-3.15$ & 0.08 & 1.92 & × & 収束 & △ & 1.0 & 1.6 & 2 &  \\
+8 & \texttt{A\_\allowbreak{}Tff\_\allowbreak{}WLF} & 縦 $-0.5$\textsuperscript{§} & 169.56 & $-3.16$ & 0.06 & 1.92 & × & 収束 & △ & 0.9 & 1.8 & 1 &  \\
+9 & \texttt{C\_\allowbreak{}noTff} & --- & 169.50 & $-3.22$ & --- & --- & --- & --- & --- & --- & --- &  &  \\
+ & \texttt{C} & --- & --- & --- & --- & --- & --- & --- & --- & 1.3 & 1.5 & 9 &  \\
+\bottomrule
+\end{tabular}
+\end{table}
+\begin{table}[H]\centering\footnotesize
+\caption{厚みごとのランキング：温度適切版・粉砕材混合 PP・厚み 1 mm（学習の条件 12。LML の大きい順）}
+\begin{tabular}{rlp{11\zw}rrrrccc rrrl}
+\toprule
+順位 & モデル & 係数（厚みごと） & LML & 最大との差 & $\Delta$LML & 基準 & 支持 & 取り直し & 確認 & 誤差 厚みごと & 誤差 総合 & 誤差順位 & 印 \\
+\midrule
+1 & \texttt{A\_\allowbreak{}Tset\_\allowbreak{}WLF} & 縦 7.25 & 173.06 & 0.00 & 6.03 & 1.92 & ○ & \textbf{未収束} & ○ & 1.9 & 2.8 & 3 & 厚みの規則 \\
+2 & \textbf{\texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr}} & 縦 11 kJ/mol & 173.03 & $-0.03$ & 2.40 & 1.92 & ○ & 収束 & ○ & 2.0 & 2.6 & 4 & \textbf{本番} \\
+3 & \texttt{B\_\allowbreak{}Tset\_\allowbreak{}Arr} & 横 $-26$・縦 $-34$ kJ/mol\textsuperscript{§} & 172.00 & $-1.06$ & 4.97 & 3 & ○ & \textbf{未収束} & ○ & 1.6 & 2.7 & 1 &  \\
+4 & \texttt{B\_\allowbreak{}Tff\_\allowbreak{}WLF} & 横 $-0.75$・縦 $-1.5$\textsuperscript{§} & 171.69 & $-1.37$ & 0.52 & 3 & × & 収束 & △ & 2.3 & 2.6 & 7 &  \\
+5 & \texttt{B\_\allowbreak{}Tff\_\allowbreak{}Arr} & 横 $-1$・縦 $-2$ kJ/mol\textsuperscript{§} & 171.62 & $-1.44$ & 0.45 & 3 & × & 収束 & △ & 2.3 & 2.6 & 6 &  \\
+6 & \texttt{B\_\allowbreak{}Tset\_\allowbreak{}WLF} & 横 $-19.5$・縦 $-27.5$\textsuperscript{§} & 171.58 & $-1.48$ & 4.55 & 3 & ○ & \textbf{未収束} & ○ & 1.6 & 2.6 & 2 &  \\
+7 & \texttt{A\_\allowbreak{}Tff\_\allowbreak{}Arr} & 縦 $-0.5$ kJ/mol\textsuperscript{§} & 171.19 & $-1.87$ & 0.02 & 1.92 & × & 収束 & △ & 2.4 & 2.9 & 8 &  \\
+8 & \texttt{C\_\allowbreak{}noTff} & --- & 171.17 & $-1.89$ & --- & --- & --- & --- & --- & --- & --- &  &  \\
+9 & \texttt{A\_\allowbreak{}Tff\_\allowbreak{}WLF} & 縦 0 & 171.17 & $-1.89$ & 0.00 & 1.92 & × & 収束 & △ & 2.5 & 2.7 & 9 &  \\
+ & \texttt{C} & --- & --- & --- & --- & --- & --- & --- & --- & 2.2 & 2.9 & 5 &  \\
+\bottomrule
+\end{tabular}
+\end{table}
+\begin{table}[H]\centering\footnotesize
+\caption{厚みごとのランキング：温度適切版・粉砕材混合 PP・厚み 1.5 mm（学習の条件 12。LML の大きい順）}
+\begin{tabular}{rlp{11\zw}rrrrccc rrrl}
+\toprule
+順位 & モデル & 係数（厚みごと） & LML & 最大との差 & $\Delta$LML & 基準 & 支持 & 取り直し & 確認 & 誤差 厚みごと & 誤差 総合 & 誤差順位 & 印 \\
+\midrule
+1 & \texttt{B\_\allowbreak{}Tff\_\allowbreak{}Arr} & 横 $-1$・縦 $-4$ kJ/mol\textsuperscript{§} & 181.33 & 0.00 & 0.43 & 3 & × & 収束 & △ & 3.9 & 2.3 & 7 &  \\
+2 & \texttt{B\_\allowbreak{}Tff\_\allowbreak{}WLF} & 横 $-0.5$・縦 $-1$\textsuperscript{§} & 181.21 & $-0.12$ & 0.30 & 3 & × & 収束 & △ & 3.3 & 2.2 & 3 &  \\
+3 & \texttt{A\_\allowbreak{}Tff\_\allowbreak{}Arr} & 縦 $-2$ kJ/mol\textsuperscript{§} & 181.15 & $-0.18$ & 0.24 & 1.92 & × & 収束 & △ & 3.6 & 2.4 & 5 &  \\
+4 & \texttt{A\_\allowbreak{}Tff\_\allowbreak{}WLF} & 縦 $-0.25$\textsuperscript{§} & 180.91 & $-0.43$ & 0.00 & 1.92 & × & 収束 & △ & 3.2 & 2.4 & 2 &  \\
+5 & \texttt{C\_\allowbreak{}noTff} & --- & 180.91 & $-0.43$ & --- & --- & --- & --- & --- & --- & --- &  &  \\
+6 & \texttt{B\_\allowbreak{}Tset\_\allowbreak{}Arr} & 横 25・縦 75 kJ/mol & 179.17 & $-2.16$ & 3.73 & 3 & ○ & \textbf{未収束} & ○ & 4.5 & 2.5 & 8 &  \\
+7 & \texttt{B\_\allowbreak{}Tset\_\allowbreak{}WLF} & 横 16.75・縦 48 & 178.55 & $-2.78$ & 3.10 & 3 & ○ & \textbf{未収束} & ○ & 4.6 & 2.2 & 9 &  \\
+8 & \textbf{\texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr}} & 縦 24.5 kJ/mol & 177.43 & $-3.90$ & 1.99 & 1.92 & ○ & 収束 & ○ & 3.6 & 2.5 & 4 & \textbf{本番}・厚みの規則 \\
+9 & \texttt{A\_\allowbreak{}Tset\_\allowbreak{}WLF} & 縦 15.5 & 177.04 & $-4.29$ & 1.60 & 1.92 & × & 収束 & ○ & 3.7 & 2.5 & 6 &  \\
+ & \texttt{C} & --- & --- & --- & --- & --- & --- & --- & --- & 3.0 & 2.5 & 1 &  \\
+\bottomrule
+\end{tabular}
+\end{table}
+\begin{table}[H]\centering\footnotesize
+\caption{厚みごとのランキング：温度適切版・粉砕材混合 PP・厚み 2 mm（学習の条件 12。LML の大きい順）}
+\begin{tabular}{rlp{11\zw}rrrrccc rrrl}
+\toprule
+順位 & モデル & 係数（厚みごと） & LML & 最大との差 & $\Delta$LML & 基準 & 支持 & 取り直し & 確認 & 誤差 厚みごと & 誤差 総合 & 誤差順位 & 印 \\
+\midrule
+1 & \texttt{B\_\allowbreak{}Tset\_\allowbreak{}WLF} & 横 $-0.75$・縦 $-7.25$\textsuperscript{§} & 190.81 & 0.00 & 3.01 & 3 & ○ & 収束 & ○ & 8.6 & 4.4 & 2 &  \\
+2 & \texttt{A\_\allowbreak{}Tset\_\allowbreak{}WLF} & 縦 $-5.25$\textsuperscript{§} & 190.48 & $-0.33$ & 2.68 & 1.92 & ○ & 収束 & ○ & 8.7 & 4.8 & 3 & 厚みの規則 \\
+3 & \texttt{B\_\allowbreak{}Tset\_\allowbreak{}Arr} & 横 $-1$・縦 $-15$ kJ/mol\textsuperscript{§} & 190.17 & $-0.64$ & 2.37 & 3 & × & 収束 & ○ & 8.7 & 6.0 & 7 &  \\
+4 & \textbf{\texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr}} & 縦 $-12$ kJ/mol\textsuperscript{§} & 189.97 & $-0.84$ & 2.17 & 1.92 & ○ & 収束 & ○ & 8.7 & 6.5 & 8 & \textbf{本番} \\
+5 & \texttt{B\_\allowbreak{}Tff\_\allowbreak{}WLF} & 横 0.25・縦 $-3.75$\textsuperscript{§} & 188.87 & $-1.94$ & 1.20 & 3 & × & 収束 & △ & 8.7 & 3.6 & 6 &  \\
+6 & \texttt{A\_\allowbreak{}Tff\_\allowbreak{}WLF} & 縦 $-4$\textsuperscript{§} & 188.85 & $-1.96$ & 1.18 & 1.92 & × & 収束 & △ & 8.8 & 4.0 & 9 &  \\
+7 & \texttt{B\_\allowbreak{}Tff\_\allowbreak{}Arr} & 横 0・縦 $-5$ kJ/mol\textsuperscript{§} & 188.14 & $-2.67$ & 0.47 & 3 & × & 収束 & △ & 8.7 & 4.4 & 4 &  \\
+7 & \texttt{A\_\allowbreak{}Tff\_\allowbreak{}Arr} & 縦 $-5$ kJ/mol\textsuperscript{§} & 188.14 & $-2.67$ & 0.47 & 1.92 & × & 収束 & △ & 8.7 & 5.0 & 4 &  \\
+9 & \texttt{C\_\allowbreak{}noTff} & --- & 187.67 & $-3.14$ & --- & --- & --- & --- & --- & --- & --- &  &  \\
+ & \texttt{C} & --- & --- & --- & --- & --- & --- & --- & --- & 8.5 & 6.6 & 1 &  \\
+\bottomrule
+\end{tabular}
+\end{table}
+\begin{table}[H]\centering\footnotesize
+\caption{Tff か Tset か（組ごと・厚みごと）：温度適切版・粉砕材混合 PP（厚みごとの比較のノートの 5〜8 節。\texttt{05\_\allowbreak{}…/\allowbreak{}02\_\allowbreak{}粉砕材混合PP実験/\allowbreak{}02\_\allowbreak{}検討結果/\allowbreak{}02\_\allowbreak{}粉砕材混合PP実験\_\allowbreak{}検討結果(5適切学習データ)/\allowbreak{}全ショット版/\allowbreak{}厚みごと/\allowbreak{}シフトに使う温度/\allowbreak{}厚みごとの比較\_\allowbreak{}まとめ.csv}）}
+\begin{tabular}{llrrlrlrrll}
+\toprule
+厚み & 組 & (a) ずれ Tset \% & ずれ Tff \% & (a) & (b) $\Delta L$（Tff − Tset） & (b) & (c) 誤差 Tset \% & 誤差 Tff \% & (c) & 多数決 \\
+\midrule
+0.5 mm & \texttt{B\_\allowbreak{}Arr} & 0.5 & 0.5 & 差なし & $-0.98$ & 差なし & 1.7 & 1.9 & 差なし & 差なし \\
+0.5 mm & \texttt{B\_\allowbreak{}WLF} & 0.4 & 0.5 & 差なし & $-1.08$ & 差なし & 1.9 & 1.9 & 差なし & 差なし \\
+0.5 mm & \texttt{A\_\allowbreak{}Arr} & 0.7 & 0.8 & 差なし & $-2.18$ & 差なし & 1.6 & 1.6 & 差なし & 差なし \\
+0.5 mm & \texttt{A\_\allowbreak{}WLF} & 0.7 & 0.8 & 差なし & $-3.06$ & Tset & 1.8 & 1.8 & 差なし & 差なし \\
+1 mm & \texttt{B\_\allowbreak{}Arr} & 0.6 & 0.6 & 差なし & $-0.38$ & 差なし & 2.7 & 2.6 & 差なし & 差なし \\
+1 mm & \texttt{B\_\allowbreak{}WLF} & 0.6 & 0.6 & 差なし & 0.11 & 差なし & 2.6 & 2.6 & 差なし & 差なし \\
+1 mm & \texttt{A\_\allowbreak{}Arr} & 1.0 & 0.9 & 差なし & $-1.84$ & 差なし & 2.6 & 2.9 & 差なし & 差なし \\
+1 mm & \texttt{A\_\allowbreak{}WLF} & 1.0 & 0.9 & 差なし & $-1.89$ & 差なし & 2.8 & 2.7 & 差なし & 差なし \\
+1.5 mm & \texttt{B\_\allowbreak{}Arr} & 0.8 & 0.8 & 差なし & 2.16 & 差なし & 2.5 & 2.3 & 差なし & 差なし \\
+1.5 mm & \texttt{B\_\allowbreak{}WLF} & 1.1 & 0.8 & 差なし & 2.66 & 差なし & 2.2 & 2.2 & 差なし & 差なし \\
+1.5 mm & \texttt{A\_\allowbreak{}Arr} & 1.4 & 1.3 & 差なし & 3.72 & Tff & 2.5 & 2.4 & 差なし & 差なし \\
+1.5 mm & \texttt{A\_\allowbreak{}WLF} & 1.4 & 1.3 & 差なし & 3.86 & Tff & 2.5 & 2.4 & 差なし & 差なし \\
+2 mm & \texttt{B\_\allowbreak{}Arr} & 0.7 & 0.7 & 差なし & $-2.03$ & 差なし & 6.0 & 4.4 & Tff & 差なし \\
+2 mm & \texttt{B\_\allowbreak{}WLF} & 0.7 & 0.7 & 差なし & $-1.94$ & 差なし & 4.4 & 3.6 & 差なし & 差なし \\
+2 mm & \texttt{A\_\allowbreak{}Arr} & 1.2 & 1.1 & 差なし & $-1.83$ & 差なし & 6.5 & 5.0 & Tff & 差なし \\
+2 mm & \texttt{A\_\allowbreak{}WLF} & 1.2 & 1.1 & 差なし & $-1.63$ & 差なし & 4.8 & 4.0 & 差なし & 差なし \\
+\bottomrule
+\end{tabular}
+\end{table}
+\clearpage
+\subsection{温度適切版・GPPS（本番：\texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr}）}
+\begin{table}[H]\centering\footnotesize
+\caption{厚みごとのランキング：温度適切版・GPPS・厚み 1 mm（学習の条件 12。LML の大きい順）}
+\begin{tabular}{rlp{11\zw}rrrrccc rrrl}
+\toprule
+順位 & モデル & 係数（厚みごと） & LML & 最大との差 & $\Delta$LML & 基準 & 支持 & 取り直し & 確認 & 誤差 厚みごと & 誤差 総合 & 誤差順位 & 印 \\
+\midrule
+1 & \texttt{B\_\allowbreak{}Tset\_\allowbreak{}Arr} & 横 22・縦 55 kJ/mol & 159.11 & 0.00 & 6.20 & 3 & ○ & 収束 & ○ & 1.8 & 5.9 & 3 & 厚みの規則 \\
+2 & \texttt{B\_\allowbreak{}Tff\_\allowbreak{}WLF} & 横 6.5・縦 14.5 & 157.89 & $-1.22$ & 1.23 & 3 & × & 収束 & △ & 1.8 & 5.6 & 1 &  \\
+3 & \texttt{B\_\allowbreak{}Tff\_\allowbreak{}Arr} & 横 26・縦 55 kJ/mol & 157.31 & $-1.80$ & 0.65 & 3 & × & 収束 & △ & 1.8 & 5.6 & 2 &  \\
+4 & \texttt{B\_\allowbreak{}Tset\_\allowbreak{}WLF} & 横 12・縦 27 & 157.20 & $-1.91$ & 4.30 & 3 & ○ & \textbf{未収束} & ○ & 2.2 & 6.1 & 8 &  \\
+5 & \texttt{A\_\allowbreak{}Tff\_\allowbreak{}WLF} & 縦 0.75 & 156.92 & $-2.19$ & 0.25 & 1.92 & × & 収束 & △ & 2.2 & 5.6 & 6 &  \\
+6 & \texttt{A\_\allowbreak{}Tset\_\allowbreak{}WLF} & 縦 1.25 & 156.90 & $-2.21$ & 3.99 & 1.92 & ○ & 収束 & ○ & 2.3 & 6.1 & 9 &  \\
+7 & \textbf{\texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr}} & 縦 5.5 kJ/mol & 156.75 & $-2.36$ & 3.85 & 1.92 & ○ & 収束 & ○ & 2.2 & 5.8 & 7 & \textbf{本番} \\
+8 & \texttt{A\_\allowbreak{}Tff\_\allowbreak{}Arr} & 縦 1.5 kJ/mol & 156.72 & $-2.39$ & 0.05 & 1.92 & × & 収束 & △ & 2.2 & 5.5 & 5 &  \\
+9 & \texttt{C\_\allowbreak{}noTff} & --- & 156.66 & $-2.44$ & --- & --- & --- & --- & --- & --- & --- &  &  \\
+ & \texttt{C} & --- & --- & --- & --- & --- & --- & --- & --- & 2.1 & 5.7 & 4 &  \\
+\bottomrule
+\end{tabular}
+\end{table}
+\begin{table}[H]\centering\footnotesize
+\caption{厚みごとのランキング：温度適切版・GPPS・厚み 1.5 mm（学習の条件 12。LML の大きい順）}
+\begin{tabular}{rlp{11\zw}rrrrccc rrrl}
+\toprule
+順位 & モデル & 係数（厚みごと） & LML & 最大との差 & $\Delta$LML & 基準 & 支持 & 取り直し & 確認 & 誤差 厚みごと & 誤差 総合 & 誤差順位 & 印 \\
+\midrule
+1 & \texttt{B\_\allowbreak{}Tff\_\allowbreak{}Arr} & 横 2・縦 $-2$ kJ/mol\textsuperscript{§} & 143.36 & 0.00 & 1.35 & 3 & × & 収束 & △ & 4.6 & 3.4 & 5 &  \\
+2 & \texttt{A\_\allowbreak{}Tff\_\allowbreak{}Arr} & 縦 $-6.5$ kJ/mol\textsuperscript{§} & 142.92 & $-0.44$ & 0.91 & 1.92 & × & 収束 & △ & 4.1 & 3.2 & 2 &  \\
+3 & \texttt{B\_\allowbreak{}Tff\_\allowbreak{}WLF} & 横 0.5・縦 0.25 & 142.85 & $-0.51$ & 0.84 & 3 & × & 収束 & △ & 4.5 & 3.5 & 3 &  \\
+4 & \texttt{A\_\allowbreak{}Tff\_\allowbreak{}WLF} & 縦 $-1$\textsuperscript{§} & 142.32 & $-1.04$ & 0.31 & 1.92 & × & 収束 & △ & 3.9 & 3.2 & 1 &  \\
+5 & \texttt{C\_\allowbreak{}noTff} & --- & 142.00 & $-1.35$ & --- & --- & --- & --- & --- & --- & --- &  &  \\
+6 & \texttt{B\_\allowbreak{}Tset\_\allowbreak{}WLF} & 横 $-14$・縦 $-22$\textsuperscript{§} & 137.99 & $-5.36$ & 0.70 & 3 & × & \textbf{未収束} & ○ & 7.1 & 3.0 & 9 &  \\
+7 & \texttt{B\_\allowbreak{}Tset\_\allowbreak{}Arr} & 横 $-23$・縦 $-34$ kJ/mol\textsuperscript{§} & 137.76 & $-5.59$ & 0.47 & 3 & × & \textbf{未収束} & ○ & 6.4 & 3.3 & 8 &  \\
+8 & \texttt{A\_\allowbreak{}Tset\_\allowbreak{}WLF} & 縦 1.5 & 137.65 & $-5.70$ & 0.36 & 1.92 & × & 収束 & ○ & 4.8 & 2.8 & 7 &  \\
+9 & \textbf{\texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr}} & 縦 5.5 kJ/mol & 137.55 & $-5.81$ & 0.25 & 1.92 & × & 収束 & ○ & 4.5 & 3.1 & 4 & \textbf{本番} \\
+ & \texttt{C} & --- & --- & --- & --- & --- & --- & --- & --- & 4.8 & 3.3 & 6 & 厚みの規則 \\
+\bottomrule
+\end{tabular}
+\end{table}
+\begin{table}[H]\centering\footnotesize
+\caption{厚みごとのランキング：温度適切版・GPPS・厚み 2 mm（学習の条件 12。LML の大きい順）}
+\begin{tabular}{rlp{11\zw}rrrrccc rrrl}
+\toprule
+順位 & モデル & 係数（厚みごと） & LML & 最大との差 & $\Delta$LML & 基準 & 支持 & 取り直し & 確認 & 誤差 厚みごと & 誤差 総合 & 誤差順位 & 印 \\
+\midrule
+1 & \texttt{B\_\allowbreak{}Tset\_\allowbreak{}Arr} & 横 1・縦 8 kJ/mol & 154.58 & 0.00 & 2.64 & 3 & × & 収束 & ○ & 3.1 & 5.1 & 4 &  \\
+2 & \texttt{B\_\allowbreak{}Tff\_\allowbreak{}Arr} & 横 1・縦 $-1$ kJ/mol\textsuperscript{§} & 154.50 & $-0.07$ & 0.27 & 3 & × & 収束 & △ & 3.2 & 4.9 & 6 &  \\
+3 & \texttt{A\_\allowbreak{}Tff\_\allowbreak{}Arr} & 縦 $-2$ kJ/mol\textsuperscript{§} & 154.37 & $-0.21$ & 0.13 & 1.92 & × & 収束 & △ & 3.3 & 5.0 & 7 &  \\
+4 & \texttt{B\_\allowbreak{}Tff\_\allowbreak{}WLF} & 横 0.25・縦 0.25 & 154.33 & $-0.24$ & 0.10 & 3 & × & 収束 & △ & 3.3 & 4.8 & 9 &  \\
+5 & \textbf{\texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr}} & 縦 6 kJ/mol & 154.32 & $-0.26$ & 2.39 & 1.92 & ○ & 収束 & ○ & 3.0 & 5.2 & 3 & \textbf{本番}・厚みの規則 \\
+6 & \texttt{C\_\allowbreak{}noTff} & --- & 154.23 & $-0.35$ & --- & --- & --- & --- & --- & --- & --- &  &  \\
+7 & \texttt{A\_\allowbreak{}Tff\_\allowbreak{}WLF} & 縦 0 & 154.23 & $-0.35$ & 0.00 & 1.92 & × & 収束 & △ & 3.3 & 4.9 & 8 &  \\
+8 & \texttt{B\_\allowbreak{}Tset\_\allowbreak{}WLF} & 横 0.25・縦 1.5 & 154.22 & $-0.35$ & 2.29 & 3 & × & 収束 & ○ & 3.0 & 5.2 & 2 &  \\
+9 & \texttt{A\_\allowbreak{}Tset\_\allowbreak{}WLF} & 縦 1 & 154.01 & $-0.57$ & 2.07 & 1.92 & ○ & 収束 & ○ & 2.8 & 5.2 & 1 &  \\
+ & \texttt{C} & --- & --- & --- & --- & --- & --- & --- & --- & 3.2 & 5.1 & 5 &  \\
+\bottomrule
+\end{tabular}
+\end{table}
+\begin{table}[H]\centering\footnotesize
+\caption{Tff か Tset か（組ごと・厚みごと）：温度適切版・GPPS（厚みごとの比較のノートの 5〜8 節。\texttt{05\_\allowbreak{}…/\allowbreak{}03\_\allowbreak{}GPPS実験/\allowbreak{}03\_\allowbreak{}検討結果/\allowbreak{}03\_\allowbreak{}GPPS実験\_\allowbreak{}検討結果(5適切学習データ)/\allowbreak{}全ショット版/\allowbreak{}厚みごと/\allowbreak{}シフトに使う温度/\allowbreak{}厚みごとの比較\_\allowbreak{}まとめ.csv}）}
+\begin{tabular}{llrrlrlrrll}
+\toprule
+厚み & 組 & (a) ずれ Tset \% & ずれ Tff \% & (a) & (b) $\Delta L$（Tff − Tset） & (b) & (c) 誤差 Tset \% & 誤差 Tff \% & (c) & 多数決 \\
+\midrule
+1 mm & \texttt{B\_\allowbreak{}Arr} & 0.7 & 0.8 & 差なし & $-1.80$ & 差なし & 5.9 & 5.6 & 差なし & 差なし \\
+1 mm & \texttt{B\_\allowbreak{}WLF} & 0.9 & 1.0 & 差なし & 0.69 & 差なし & 6.1 & 5.6 & 差なし & 差なし \\
+1 mm & \texttt{A\_\allowbreak{}Arr} & 1.2 & 1.0 & 差なし & $-0.04$ & 差なし & 5.8 & 5.5 & 差なし & 差なし \\
+1 mm & \texttt{A\_\allowbreak{}WLF} & 1.3 & 0.9 & 差なし & 0.02 & 差なし & 6.1 & 5.6 & 差なし & 差なし \\
+1.5 mm & \texttt{B\_\allowbreak{}Arr} & 0.6 & 0.9 & 差なし & 5.59 & Tff & 3.3 & 3.4 & 差なし & 差なし \\
+1.5 mm & \texttt{B\_\allowbreak{}WLF} & 1.8 & 1.8 & 差なし & 4.85 & Tff & 3.0 & 3.5 & 差なし & 差なし \\
+1.5 mm & \texttt{A\_\allowbreak{}Arr} & 1.9 & 1.4 & 差なし & 5.37 & Tff & 3.1 & 3.2 & 差なし & 差なし \\
+1.5 mm & \texttt{A\_\allowbreak{}WLF} & 1.9 & 1.2 & Tff & 4.66 & Tff & 2.8 & 3.2 & 差なし & \textbf{Tff} \\
+2 mm & \texttt{B\_\allowbreak{}Arr} & 1.1 & 1.1 & 差なし & $-0.07$ & 差なし & 5.1 & 4.9 & 差なし & 差なし \\
+2 mm & \texttt{B\_\allowbreak{}WLF} & 1.2 & 1.2 & 差なし & 0.11 & 差なし & 5.2 & 4.8 & 差なし & 差なし \\
+2 mm & \texttt{A\_\allowbreak{}Arr} & 2.0 & 1.8 & 差なし & 0.05 & 差なし & 5.2 & 5.0 & 差なし & 差なし \\
+2 mm & \texttt{A\_\allowbreak{}WLF} & 2.1 & 1.8 & 差なし & 0.22 & 差なし & 5.2 & 4.9 & 差なし & 差なし \\
+\bottomrule
+\end{tabular}
+\end{table}
+\clearpage
+
+\appendix
+\section{読んだ検討結果フォルダ}
+\begin{table}[H]\centering\footnotesize
+\caption{検討結果フォルダ（この下の \texttt{全ショット版/\allowbreak{}全厚み総合/\allowbreak{}シフトファクターの検討/\allowbreak{}} と \texttt{全ショット版/\allowbreak{}厚みごと/\allowbreak{}} の CSV を読んだ）}\label{tab:files}
+\begin{tabular}{lll}
+\toprule
+学習データ & 材料 & フォルダ \\
+\midrule
+通常版 & PP & \texttt{05\_\allowbreak{}…/\allowbreak{}01\_\allowbreak{}バージンPP再々実験/\allowbreak{}01\_\allowbreak{}検討結果/\allowbreak{}01\_\allowbreak{}バージンPP再々実験\_\allowbreak{}シフト検討結果(5all学習データ)/\allowbreak{}} \\
+通常版 & 粉砕材混合 PP & \texttt{05\_\allowbreak{}…/\allowbreak{}02\_\allowbreak{}粉砕材混合PP実験/\allowbreak{}02\_\allowbreak{}検討結果/\allowbreak{}02\_\allowbreak{}粉砕材混合PP実験\_\allowbreak{}検討結果(5all学習データ)/\allowbreak{}} \\
+通常版 & GPPS & \texttt{05\_\allowbreak{}…/\allowbreak{}03\_\allowbreak{}GPPS実験/\allowbreak{}03\_\allowbreak{}検討結果/\allowbreak{}03\_\allowbreak{}GPPS実験\_\allowbreak{}検討結果(5all学習データ)/\allowbreak{}} \\
+温度適切版 & PP & \texttt{05\_\allowbreak{}…/\allowbreak{}01\_\allowbreak{}バージンPP再々実験/\allowbreak{}01\_\allowbreak{}検討結果/\allowbreak{}01\_\allowbreak{}バージンPP再々実験\_\allowbreak{}シフト検討結果(5適切学習データ)/\allowbreak{}} \\
+温度適切版 & 粉砕材混合 PP & \texttt{05\_\allowbreak{}…/\allowbreak{}02\_\allowbreak{}粉砕材混合PP実験/\allowbreak{}02\_\allowbreak{}検討結果/\allowbreak{}02\_\allowbreak{}粉砕材混合PP実験\_\allowbreak{}検討結果(5適切学習データ)/\allowbreak{}} \\
+温度適切版 & GPPS & \texttt{05\_\allowbreak{}…/\allowbreak{}03\_\allowbreak{}GPPS実験/\allowbreak{}03\_\allowbreak{}検討結果/\allowbreak{}03\_\allowbreak{}GPPS実験\_\allowbreak{}検討結果(5適切学習データ)/\allowbreak{}} \\
+\bottomrule
+\end{tabular}
+\end{table}
+\end{document}

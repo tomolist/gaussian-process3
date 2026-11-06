@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""材料別の温度シフト GPR のノート（01_機械学習コードフォルダ/材料別_温度シフトファクター検討/ の下の 5 つ）の説明書を作る。
+"""材料別の温度シフト GPR のノート（01_機械学習コードフォルダ/材料別_温度シフトファクター検討/ の下の 6 つ。2026-11-06 に④Tff の入力の有無の比較を足した）の説明書を作る。
 
 使い方（リポジトリ直下から）: uv run python 04_補助スクリプト/build_mat_nb_manual.py
 report_mat_nb_manual_template.tex の @@項目@@ に、mat_common の設定（学習ファイルの列、元ファイル名の形式、結果のフォルダの名前、材料）と、
@@ -27,7 +27,10 @@ NB_ROOT = os.path.join(rc.W, "01_機械学習コードフォルダ", "材料別_
 DIR_TRAIN, DIR_STUDY = "材料別_温度シフト機械学習コード", "材料別_温度シフトファクター検討用コード"
 NB = {"TRAIN": (DIR_TRAIN, "材料別_温度シフトGPR_ARD対応Matern52＋線形＋ホワイトノイズ.ipynb"),
       "STUDY": (DIR_STUDY, "材料別_温度シフトファクターの検討_ARD対応Matern52＋線形＋ホワイトノイズ.ipynb"),
-      "THICK": (DIR_STUDY, "材料別_厚みごとの比較_温度シフトファクターの検討_ARD対応Matern52＋線形＋ホワイトノイズ.ipynb")}   # 名前は 2026-11-05 にユーザーが変えたもの
+      "THICK": (DIR_STUDY, "材料別_厚みごとの比較_温度シフトファクターの検討_ARD対応Matern52＋線形＋ホワイトノイズ.ipynb"),   # 名前は 2026-11-05 にユーザーが変えたもの
+      "TFF": (DIR_STUDY, "材料別_Tffの入力の有無の比較_ARD対応Matern52＋線形＋ホワイトノイズ.ipynb")}   # ④（2026-11-06。build_mat_tff_input_nb.py）
+TFF_DIR = "Tffの入力の有無の比較"       # ④の結果のフォルダ（<版>/全厚み総合/ の下。build_mat_tff_input_nb.py の OUT_NAME と同じ）
+TIME_TFF = "約 3 分"                    # ④の時間の目安（2026-11-06 の確かめの実行で計測。3 材料・全ショット版）
 STEM = "説明書_材料別温度シフトGPRのノート"
 COL_INFO = {      # 学習ファイルの列（mat_common.COLS の記号）→ (説明, 単位)
     "file": ("1 ショットの計測ファイルの名前（形式は 4.4 節）", "―"),
@@ -52,6 +55,7 @@ for key, (folder, name) in NB.items():                 # ノートの場所が�
     assert os.path.isfile(os.path.join(NB_ROOT, folder, name)), f"ノートが見つからない：{folder}/{name}"
     V[f"NB_{key}"] = name
 V["DIR_TRAIN"], V["DIR_STUDY"] = DIR_TRAIN, DIR_STUDY
+V["TFF_DIR"], V["TIME_TFF"] = TFF_DIR, TIME_TFF
 
 # ---- 学習ファイルの列（mat_common.COLS・REQUIRED から）
 assert set(mc.COLS.values()) == set(COL_INFO), f"mat_common.COLS の列と、この説明の列が違う：{set(mc.COLS.values()) ^ set(COL_INFO)}"

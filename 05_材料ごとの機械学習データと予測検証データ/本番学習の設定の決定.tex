@@ -1,0 +1,513 @@
+\documentclass[paper=a4paper,fontsize=10.5pt,line_length=44zw,number_of_lines=40]{jlreq}
+\usepackage[haranoaji]{luatexja-preset}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{float}
+\usepackage{fancyvrb}
+\usepackage[hidelinks,bookmarksnumbered]{hyperref}
+\newcommand{\file}[1]{\texttt{\detokenize{#1}}}
+\newcommand{\mdl}[1]{\texttt{\detokenize{#1}}}
+\newcommand{\Tff}{T_{\mathrm{ff}}}
+\newcommand{\Tset}{T_{\mathrm{set}}}
+\let\origtextbf\textbf
+\renewcommand{\textbf}[1]{\origtextbf{\gtfamily #1}}   % 日本語の強調はゴシック体（明朝の太字の書体がないため）
+\renewcommand{\arraystretch}{1.2}
+\setlength{\tabcolsep}{4pt}
+\title{材料別の温度シフト GPR\\本番の学習の設定と、その根拠}
+\author{シフトファクター検討用のノート（11 月 4 日実行）と\\厚みごとの比較のノート（11 月 5 日実行）の結果から}
+\date{2026年11月5日}
+\begin{document}
+\maketitle
+
+\section*{この報告書について}
+\begin{itemize}[itemsep=0.3ex,topsep=0.4ex]
+\item 学習用のノート（本番。\texttt{01\_\allowbreak{}機械学習コードフォルダ/\allowbreak{}材料別\_\allowbreak{}温度シフトファクター検討/\allowbreak{}材料別\_\allowbreak{}温度シフト機械学習コード/\allowbreak{}材料別\_\allowbreak{}温度シフトGPR\_\allowbreak{}ARD対応Matern52＋線形＋ホワイトノイズ.ipynb}）を、3 材料 × 2 種類の学習データ（通常版・温度適切版）× 学習の範囲 2 つ（全厚み・厚みごと）で実行する前に、設定エリアの \texttt{SHIFT\_\allowbreak{}COL}・\texttt{SHIFT\_\allowbreak{}STRUCT}・\texttt{SHIFT\_\allowbreak{}FORM} を決めました。
+\item 根拠は、ユーザーが実行したシフトファクター検討用のノートと、厚みごとの比較のノートの結果の CSV です（場所は付録 A）。報告書の数値は、生成スクリプト \texttt{04\_\allowbreak{}補助スクリプト/\allowbreak{}build\_\allowbreak{}report\_\allowbreak{}mat\_\allowbreak{}prod\_\allowbreak{}settings.py} が CSV から読んだものです。
+\item 用語：LML は対数周辺尤度（学習データの説明のよさ。大きいほどよい）。$\Delta$LML は、シフトの係数を 0 にしたモデル（$\theta = 0$）との LML の差です。モデルの記号は「構造\_シフトに使う温度\_型」です。構造は A（縦だけのシフト）・B（横・縦のシフト）、温度は Tset（加熱シリンダ温度）・Tff（流動中樹脂温度）、型は Arr（アレニウス型）・WLF（WLF 型）。C はシフトなし（4 変数を並べた通常の GPR）です。
+\item この版（11 月 5 日の 2 つ目の版）：ユーザーの指示で学習用のノートに厚みの設定 \texttt{THICKNESS} を足したので、\ref{sec:thickrun} 節を書き直し、厚みごとの実行の一覧（表~\ref{tab:truns}）と、ダイアログを使わないときの \texttt{FILES} の例（付録 B）を足しました。また、最初の版で 5 章に書いた「★ が出た厚みだけ C で学習し直す」という選択肢を取り下げ、その問題点を \ref{sec:noc} 節に書きました。
+\end{itemize}
+
+\section{結論}\label{sec:concl}
+\begin{table}[H]\centering\footnotesize
+\caption{本番の学習の設定（学習用のノートの設定エリア。全厚み・厚みごとで同じ）}\label{tab:concl}
+\begin{tabular}{llllll}
+\toprule
+学習データ & 材料 & モデル & \texttt{SHIFT\_\allowbreak{}COL} & \texttt{SHIFT\_\allowbreak{}STRUCT} & \texttt{SHIFT\_\allowbreak{}FORM} \\
+\midrule
+通常版 & PP & \texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr} & \texttt{"加熱シリンダ温度[℃]"} & \texttt{"A"} & \texttt{"arrhenius"} \\
+通常版 & 粉砕材混合 PP & \texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr} & \texttt{"加熱シリンダ温度[℃]"} & \texttt{"A"} & \texttt{"arrhenius"} \\
+通常版 & GPPS & \texttt{B\_\allowbreak{}Tset\_\allowbreak{}Arr} & \texttt{"加熱シリンダ温度[℃]"} & \texttt{"B"} & \texttt{"arrhenius"} \\
+\midrule
+温度適切版 & PP & \texttt{C} & \texttt{None} & \texttt{（使わない）} & \texttt{（使わない）} \\
+温度適切版 & 粉砕材混合 PP & \texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr} & \texttt{"加熱シリンダ温度[℃]"} & \texttt{"A"} & \texttt{"arrhenius"} \\
+温度適切版 & GPPS & \texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr} & \texttt{"加熱シリンダ温度[℃]"} & \texttt{"A"} & \texttt{"arrhenius"} \\
+\bottomrule
+\end{tabular}
+\end{table}
+\begin{itemize}[itemsep=0.3ex,topsep=0.4ex]
+\item 6 つのうち 5 つで、\textbf{加熱シリンダ温度 Tset のアレニウス型のシフト}を使います。縦だけ（A）が 4 つ、横・縦（B）が通常版の GPPS の 1 つです。温度適切版の PP だけは、どのシフトも支持されないので、\textbf{シフトなし（C）}です。
+\item 流動中樹脂温度 Tff のシフトは、どの材料・学習データでも、尤度で支持されません（\ref{sec:total} 章）。
+\item \textbf{厚みごとの学習も、全厚みと同じモデル}にします。厚みごとの検討の結果は、どの厚みでも Tset のままでよいことを示しています。一方で、厚みごとに係数を決め直すと、係数が厚みで大きく動き、符号が逆になる厚みもあります。厚みごとに別のモデルを選ぶ根拠にはなりません（\ref{sec:thick} 章）。
+\item ほかの設定は、既定のままにします（検討のときと同じ。表~\ref{tab:other}）。
+\end{itemize}
+
+\begin{table}[H]\centering\footnotesize
+\caption{そのほかの設定（既定のまま）}\label{tab:other}
+\begin{tabular}{lp{25\zw}}
+\toprule
+設定 & 値と理由 \\
+\midrule
+\texttt{THICKNESS} & 全厚み：\texttt{None}（既定）、厚みごと：0.5・1.0・1.5・2.0（1 回に 1 つ。\ref{sec:thickrun} 節） \\
+\texttt{INPUT\_\allowbreak{}MODE} & \texttt{"shot"}（ショットごとの入力。10 月 23 日のユーザー決定） \\
+\texttt{SEED}・\texttt{NOISE\_\allowbreak{}LB}・\texttt{USE\_\allowbreak{}LINEAR} & 42・1e-6・\texttt{True}（検討と同じ） \\
+\texttt{N\_\allowbreak{}RESTARTS}・\texttt{PROFILE\_\allowbreak{}RESTARTS} & 20・1（検討と同じ） \\
+\texttt{USE\_\allowbreak{}EXCLUSIONS} & \texttt{True}（問題データ一覧の「除外」を除く） \\
+\texttt{SHIFT\_\allowbreak{}CFG} & PP・粉砕材混合 PP：Tref 210 ℃・Tg $-10$ ℃、GPPS：Tref 220 ℃・Tg 100 ℃ \\
+\texttt{FORM\_\allowbreak{}CFG}・\texttt{FINE\_\allowbreak{}*}・\texttt{MAX\_\allowbreak{}*} & 既定（プロファイル尤度の格子。検討と同じ） \\
+\bottomrule
+\end{tabular}
+\end{table}
+候補のモデルの学習済みモデル（\texttt{学習済みモデル\_\allowbreak{}<モデル>.joblib}）の記録で、6 つとも、入力の取り方が \texttt{"shot"}、シフトファクターの設定（基準温度・Tg・格子）が既定と同じこと、学習データのファイルが \texttt{データ確認/\allowbreak{}データの概要.csv} と同じことを確かめました。やり直しの回数などは記録にないので、既定で実行したと考えています（要確認）。
+
+\subsection{全厚みの実行の分け方}\label{sec:runs}
+\texttt{SHIFT\_\allowbreak{}COL}・\texttt{SHIFT\_\allowbreak{}STRUCT}・\texttt{SHIFT\_\allowbreak{}FORM} は、\texttt{MATERIALS} のすべての材料に同じものを使います。そのため、同じモデルの材料をまとめて、全厚みは次の 4 回に分けて実行します。
+\begin{table}[H]\centering\footnotesize
+\caption{全厚みの実行の分け方}\label{tab:runs}
+\begin{tabular}{lllllll}
+\toprule
+実行 & 学習データ & \texttt{MATERIALS} & モデル & \texttt{SHIFT\_\allowbreak{}COL} & \texttt{SHIFT\_\allowbreak{}STRUCT} & \texttt{SHIFT\_\allowbreak{}FORM} \\
+\midrule
+① & 通常版 & \texttt{["PP", "MIX"]} & \texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr} & \texttt{"加熱シリンダ温度[℃]"} & \texttt{"A"} & \texttt{"arrhenius"} \\
+② & 通常版 & \texttt{["GPPS"]} & \texttt{B\_\allowbreak{}Tset\_\allowbreak{}Arr} & \texttt{"加熱シリンダ温度[℃]"} & \texttt{"B"} & \texttt{"arrhenius"} \\
+③ & 温度適切版 & \texttt{["PP"]} & \texttt{C} & \texttt{None} & \texttt{（使わない）} & \texttt{（使わない）} \\
+④ & 温度適切版 & \texttt{["MIX", "GPPS"]} & \texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr} & \texttt{"加熱シリンダ温度[℃]"} & \texttt{"A"} & \texttt{"arrhenius"} \\
+\bottomrule
+\end{tabular}
+\end{table}
+ダイアログで選ぶファイル（検討のときと同じ）：
+\begin{itemize}[itemsep=0.3ex,topsep=0.4ex]
+\item[①] 通常版・PP、粉砕材混合 PP（結果は \texttt{全ショット版/\allowbreak{}全厚み総合/\allowbreak{}A\_\allowbreak{}Tset\_\allowbreak{}Arr\_\allowbreak{}アレニウス型の縦だけの温度シフトに加熱シリンダ温度採用/\allowbreak{}}）
+\begin{itemize}[itemsep=0.1ex,topsep=0.2ex]
+\item PP（\texttt{05\_\allowbreak{}…/\allowbreak{}01\_\allowbreak{}バージンPP再々実験/\allowbreak{}} から）：学習 \texttt{01\_\allowbreak{}学習・検証データ/\allowbreak{}学習データ\_\allowbreak{}pp\_\allowbreak{}max\_\allowbreak{}5data/\allowbreak{}結合\_\allowbreak{}03\_\allowbreak{}pp\_\allowbreak{}max\_\allowbreak{}5data\_\allowbreak{}外れ値なし.csv}、検証 \texttt{01\_\allowbreak{}学習・検証データ/\allowbreak{}検証データ\_\allowbreak{}pp\_\allowbreak{}max\_\allowbreak{}5data用\_\allowbreak{}3data/\allowbreak{}結合\_\allowbreak{}05\_\allowbreak{}pp\_\allowbreak{}max\_\allowbreak{}3data(no1.5-3.0)\_\allowbreak{}外れ値なし.csv}、学習結果フォルダ \texttt{01\_\allowbreak{}検討結果/\allowbreak{}01\_\allowbreak{}バージンPP再々実験\_\allowbreak{}シフト検討結果(5all学習データ)/\allowbreak{}}
+\item 粉砕材混合 PP（\texttt{05\_\allowbreak{}…/\allowbreak{}02\_\allowbreak{}粉砕材混合PP実験/\allowbreak{}} から）：学習 \texttt{02\_\allowbreak{}学習・検証データ/\allowbreak{}学習データ\_\allowbreak{}mixpp\_\allowbreak{}max\_\allowbreak{}5data/\allowbreak{}結合\_\allowbreak{}03\_\allowbreak{}mixpp\_\allowbreak{}max\_\allowbreak{}5data\_\allowbreak{}外れ値なし.csv}、検証 \texttt{02\_\allowbreak{}学習・検証データ/\allowbreak{}検証データ\_\allowbreak{}mixpp\_\allowbreak{}max\_\allowbreak{}5data用\_\allowbreak{}3data/\allowbreak{}結合\_\allowbreak{}02\_\allowbreak{}mixpp\_\allowbreak{}max\_\allowbreak{}3data\_\allowbreak{}外れ値なし.csv}、学習結果フォルダ \texttt{02\_\allowbreak{}検討結果/\allowbreak{}02\_\allowbreak{}粉砕材混合PP実験\_\allowbreak{}検討結果(5all学習データ)/\allowbreak{}}
+\end{itemize}
+\item[②] 通常版・GPPS（結果は \texttt{全ショット版/\allowbreak{}全厚み総合/\allowbreak{}B\_\allowbreak{}Tset\_\allowbreak{}Arr\_\allowbreak{}アレニウス型の温度シフトに加熱シリンダ温度採用/\allowbreak{}}）
+\begin{itemize}[itemsep=0.1ex,topsep=0.2ex]
+\item GPPS（\texttt{05\_\allowbreak{}…/\allowbreak{}03\_\allowbreak{}GPPS実験/\allowbreak{}} から）：学習 \texttt{03\_\allowbreak{}学習・検証データ/\allowbreak{}学習データ\_\allowbreak{}gpps\_\allowbreak{}max\_\allowbreak{}5data/\allowbreak{}結合\_\allowbreak{}gpps\_\allowbreak{}5data\_\allowbreak{}20261014\_\allowbreak{}060353.csv}、検証 \texttt{03\_\allowbreak{}学習・検証データ/\allowbreak{}検証データ\_\allowbreak{}gpps\_\allowbreak{}max\_\allowbreak{}5data用\_\allowbreak{}3data/\allowbreak{}結合\_\allowbreak{}gpps\_\allowbreak{}3data\_\allowbreak{}20261014\_\allowbreak{}052315.csv}、学習結果フォルダ \texttt{03\_\allowbreak{}検討結果/\allowbreak{}03\_\allowbreak{}GPPS実験\_\allowbreak{}検討結果(5all学習データ)/\allowbreak{}}
+\end{itemize}
+\item[③] 温度適切版・PP（結果は \texttt{全ショット版/\allowbreak{}全厚み総合/\allowbreak{}C\_\allowbreak{}温度シフトなし/\allowbreak{}}）
+\begin{itemize}[itemsep=0.1ex,topsep=0.2ex]
+\item PP（\texttt{05\_\allowbreak{}…/\allowbreak{}01\_\allowbreak{}バージンPP再々実験/\allowbreak{}} から）：学習 \texttt{01\_\allowbreak{}学習・検証データ/\allowbreak{}学習データ\_\allowbreak{}pp\_\allowbreak{}max\_\allowbreak{}温度適切5data/\allowbreak{}結合\_\allowbreak{}03\_\allowbreak{}pp\_\allowbreak{}max\_\allowbreak{}温度適切5data\_\allowbreak{}外れ値なし.csv}、検証 \texttt{01\_\allowbreak{}学習・検証データ/\allowbreak{}検証データ\_\allowbreak{}pp\_\allowbreak{}max\_\allowbreak{}温度適切5data用\_\allowbreak{}3data/\allowbreak{}結合\_\allowbreak{}05\_\allowbreak{}pp\_\allowbreak{}max\_\allowbreak{}温度適切3data(no1.5-3.0)\_\allowbreak{}外れ値なし.csv}、学習結果フォルダ \texttt{01\_\allowbreak{}検討結果/\allowbreak{}01\_\allowbreak{}バージンPP再々実験\_\allowbreak{}シフト検討結果(5適切学習データ)/\allowbreak{}}
+\end{itemize}
+\item[④] 温度適切版・粉砕材混合 PP、GPPS（結果は \texttt{全ショット版/\allowbreak{}全厚み総合/\allowbreak{}A\_\allowbreak{}Tset\_\allowbreak{}Arr\_\allowbreak{}アレニウス型の縦だけの温度シフトに加熱シリンダ温度採用/\allowbreak{}}）
+\begin{itemize}[itemsep=0.1ex,topsep=0.2ex]
+\item 粉砕材混合 PP（\texttt{05\_\allowbreak{}…/\allowbreak{}02\_\allowbreak{}粉砕材混合PP実験/\allowbreak{}} から）：学習 \texttt{02\_\allowbreak{}学習・検証データ/\allowbreak{}学習データ\_\allowbreak{}mixpp\_\allowbreak{}max\_\allowbreak{}温度適切5data/\allowbreak{}結合\_\allowbreak{}03\_\allowbreak{}mixpp\_\allowbreak{}max\_\allowbreak{}温度適切5data\_\allowbreak{}外れ値なし.csv}、検証 \texttt{02\_\allowbreak{}学習・検証データ/\allowbreak{}検証データ\_\allowbreak{}mixpp\_\allowbreak{}max\_\allowbreak{}温度適切5data用\_\allowbreak{}3data/\allowbreak{}結合\_\allowbreak{}02\_\allowbreak{}mixpp\_\allowbreak{}max\_\allowbreak{}温度適切3data\_\allowbreak{}外れ値なし.csv}、学習結果フォルダ \texttt{02\_\allowbreak{}検討結果/\allowbreak{}02\_\allowbreak{}粉砕材混合PP実験\_\allowbreak{}検討結果(5適切学習データ)/\allowbreak{}}
+\item GPPS（\texttt{05\_\allowbreak{}…/\allowbreak{}03\_\allowbreak{}GPPS実験/\allowbreak{}} から）：学習 \texttt{03\_\allowbreak{}学習・検証データ/\allowbreak{}学習データ\_\allowbreak{}gpps\_\allowbreak{}max\_\allowbreak{}温度適切5data/\allowbreak{}結合\_\allowbreak{}gpps\_\allowbreak{}5data\_\allowbreak{}20261014\_\allowbreak{}060353.csv}、検証 \texttt{03\_\allowbreak{}学習・検証データ/\allowbreak{}検証データ\_\allowbreak{}gpps\_\allowbreak{}max\_\allowbreak{}温度適切5data用\_\allowbreak{}3data/\allowbreak{}結合\_\allowbreak{}gpps\_\allowbreak{}3data(温度適切)\_\allowbreak{}20261014\_\allowbreak{}052315.csv}、学習結果フォルダ \texttt{03\_\allowbreak{}検討結果/\allowbreak{}03\_\allowbreak{}GPPS実験\_\allowbreak{}検討結果(5適切学習データ)/\allowbreak{}}
+\end{itemize}
+\end{itemize}
+学習結果フォルダに検討と同じフォルダを選ぶと、ノートの設計どおり \texttt{全ショット版/\allowbreak{}全厚み総合/\allowbreak{}<モデルのフォルダ>/\allowbreak{}} に入ります。検討の結果（\texttt{全厚み総合/\allowbreak{}シフトファクターの検討/\allowbreak{}}・\texttt{厚みごと/\allowbreak{}}）とは別のフォルダなので、消えません。\texttt{データ確認/\allowbreak{}} の表は、同じデータなので同じ内容で書き直されます。
+
+\subsection{厚みごとの実行}\label{sec:thickrun}
+ユーザーの指示で、学習用のノートに、学習する厚みを選ぶ設定 \texttt{THICKNESS} を足しました（11 月 5 日）。\texttt{None}（既定）なら全厚み、厚みの数（例：\texttt{0.5}）を書くと、その厚みの 5data だけで学習し、同じ厚みの 3data で検証します。厚みごとの本番は、表~\ref{tab:runs} の 4 つの実行のそれぞれで、\texttt{THICKNESS} だけを変えて、1 回ずつ実行します（列・形・型は表~\ref{tab:concl} のまま）。
+\begin{table}[H]\centering\footnotesize
+\caption{厚みごとの実行の一覧（\texttt{MATERIALS} と列・形・型は表~\ref{tab:runs} と同じ。全部で 15 回）}\label{tab:truns}
+\begin{tabular}{lllp{9\zw}p{15\zw}}
+\toprule
+実行 & 学習データ & モデル & \texttt{THICKNESS} に書く値 & 学習する材料 \\
+\midrule
+① & 通常版 & \texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr} & 0.5・1・1.5・2（4 回） & PP・粉砕材混合 PP \\
+② & 通常版 & \texttt{B\_\allowbreak{}Tset\_\allowbreak{}Arr} & 1・1.5・2（3 回） & GPPS \\
+③ & 温度適切版 & \texttt{C} & 0.5・1・1.5・2（4 回） & PP \\
+④ & 温度適切版 & \texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr} & 0.5・1・1.5・2（4 回） & 0.5 mm：粉砕材混合 PP／1・1.5・2 mm：粉砕材混合 PP・GPPS \\
+\bottomrule
+\end{tabular}
+\end{table}
+\begin{itemize}[itemsep=0.3ex,topsep=0.4ex]
+\item その厚みのデータがない材料は、その回は学習しません（GPPS の 0.5 mm。④の 0.5 mm は、粉砕材混合 PP だけを学習します）。
+\item 結果は、全厚みと同じ学習結果フォルダの \texttt{全ショット版/\allowbreak{}厚みごと/\allowbreak{}厚み<厚み>mm/\allowbreak{}<モデルのフォルダ>/\allowbreak{}} です（例：\texttt{厚み0.5mm/\allowbreak{}}。1 mm は \texttt{厚み1mm/\allowbreak{}}）。全厚みの結果（\texttt{全厚み総合/\allowbreak{}}）とも、厚みごとの比較のノートの結果（\texttt{厚みごと/\allowbreak{}} の直下の 4 つのフォルダ）とも別のフォルダです。
+\item データの確認（外れ値・P3\_3 の性質）は、厚みを選んでも、全厚みのデータで行います。検証の低速側・高速側は、その厚みの学習データの射出速度の範囲で分け直します（通常版の 0.5・1.0 mm の検証は、高速側だけ）。厚みが 1 つなので、全厚み共通の図は作りません。
+\item 試しの実行（結果は \texttt{\_\allowbreak{}tmp/\allowbreak{}} の中。本物の学習結果フォルダには書いていない）で、厚みごとの係数・$\Delta$LML・3data の誤差が、厚みごとの比較のノート（6・9 節）と同じになることを確かめました（温度適切版の粉砕材混合 PP の 0.5 mm（\texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr}）：$E_v$ 13 kJ/mol・$\Delta$LML 4.28、通常版の GPPS の 1.0 mm（\texttt{B\_\allowbreak{}Tset\_\allowbreak{}Arr}）：$E_h$ 5・$E_v$ 16 kJ/mol・$\Delta$LML 11.44）。全厚み（\texttt{THICKNESS = None}）の結果も、検討用のノートと同じでした（温度適切版の GPPS（\texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr}）：$E_v$ 6.5［4〜9.5］ kJ/mol・LML 446.3・3data の RMSE 0.0469）。
+\item 厚みごとの学習のデータは少ない（学習の条件 12〜24 個。表~\ref{tab:datah}）ので、ノートの判定に ★ が出やすくなります。★ が出ても、モデルは替えずに、結果として扱います（\ref{sec:noc} 節）。
+\item ダイアログを使わないときは、付録 B の \texttt{FILES} を設定エリアに書きます（学習データ・検証データ・学習結果フォルダは、全厚み・厚みごととも同じ）。
+\end{itemize}
+
+\section{決め方}
+\subsection{全厚み：候補の選び方（ユーザー決定、11 月 3 日）}
+シフトファクター検討用のノートのまとめと同じ規則（\texttt{mat\_\allowbreak{}common.shift\_\allowbreak{}candidates}）です。この報告書のスクリプトで当てはめ直し、6 つとも \texttt{候補の選び方.csv} の結論と一致することを確かめました。
+\begin{enumerate}[itemsep=0.3ex,topsep=0.4ex]
+\item 列（Tset・Tff）と型（Arr・WLF）の組ごとに、A の $\Delta$LML が 1.92 以上なら、その組の温度シフトは支持される（尤度比検定の 5\% 基準。係数 1 つ）。支持されたら、B が A より 1.92 以上大きいときだけ B、そうでなければ A。A が支持されず、B だけが 3.0 以上（係数 2 つの基準）のときは、B − A が 1.92 以上なら B、そうでなければ「決まらない」。
+\item 残った組どうしは、LML の大きいものを選ぶ（$\theta = 0$ のモデルが列ごとに違うので、$\Delta$LML では比べない）。
+\item どの組も残らなければ、シフトなしの C。
+\end{enumerate}
+あわせて、検討用のノートの判定（3data の RMSE が C の 1.1 倍以内、95\% 予測区間に入る割合が 0.8 以上、縦のシフトの向きが「低温ほど粘い」）も確かめました。3data の誤差は、選ぶ基準には使っていません（\ref{sec:note} 章）。
+
+\subsection{厚みごと：全厚みと同じモデル（Claude の判断）}
+厚みごとの比較のノートの結果を、次の 4 つの面から見て決めました（詳しくは \ref{sec:thick} 章）。
+\begin{enumerate}[itemsep=0.3ex,topsep=0.4ex]
+\item シフトに使う温度：厚みごとに Tff と Tset を比べた多数決（ノートの 8 節）と、全厚みの係数が厚みごとに効いているか（4 節）。
+\item 形と型：厚みごとのデータだけで決め直した係数（6 節）が、厚みによらず安定しているか。
+\item 厚みごとに同じ規則を当てた候補が、厚みによらずそろうか（参考）。
+\item 厚みごとのモデルと総合データのモデルの予測誤差（9 節。設定ではなく、本番の結果を比べるときの参考）。
+\end{enumerate}
+
+\section{全厚みの根拠}\label{sec:total}
+表~\ref{tab:cand} は \texttt{全厚み総合/\allowbreak{}シフトファクターの検討/\allowbreak{}候補の選び方.csv} の値です（太字は基準を満たしたもの）。表~\ref{tab:detail}・\ref{tab:rank} は、同じフォルダの \texttt{まとめ.csv} の値です。
+\begin{table}[H]\centering\footnotesize
+\caption{候補の選び方（\texttt{候補の選び方.csv}。A の基準 1.92、B の基準 3.0、B − A の基準 1.92）}\label{tab:cand}
+\begin{tabular}{lllrrrl}
+\toprule
+材料 & 温度 & 型 & A の $\Delta$LML & B の $\Delta$LML & B − A & この組の結論 \\
+\midrule
+\multicolumn{7}{l}{\textbf{通常版}} \\
+PP & Tset & アレニウス型 & \textbf{3.30} & \textbf{3.23} & $-0.07$ & \texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr}（候補） \\
+ & Tset & WLF型 & \textbf{2.06} & 2.06 & 0.00 & \texttt{A\_\allowbreak{}Tset\_\allowbreak{}WLF} \\
+ & Tff & アレニウス型 & 1.07 & 1.07 & 0.00 & 支持されない \\
+ & Tff & WLF型 & 0.94 & 0.94 & 0.00 & 支持されない \\
+粉砕材混合 PP & Tset & アレニウス型 & \textbf{9.65} & \textbf{9.64} & 0.00 & \texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr}（候補） \\
+ & Tset & WLF型 & \textbf{6.98} & \textbf{7.34} & 0.36 & \texttt{A\_\allowbreak{}Tset\_\allowbreak{}WLF} \\
+ & Tff & アレニウス型 & 0.35 & 0.33 & $-0.02$ & 支持されない \\
+ & Tff & WLF型 & 0.24 & 0.62 & 0.38 & 支持されない \\
+GPPS & Tset & アレニウス型 & \textbf{20.33} & \textbf{22.58} & \textbf{2.26} & \texttt{B\_\allowbreak{}Tset\_\allowbreak{}Arr}（候補） \\
+ & Tset & WLF型 & \textbf{17.21} & \textbf{19.53} & \textbf{2.32} & \texttt{B\_\allowbreak{}Tset\_\allowbreak{}WLF} \\
+ & Tff & アレニウス型 & 0.53 & 2.51 & \textbf{1.99} & 支持されない \\
+ & Tff & WLF型 & 0.00 & 2.19 & \textbf{2.19} & 支持されない \\
+\midrule
+\multicolumn{7}{l}{\textbf{温度適切版}} \\
+PP & Tset & アレニウス型 & 0.78 & 0.78 & 0.00 & 支持されない \\
+ & Tset & WLF型 & 0.32 & 0.32 & 0.00 & 支持されない \\
+ & Tff & アレニウス型 & 0.07 & 0.07 & 0.00 & 支持されない \\
+ & Tff & WLF型 & 0.07 & 0.07 & 0.00 & 支持されない \\
+粉砕材混合 PP & Tset & アレニウス型 & \textbf{5.34} & \textbf{5.31} & $-0.03$ & \texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr}（候補） \\
+ & Tset & WLF型 & \textbf{3.08} & \textbf{3.58} & 0.50 & \texttt{A\_\allowbreak{}Tset\_\allowbreak{}WLF} \\
+ & Tff & アレニウス型 & 0.65 & 0.65 & 0.00 & 支持されない \\
+ & Tff & WLF型 & 0.30 & 0.69 & 0.39 & 支持されない \\
+GPPS & Tset & アレニウス型 & \textbf{9.87} & \textbf{11.27} & 1.39 & \texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr}（候補） \\
+ & Tset & WLF型 & \textbf{8.95} & \textbf{10.43} & 1.48 & \texttt{A\_\allowbreak{}Tset\_\allowbreak{}WLF} \\
+ & Tff & アレニウス型 & 0.92 & 1.96 & 1.05 & 支持されない \\
+ & Tff & WLF型 & 0.21 & 1.26 & 1.05 & 支持されない \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[H]\centering\footnotesize
+\caption{候補のモデルの係数と 3data の誤差（\texttt{まとめ.csv}。RMSE は ln $\eta$、C 比は C の RMSE との比、被覆率は 95\% 予測区間に入る割合。係数の単位は、アレニウス型が kJ/mol、WLF 型は無次元）}\label{tab:detail}
+\begin{tabular}{llp{13\zw}rrrrrr}
+\toprule
+材料 & モデル & 係数［95\% 区間］ & LML & RMSE & 低速側 & 高速側 & C 比 & 被覆率 \\
+\midrule
+\multicolumn{9}{l}{\textbf{通常版}} \\
+PP & \texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr} & $E_v$ 3.5［1〜5.5］ kJ/mol & 1,273.5 & 0.2464 & 0.4484 & 0.0574 & 0.98 & 0.86 \\
+粉砕材混合 PP & \texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr} & $E_v$ 5.5［3.5〜8］ kJ/mol & 1,324.5 & 0.1958 & 0.3359 & 0.0467 & 1.06 & 0.92 \\
+GPPS & \texttt{B\_\allowbreak{}Tset\_\allowbreak{}Arr} & $E_h$ 1［1〜1］・$E_v$ 9［7〜11］ kJ/mol & 936.2 & 0.1213 & 0.1758 & 0.0668 & 0.94 & 0.82 \\
+\midrule
+\multicolumn{9}{l}{\textbf{温度適切版}} \\
+PP & \texttt{C} & --- & 625.2 & 0.0451 & --- & 0.0451 & 1.00 & 0.82 \\
+粉砕材混合 PP & \texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr} & $E_v$ 5.5［2.5〜9］ kJ/mol & 693.2 & 0.0377 & --- & 0.0377 & 0.97 & 0.94 \\
+GPPS & \texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr} & $E_v$ 6.5［4〜9.5］ kJ/mol & 446.3 & 0.0469 & --- & 0.0469 & 1.00 & 0.76 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[H]\centering\footnotesize
+\caption{3data の RMSE（全体）で 9 つのモデルを並べたときの、候補の順位と、RMSE が最小のモデル（右端は、そのモデルが尤度で支持されたか）}\label{tab:rank}
+\begin{tabular}{lllllll}
+\toprule
+材料 & 候補 & RMSE & 順位 & 最小のモデル & RMSE & 尤度で \\
+\midrule
+\multicolumn{7}{l}{\textbf{通常版}} \\
+PP & \texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr} & 0.2464 & 3 / 9 & \texttt{B\_\allowbreak{}Tset\_\allowbreak{}WLF}・\texttt{A\_\allowbreak{}Tset\_\allowbreak{}WLF} & 0.2462 & 支持 \\
+粉砕材混合 PP & \texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr} & 0.1958 & 7 / 9 & \texttt{C} & 0.1840 & --- \\
+GPPS & \texttt{B\_\allowbreak{}Tset\_\allowbreak{}Arr} & 0.1213 & 3 / 9 & \texttt{B\_\allowbreak{}Tset\_\allowbreak{}WLF} & 0.1117 & 支持 \\
+\midrule
+\multicolumn{7}{l}{\textbf{温度適切版}} \\
+PP & \texttt{C} & 0.0451 & 1 / 9 & \texttt{C} & 0.0451 & --- \\
+粉砕材混合 PP & \texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr} & 0.0377 & 8 / 9 & \texttt{B\_\allowbreak{}Tff\_\allowbreak{}WLF} & 0.0266 & 支持されない \\
+GPPS & \texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr} & 0.0469 & 5 / 9 & \texttt{A\_\allowbreak{}Tff\_\allowbreak{}Arr} & 0.0454 & 支持されない \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{通常版・PP：\texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr}}
+Tset のシフト：A の $\Delta$LML は アレニウス型 3.30、WLF型 2.06（基準 1.92）。B − A は アレニウス型 $-0.07$、WLF型 0.00（基準 1.92）。 Tff のシフト：A の $\Delta$LML は最大 1.07、B は最大 1.07 で、どの組も支持されない。 残った組の LML は \texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr} 1,273.5、\texttt{A\_\allowbreak{}Tset\_\allowbreak{}WLF} 1,272.3。最も大きい \texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr} を候補にした。 確かめ：3data の RMSE（全体）0.2464 は C（0.2524）の 0.98 倍（基準 1.1 倍以内）、95\% 予測区間に入る割合は 0.86（基準 0.8 以上）。 縦のシフトの向きは「低温ほど粘い」で、シフトで温度ごとの曲線が近づく（判定の一覧の「シフト」の 2 行が OK）。
+
+
+補足：Tff のモデルの LML（\texttt{B\_\allowbreak{}Tff\_\allowbreak{}Arr} 1,275.3 など）は、候補より大きい。しかし、$\theta = 0$（Tff を使わないモデル）との差は 1.07 しかない。LML の大きさは、Tff のシフトではなく、Tff を使わずに Tset を GP の入力にしたモデル（LML 1,274.2）から来ている。説明変数に Tff を入れる指定（CLAUDE.md §9）があるので、Tff を使わないモデルは選べない。規則どおり、Tset のシフトにした。低速側の RMSE は、どのモデルも 0.45〜0.46 と大きい（外挿。設定では変わらない）。
+\subsection{通常版・粉砕材混合 PP：\texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr}}
+Tset のシフト：A の $\Delta$LML は アレニウス型 9.65、WLF型 6.98（基準 1.92）。B − A は アレニウス型 0.00、WLF型 0.36（基準 1.92）。 Tff のシフト：A の $\Delta$LML は最大 0.35、B は最大 0.62 で、どの組も支持されない。 残った組の LML は \texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr} 1,324.5、\texttt{A\_\allowbreak{}Tset\_\allowbreak{}WLF} 1,321.8。最も大きい \texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr} を候補にした。 確かめ：3data の RMSE（全体）0.1958 は C（0.1840）の 1.06 倍（基準 1.1 倍以内）、95\% 予測区間に入る割合は 0.92（基準 0.8 以上）。 縦のシフトの向きは「低温ほど粘い」で、シフトで温度ごとの曲線が近づく（判定の一覧の「シフト」の 2 行が OK）。
+
+
+補足：3data の RMSE は C（0.1840）が最も小さいが、候補との差は 1.1 倍以内。WLF 型の \texttt{A\_\allowbreak{}Tset\_\allowbreak{}WLF}・\texttt{B\_\allowbreak{}Tset\_\allowbreak{}WLF} は、C の 1.1 倍を少し超えた（★）。
+\subsection{通常版・GPPS：\texttt{B\_\allowbreak{}Tset\_\allowbreak{}Arr}}
+Tset のシフト：A の $\Delta$LML は アレニウス型 20.33、WLF型 17.21（基準 1.92）。B − A は アレニウス型 2.26、WLF型 2.32（基準 1.92）。 Tff のシフト：A の $\Delta$LML は最大 0.53、B は最大 2.51 で、どの組も支持されない。 残った組の LML は \texttt{B\_\allowbreak{}Tset\_\allowbreak{}Arr} 936.2、\texttt{B\_\allowbreak{}Tset\_\allowbreak{}WLF} 933.2。最も大きい \texttt{B\_\allowbreak{}Tset\_\allowbreak{}Arr} を候補にした。 確かめ：3data の RMSE（全体）0.1213 は C（0.1286）の 0.94 倍（基準 1.1 倍以内）、95\% 予測区間に入る割合は 0.82（基準 0.8 以上）。 縦のシフトの向きは「低温ほど粘い」で、シフトで温度ごとの曲線が近づく（判定の一覧の「シフト」の 2 行が OK）。
+
+
+補足：B が A より 1.92 以上大きいので、B（横・縦のシフト）になった。WLF 型の \texttt{B\_\allowbreak{}Tset\_\allowbreak{}WLF} は、LML は 3.0 小さいが、3data の RMSE は 0.1117 で、候補（0.1213）より小さい（5 章）。
+\subsection{温度適切版・PP：\texttt{C}}
+Tset のシフト：A の $\Delta$LML は アレニウス型 0.78、WLF型 0.32（基準 1.92）。B − A は アレニウス型 0.00、WLF型 0.00（基準 1.92）。 Tff のシフト：A の $\Delta$LML は最大 0.07、B は最大 0.07 で、どの組も支持されない。 残った組がないので、シフトなしの C（\texttt{SHIFT\_\allowbreak{}COL = None}）にした。 確かめ：3data の RMSE（全体）は 0.0451、95\% 予測区間に入る割合は 0.82（基準 0.8 以上）。
+
+
+補足：Tset・Tff のどちらのシフトも、$\Delta$LML は最大 0.78 で、支持されない。C の 3data の RMSE（0.0451）は、9 つのモデルで最も小さい。温度適切版の検証データは、高速側（280・320 mm/s）だけ。
+\subsection{温度適切版・粉砕材混合 PP：\texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr}}
+Tset のシフト：A の $\Delta$LML は アレニウス型 5.34、WLF型 3.08（基準 1.92）。B − A は アレニウス型 $-0.03$、WLF型 0.50（基準 1.92）。 Tff のシフト：A の $\Delta$LML は最大 0.65、B は最大 0.69 で、どの組も支持されない。 残った組の LML は \texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr} 693.2、\texttt{A\_\allowbreak{}Tset\_\allowbreak{}WLF} 690.9。最も大きい \texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr} を候補にした。 確かめ：3data の RMSE（全体）0.0377 は C（0.0387）の 0.97 倍（基準 1.1 倍以内）、95\% 予測区間に入る割合は 0.94（基準 0.8 以上）。 縦のシフトの向きは「低温ほど粘い」で、シフトで温度ごとの曲線が近づく（判定の一覧の「シフト」の 2 行が OK）。
+
+
+補足：3data の RMSE は、Tff のモデル（\texttt{B\_\allowbreak{}Tff\_\allowbreak{}WLF} 0.0266）のほうが、候補（0.0377）より小さい。しかし、Tff のシフトは尤度で支持されず、縦のシフトの向きも逆（判定の一覧で ★）。検証データは高速側だけなので、誤差の差だけでは選ばなかった（5 章）。
+\subsection{温度適切版・GPPS：\texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr}}
+Tset のシフト：A の $\Delta$LML は アレニウス型 9.87、WLF型 8.95（基準 1.92）。B − A は アレニウス型 1.39、WLF型 1.48（基準 1.92）。 Tff のシフト：A の $\Delta$LML は最大 0.92、B は最大 1.96 で、どの組も支持されない。 残った組の LML は \texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr} 446.3、\texttt{A\_\allowbreak{}Tset\_\allowbreak{}WLF} 445.3。最も大きい \texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr} を候補にした。 確かめ：3data の RMSE（全体）0.0469 は C（0.0469）の 1.00 倍（基準 1.1 倍以内）、95\% 予測区間に入る割合は 0.76（基準 0.8 以上）。 縦のシフトの向きは「低温ほど粘い」で、シフトで温度ごとの曲線が近づく（判定の一覧の「シフト」の 2 行が OK）。
+
+
+補足：B − A は 1.39 で基準 1.92 に届かないので、A（縦だけ）になった。95\% 予測区間に入る割合は 0.76 で、基準 0.8 に届かない（★。9 つのモデルとも 0.73〜0.82）。予測区間が、やや狭い。
+
+\section{厚みごとの根拠}\label{sec:thick}
+\subsection{データの量}
+\begin{table}[H]\centering\small
+\caption{厚みごとの条件の数（学習 5data の条件 / 検証 3data の条件。\texttt{プロファイル尤度\_\allowbreak{}厚みごと.csv} の「学習の条件数」と、\texttt{厚みごとと総合の比較.csv} の「条件数」。全厚みは \texttt{データの概要.csv}）}\label{tab:datah}
+\begin{tabular}{lccccc}
+\toprule
+材料 & 0.5 mm & 1.0 mm & 1.5 mm & 2.0 mm & 全厚み \\
+\midrule
+\multicolumn{6}{l}{\textbf{通常版}} \\
+PP & 21 / 5 & 24 / 6 & 24 / 9 & 24 / 12 & 93 / 32 \\
+粉砕材混合 PP & 21 / 6 & 24 / 6 & 24 / 12 & 24 / 12 & 93 / 36 \\
+GPPS & --- & 24 / 6 & 24 / 12 & 24 / 12 & 72 / 30 \\
+\midrule
+\multicolumn{6}{l}{\textbf{温度適切版}} \\
+PP & 12 / 5 & 12 / 6 & 12 / 6 & 12 / 6 & 48 / 23 \\
+粉砕材混合 PP & 12 / 6 & 12 / 6 & 12 / 6 & 12 / 6 & 48 / 24 \\
+GPPS & --- & 12 / 6 & 12 / 6 & 12 / 6 & 36 / 18 \\
+\bottomrule
+\end{tabular}
+\end{table}
+厚みごとの学習の条件は 12〜24 個で、全厚み（36〜93 個）の 3〜4 分の 1 です。温度適切版は、1 つの厚みで 12 個（射出速度 4 水準 × 設定温度 3 水準）しかありません。
+
+\subsection{シフトに使う温度：Tset のまま}
+\begin{table}[H]\centering\small
+\caption{厚みごとの比較の判定の数（8 節：\texttt{シフトに使う温度/\allowbreak{}厚みごとの比較\_\allowbreak{}まとめ.csv} の「総合の判定」。4 節：\texttt{温度シフトの確認/\allowbreak{}温度シフトの確認\_\allowbreak{}厚みごと.csv} の「判定」。かっこは数えた数）}\label{tab:temp}
+\begin{tabular}{llll}
+\toprule
+材料 & 8 節：適した温度（厚み × 組） & 4 節：Tset のモデル & 4 節：Tff のモデル \\
+\midrule
+\multicolumn{4}{l}{\textbf{通常版}} \\
+PP & 差なし 16・Tff 0・Tset 0（16） & ○ 16・△ 0・× 0（16） & ○ 16・△ 0・× 0（16） \\
+粉砕材混合 PP & 差なし 14・Tff 2・Tset 0（16） & ○ 16・△ 0・× 0（16） & ○ 0・△ 16・× 0（16） \\
+GPPS & 差なし 12・Tff 0・Tset 0（12） & ○ 12・△ 0・× 0（12） & ○ 3・△ 9・× 0（12） \\
+\midrule
+\multicolumn{4}{l}{\textbf{温度適切版}} \\
+PP & 差なし 16・Tff 0・Tset 0（16） & ○ 16・△ 0・× 0（16） & ○ 0・△ 16・× 0（16） \\
+粉砕材混合 PP & 差なし 16・Tff 0・Tset 0（16） & ○ 16・△ 0・× 0（16） & ○ 0・△ 16・× 0（16） \\
+GPPS & 差なし 11・Tff 1・Tset 0（12） & ○ 12・△ 0・× 0（12） & ○ 0・△ 12・× 0（12） \\
+\bottomrule
+\end{tabular}
+\end{table}
+\begin{itemize}[itemsep=0.3ex,topsep=0.4ex]
+\item 8 節（厚みごとに、(a) 重ね合わせのずれ・(b) 尤度・(c) 検証誤差で Tff と Tset を比べた多数決）では、全部で 88 の「厚み × 組」のうち、差なしが 85、Tff が 3、Tset が 0 でした。厚みごとに温度を替える根拠はありません。
+\item 4 節（全厚みで学習した係数で、厚みごとの温度による粘度の比 R を表せるか）では、Tset のシフトのモデルは、6 つとも、すべての厚みで ○ でした。Tff のシフトのモデルは、通常版の PP（すべて ○）を除くと、○ は 72 個中 3 個で、残りは △（換算しても、温度の違う曲線のずれが減らない）でした。
+\item 全厚みの結論（\ref{sec:total} 章：Tset のシフトが支持され、Tff は支持されない）と食い違わないので、厚みごとも Tset のままにします。
+\end{itemize}
+
+\subsection{形と型：厚みごとの係数は不安定}\label{sec:tprof}
+表~\ref{tab:tprof} は、全厚みで選んだモデルを、厚みごとの 5data だけで学習したときの係数（6 節。\texttt{シフトに使う温度/\allowbreak{}プロファイル尤度\_\allowbreak{}厚みごと.csv}）です。右の 2 列は参考で、厚みごとに \ref{sec:total} 章と同じ規則を当てた候補と、その厚みで細かい格子の取り直しが収束しなかったモデルの数です。
+\begin{table}[H]\centering\footnotesize
+\caption{厚みごとのプロファイル尤度（$\Delta$LML の太字は基準を満たしたもの）。†：縦の係数が負（低温ほど粘度が低い向き）。‡：規則の注意が出た（係数の数が違う組が残った、など）}\label{tab:tprof}
+\begin{tabular}{lllllc}
+\toprule
+厚み & 選んだモデルの係数 & $\Delta$LML & 取り直し & 厚みごとに規則を当てた候補 & 未収束 \\
+\midrule
+\multicolumn{6}{l}{\textbf{通常版・PP}（選んだモデル \texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr}）} \\
+0.5 mm & $E_v$ 7.5 & \textbf{7.43} & 収束 & \texttt{A\_\allowbreak{}Tset\_\allowbreak{}WLF}（縦 4.75） & 0 / 8 \\
+1 mm & $E_v$ 6.5 & \textbf{2.68} & 収束 & \texttt{B\_\allowbreak{}Tff\_\allowbreak{}Arr}（縦 $-21$\textsuperscript{†}） & 0 / 8 \\
+1.5 mm & $E_v$ 4.5 & 1.82 & 収束 & C（どの組も支持されない） & 0 / 8 \\
+2 mm & $E_v$ $-12.5$\textsuperscript{†} & \textbf{3.26} & 収束 & \texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr}（縦 $-12.5$\textsuperscript{†}） & 0 / 8 \\
+\midrule
+\multicolumn{6}{l}{\textbf{通常版・粉砕材混合 PP}（選んだモデル \texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr}）} \\
+0.5 mm & $E_v$ 8 & \textbf{12.23} & 収束 & \texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr}（縦 8）\textsuperscript{‡} & 1 / 8 \\
+1 mm & $E_v$ 4 & 0.94 & 収束 & C（どの組も支持されない） & 0 / 8 \\
+1.5 mm & $E_v$ 4.5 & 1.22 & 収束 & C（どの組も支持されない） & 0 / 8 \\
+2 mm & $E_v$ 3 & 0.66 & 収束 & \texttt{A\_\allowbreak{}Tff\_\allowbreak{}WLF}（縦 $-3.5$\textsuperscript{†}） & 0 / 8 \\
+\midrule
+\multicolumn{6}{l}{\textbf{通常版・GPPS}（選んだモデル \texttt{B\_\allowbreak{}Tset\_\allowbreak{}Arr}）} \\
+1 mm & $E_h$ 5・$E_v$ 16 & \textbf{11.44} & 収束 & \texttt{B\_\allowbreak{}Tset\_\allowbreak{}Arr}（縦 16） & 0 / 8 \\
+1.5 mm & $E_h$ 2・$E_v$ 12 & \textbf{12.59} & 収束 & \texttt{B\_\allowbreak{}Tset\_\allowbreak{}WLF}（縦 2.75）\textsuperscript{‡} & 0 / 8 \\
+2 mm & $E_h$ 0・$E_v$ 6 & 2.72 & 収束 & \texttt{A\_\allowbreak{}Tset\_\allowbreak{}WLF}（縦 1.25） & 0 / 8 \\
+\midrule
+\multicolumn{6}{l}{\textbf{温度適切版・PP}（選んだモデル \texttt{C}）} \\
+0.5 mm & --- & --- & --- & C（どの組も支持されない） & 2 / 8 \\
+1 mm & --- & --- & --- & \texttt{A\_\allowbreak{}Tff\_\allowbreak{}Arr}（縦 $-33$\textsuperscript{†}） & 3 / 8 \\
+1.5 mm & --- & --- & --- & C（どの組も支持されない） & 1 / 8 \\
+2 mm & --- & --- & --- & \texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr}（縦 $-12.5$\textsuperscript{†}） & 0 / 8 \\
+\midrule
+\multicolumn{6}{l}{\textbf{温度適切版・粉砕材混合 PP}（選んだモデル \texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr}）} \\
+0.5 mm & $E_v$ 13 & \textbf{4.28} & 収束 & \texttt{A\_\allowbreak{}Tset\_\allowbreak{}WLF}（縦 10） & 0 / 8 \\
+1 mm & $E_v$ 11 & \textbf{2.40} & 収束 & \texttt{A\_\allowbreak{}Tset\_\allowbreak{}WLF}（縦 7.25） & 3 / 8 \\
+1.5 mm & $E_v$ 24.5 & \textbf{1.99} & 収束 & \texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr}（縦 24.5）\textsuperscript{‡} & 2 / 8 \\
+2 mm & $E_v$ $-12$\textsuperscript{†} & \textbf{2.17} & 収束 & \texttt{A\_\allowbreak{}Tset\_\allowbreak{}WLF}（縦 $-5.25$\textsuperscript{†}） & 0 / 8 \\
+\midrule
+\multicolumn{6}{l}{\textbf{温度適切版・GPPS}（選んだモデル \texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr}）} \\
+1 mm & $E_v$ 5.5 & \textbf{3.85} & 収束 & \texttt{B\_\allowbreak{}Tset\_\allowbreak{}Arr}（縦 55）\textsuperscript{‡} & 1 / 8 \\
+1.5 mm & $E_v$ 5.5 & 0.25 & 収束 & C（どの組も支持されない） & 2 / 8 \\
+2 mm & $E_v$ 6 & \textbf{2.39} & 収束 & \texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr}（縦 6） & 0 / 8 \\
+\bottomrule
+\end{tabular}
+\end{table}
+\begin{itemize}[itemsep=0.3ex,topsep=0.4ex]
+\item 係数は、厚みで大きく動きます（例：通常版の PP の \texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr} の $E_v$ は、0.5〜2.0 mm で 7.5・6.5・4.5・$-12.5$ kJ/mol。全厚みでは 3.5）。選んだモデルの 18 個の「材料・厚み」のうち 2 個で、縦の係数が負（全厚みの係数や、実測の「低温ほど粘い」と逆の向き）になりました：通常版のPPの 2 mm（\texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr}、縦の係数 $-12.5$、$\Delta$LML 3.26）、温度適切版の粉砕材混合 PPの 2 mm（\texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr}、縦の係数 $-12$、$\Delta$LML 2.17）。$\Delta$LML が基準を満たしたのは 12 個です。
+\item 厚みごとに規則を当てると、22 個の「材料・厚み」のうち 15 個で、全厚みと違うモデルになります。その中には、縦の係数が負のモデル（6 個）や Tff のモデルも入り、厚みによって列・形・型がばらばらです。厚みごとのモデル 176 個のうち 15 個は、細かい格子の取り直しが収束していません（尤度の面が平らで、係数が決まりにくい）。
+\item 条件の数が少ないために尤度の差が小さく、たまたまの違いで候補が入れ替わっていると考えられます。そこで、厚みごとにモデルを選び直さず、全厚みで選んだモデルを使います。本番の学習でも、係数は厚みごとのデータで決め直されるので、厚みによる違いは係数に表れます。
+\item 通常版の GPPS の \texttt{B\_\allowbreak{}Tset\_\allowbreak{}Arr} は、横の係数が 0 なら A と同じ形になるので、A のほうが合う厚みがあっても、B のままで困りません。
+\end{itemize}
+
+\subsection{厚みごとのモデルと総合データのモデル（参考）}
+\begin{table}[H]\centering\footnotesize
+\caption{3data の予測誤差 [\%]（厚みごとのモデル / 総合データのモデル。太字は小さいほう。\texttt{厚みごとのモデルと総合の比較/\allowbreak{}厚みごとと総合の比較.csv} の「誤差\_\%」、範囲は全体。右端は \texttt{厚みごとと総合の比較\_\allowbreak{}まとめ.csv} の「勧める学習」）}\label{tab:tvt}
+\begin{tabular}{llccccc l}
+\toprule
+材料 & モデル & 0.5 mm & 1.0 mm & 1.5 mm & 2.0 mm & 全厚み & 勧める学習 \\
+\midrule
+\multicolumn{8}{l}{\textbf{通常版}} \\
+PP & \texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr} & \textbf{1.9} / 6.5 & \textbf{1.8} / 5.6 & \textbf{10.8} / 16.4 & \textbf{25.4} / 46.2 & \textbf{16.0} / 27.9 & 厚みごと \\
+粉砕材混合 PP & \texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr} & \textbf{1.0} / 1.3 & 4.0 / \textbf{2.8} & \textbf{5.9} / 20.1 & \textbf{16.2} / 32.8 & \textbf{9.9} / 21.6 & 厚みごと \\
+GPPS & \texttt{B\_\allowbreak{}Tset\_\allowbreak{}Arr} & --- & \textbf{2.3} / 9.0 & 20.5 / \textbf{9.3} & 19.9 / \textbf{17.4} & 17.8 / \textbf{12.9} & 総合 \\
+\midrule
+\multicolumn{8}{l}{\textbf{温度適切版}} \\
+PP & \texttt{C} & \textbf{1.9} / 5.2 & \textbf{1.3} / 2.9 & \textbf{4.3} / 6.1 & 10.9 / \textbf{3.3} & 5.8 / \textbf{4.6} & 厚みごと \\
+粉砕材混合 PP & \texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr} & \textbf{1.3} / 1.6 & \textbf{2.0} / 2.6 & 3.6 / \textbf{2.5} & 8.7 / \textbf{6.5} & 4.9 / \textbf{3.8} & 総合 \\
+GPPS & \texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr} & --- & \textbf{2.2} / 5.8 & 4.5 / \textbf{3.1} & \textbf{3.0} / 5.2 & \textbf{3.4} / 4.8 & 厚みごと \\
+\bottomrule
+\end{tabular}
+\end{table}
+これは、厚みごとの比較のノートが、6 節の係数で厚みごとに学習し直したモデルの結果で、本番の厚みごとの学習の目安になります。「勧める学習」は、誤差の差が 1 ポイント以上ある厚みの数の多数決です。温度適切版のPP（「勧める学習」は厚みごと〔厚みごとがよい厚み 3、総合がよい厚み 1〕、全厚みの誤差は厚みごと 5.8\%・総合 4.6\%）は、「勧める学習」と全厚みの誤差の大小が食い違います。本番の結果を比べるときは、厚みごとの誤差と全厚みの誤差の両方を見てください。
+
+\section{注意と、ユーザーが決めること}\label{sec:note}
+\begin{enumerate}[itemsep=0.5ex,topsep=0.4ex]
+\item \textbf{型やモデルを 3data の誤差で選ぶ場合}：規則は、学習データの LML で選びます。3data の RMSE だけで選ぶと、通常版の GPPS は \texttt{B\_\allowbreak{}Tset\_\allowbreak{}WLF}（0.112 対 0.121）、温度適切版の粉砕材混合 PP は Tff のモデル（\texttt{B\_\allowbreak{}Tff\_\allowbreak{}WLF} 0.027 対 0.038） になります（表~\ref{tab:rank}）。ただし、Tff のシフトは尤度で支持されず、温度適切版の検証は高速側だけです。誤差を優先するなら、通常版の GPPS だけ \texttt{SHIFT\_\allowbreak{}FORM = "wlf"} にする選択肢があります。
+\item \textbf{温度適切版の検証}：検証データは高速側（280・320 mm/s）だけで、低速側の外挿は確かめられません。
+\item \textbf{温度適切版の GPPS の予測区間}：95\% 予測区間に入る割合が 0.76（どのモデルも 0.73〜0.82） で、基準 0.8 に届きません。
+\item \textbf{厚みごとで、縦の係数が負になりそうな厚み}：通常版のPPの 2 mm（\texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr}、縦の係数 $-12.5$、$\Delta$LML 3.26）、温度適切版の粉砕材混合 PPの 2 mm（\texttt{A\_\allowbreak{}Tset\_\allowbreak{}Arr}、縦の係数 $-12$、$\Delta$LML 2.17）。本番の厚みごとの学習も、同じデータを同じ方法で計算するので、同じように負になる見込みです（ノートの「シフト」の判定で ★ が出ます）。\textbf{表~\ref{tab:concl} のモデルのまま学習し、★ は結果として扱います}（\ref{sec:noc} 節）。
+\item \textbf{規則に入っていないこと}：規則は、縦のシフトの向きを見ません。全厚みの候補は 6 つとも向きが正しいことを確かめましたが、厚みごとに規則を当てるときは、向きも見る必要があります（\ref{sec:tprof} 節）。
+\end{enumerate}
+
+\subsection{★ が出た厚みだけ C（シフトなし）に替えることの問題点}\label{sec:noc}
+11 月 5 日の最初の版では、5 章に「★ が出たら、その厚みだけシフトなし（C）で学習し直す」という選択肢を書きました。ユーザーの指摘を受けて見直し、\textbf{この選択肢は取り下げます}。理由は次の 5 つです。
+\begin{enumerate}[itemsep=0.5ex,topsep=0.4ex]
+\item \textbf{結果を見てからモデルを替えることになる}：替える理由が「★ を消すため」なので、判定に合う結果が出るまでモデルを選び直すことになります。学習を無理に成功させるのと同じで、選んだ後の結果は、実際よりよく見えます。
+\item \textbf{問題は消えずに、見えなくなるだけ}：負の係数は、「$\Tff$ と P3\_3 を入れたうえでの $\Tset$ の効果が、その厚みでは逆向きに出た」というデータの性質です（$\Tset$ の効果の多くは $\Tff$ と P3\_3 が担うので、残りは小さく、条件の少ない厚みでは向きが決まりにくい）。C は $\Tset$ を GP の普通の入力にするので、同じ逆向きの効果を、そのまま GP の中に取り込みます。C には係数がないので、★ で気づけなくなるだけです。
+\item \textbf{比べられなくなる}：その厚みだけモデルが違うと、厚みごとの係数の表に穴があきます。厚みごとと全厚みの比較、ほかの材料や学習データ（通常版・温度適切版）との比較で、「データの分け方の違い」と「モデルの違い」が混ざり、差の理由が分からなくなります。
+\item \textbf{判定の基準の意味が崩れる}：ふつうの意味の過学習（学習データの細かいゆれまで覚えて、予測が悪くなること）とは、少し違う問題です。C は、学習データへの当てはまりを上げるために選ぶわけではなく、自由度はむしろ大きい（$\Tset$ を自由な入力にする）ので、過学習が減るわけでもありません。しかし、選び方が結果を見て後から決まるので、$\Delta$LML の基準（5\%）の意味が崩れます。22 の「材料・厚み」で調べれば、基準を偶然に超えるものが 1 つ前後出るのは、ふつうのことです。また、3data の誤差を見て替えるなら、検証データをモデル選びに使うことになり、3data の誤差が楽観的になります（過学習と同じ種類の問題）。
+\item \textbf{決まりを後から足すことになる}：公平にするには、「どの材料・学習データ・厚みでも、★ が出たら C」という決まりを、結果を見る前に決めて、すべてに当てはめる必要があります。今回は結果を見た後なので、その条件を満たしません。
+\end{enumerate}
+\textbf{勧める扱い}：表~\ref{tab:concl} のモデルのまま、すべての厚みを学習します。★ は、「この厚みでは、$\Tff$ と P3\_3 を入れたうえでの $\Tset$ の効果が逆向きに出た（条件が少なく、向きが決まりにくい）」という結果として、そのまま報告します。厚みごとの係数の向きをそろえたいときは、結果を見る前の決まりとして、すべての厚みに同じ扱い（例：全厚みで決めた係数に固定して、GP だけを厚みごとに学習する）を当てはめる方法があります（ノートの直しが要るので、ユーザーの判断です）。
+
+\appendix
+\section{見た結果ファイル}
+次のフォルダの CSV を読みました（学習結果フォルダの \texttt{全ショット版/\allowbreak{}}。ほかに、\texttt{データ確認/\allowbreak{}データの概要.csv} と、候補のモデルの学習済みモデル）。
+\begin{itemize}[itemsep=0.2ex,topsep=0.4ex]
+\item 通常版・PP：\texttt{05\_\allowbreak{}…/\allowbreak{}01\_\allowbreak{}バージンPP再々実験/\allowbreak{}01\_\allowbreak{}検討結果/\allowbreak{}01\_\allowbreak{}バージンPP再々実験\_\allowbreak{}シフト検討結果(5all学習データ)/\allowbreak{}全ショット版/\allowbreak{}}
+\item 通常版・粉砕材混合 PP：\texttt{05\_\allowbreak{}…/\allowbreak{}02\_\allowbreak{}粉砕材混合PP実験/\allowbreak{}02\_\allowbreak{}検討結果/\allowbreak{}02\_\allowbreak{}粉砕材混合PP実験\_\allowbreak{}検討結果(5all学習データ)/\allowbreak{}全ショット版/\allowbreak{}}
+\item 通常版・GPPS：\texttt{05\_\allowbreak{}…/\allowbreak{}03\_\allowbreak{}GPPS実験/\allowbreak{}03\_\allowbreak{}検討結果/\allowbreak{}03\_\allowbreak{}GPPS実験\_\allowbreak{}検討結果(5all学習データ)/\allowbreak{}全ショット版/\allowbreak{}}
+\item 温度適切版・PP：\texttt{05\_\allowbreak{}…/\allowbreak{}01\_\allowbreak{}バージンPP再々実験/\allowbreak{}01\_\allowbreak{}検討結果/\allowbreak{}01\_\allowbreak{}バージンPP再々実験\_\allowbreak{}シフト検討結果(5適切学習データ)/\allowbreak{}全ショット版/\allowbreak{}}
+\item 温度適切版・粉砕材混合 PP：\texttt{05\_\allowbreak{}…/\allowbreak{}02\_\allowbreak{}粉砕材混合PP実験/\allowbreak{}02\_\allowbreak{}検討結果/\allowbreak{}02\_\allowbreak{}粉砕材混合PP実験\_\allowbreak{}検討結果(5適切学習データ)/\allowbreak{}全ショット版/\allowbreak{}}
+\item 温度適切版・GPPS：\texttt{05\_\allowbreak{}…/\allowbreak{}03\_\allowbreak{}GPPS実験/\allowbreak{}03\_\allowbreak{}検討結果/\allowbreak{}03\_\allowbreak{}GPPS実験\_\allowbreak{}検討結果(5適切学習データ)/\allowbreak{}全ショット版/\allowbreak{}}
+\end{itemize}
+その中の、次のファイルです。
+\begin{itemize}[itemsep=0.2ex,topsep=0.4ex]
+\item \texttt{全厚み総合/\allowbreak{}シフトファクターの検討/\allowbreak{}候補の選び方.csv}：組ごとの A・B の $\Delta$LML と結論（表~\ref{tab:cand}）
+\item \texttt{全厚み総合/\allowbreak{}シフトファクターの検討/\allowbreak{}まとめ.csv}：モデルごとの係数・LML・3data の誤差（表~\ref{tab:detail}・\ref{tab:rank}、\ref{sec:total} 章の文）
+\item \texttt{全厚み総合/\allowbreak{}シフトファクターの検討/\allowbreak{}判定の一覧.csv}：シフトの向き・重ね合わせ・C との比などの判定（\ref{sec:total} 章の文）
+\item \texttt{厚みごと/\allowbreak{}シフトに使う温度/\allowbreak{}プロファイル尤度\_\allowbreak{}厚みごと.csv}：厚みごとの係数・LML・取り直し（表~\ref{tab:datah}・\ref{tab:tprof}）
+\item \texttt{厚みごと/\allowbreak{}シフトに使う温度/\allowbreak{}厚みごとの比較\_\allowbreak{}まとめ.csv}：Tff か Tset かの多数決（表~\ref{tab:temp}）
+\item \texttt{厚みごと/\allowbreak{}温度シフトの確認/\allowbreak{}温度シフトの確認\_\allowbreak{}厚みごと.csv}：全厚みの係数の、厚みごとの判定（表~\ref{tab:temp}）
+\item \texttt{厚みごと/\allowbreak{}厚みごとのモデルと総合の比較/\allowbreak{}厚みごとと総合の比較.csv}・\texttt{厚みごとと総合の比較\_\allowbreak{}まとめ.csv}：厚みごとのモデルと総合データのモデルの誤差（表~\ref{tab:datah}・\ref{tab:tvt}）
+\end{itemize}
+
+\section{ダイアログを使わないときの \texttt{FILES}}\label{sec:files}
+設定エリアの \mdl{FILES = {}} を、学習データの種類に合わせて、次のどちらかに書き換えると、ダイアログは出ません。3 材料分を書いてあり、\texttt{MATERIALS} に書かない材料の行は使われないので、全厚み・厚みごとの全部の実行で同じものを使えます。学習データ・検証データは検討のときと同じファイル、学習結果フォルダは検討と同じフォルダです（スクリプトで、Python として読めることと、場所がすべてあることを確かめました）。PDF から写すときは、字下げと \texttt{r"…"} が崩れていないかを確かめてください。
+\subsection*{通常版}
+\begin{Verbatim}[fontsize=\footnotesize,frame=single]
+FILES = {
+    "PP": {
+        "学習": r"05_材料ごとの機械学習データと予測検証データ"
+                r"\01_バージンPP再々実験\01_学習・検証データ"
+                r"\学習データ_pp_max_5data"
+                r"\結合_03_pp_max_5data_外れ値なし.csv",
+        "検証": r"05_材料ごとの機械学習データと予測検証データ"
+                r"\01_バージンPP再々実験\01_学習・検証データ"
+                r"\検証データ_pp_max_5data用_3data"
+                r"\結合_05_pp_max_3data(no1.5-3.0)_外れ値なし.csv",
+        "結果": r"05_材料ごとの機械学習データと予測検証データ"
+                r"\01_バージンPP再々実験\01_検討結果"
+                r"\01_バージンPP再々実験_シフト検討結果(5all学習データ)",
+    },
+    "MIX": {
+        "学習": r"05_材料ごとの機械学習データと予測検証データ"
+                r"\02_粉砕材混合PP実験\02_学習・検証データ"
+                r"\学習データ_mixpp_max_5data"
+                r"\結合_03_mixpp_max_5data_外れ値なし.csv",
+        "検証": r"05_材料ごとの機械学習データと予測検証データ"
+                r"\02_粉砕材混合PP実験\02_学習・検証データ"
+                r"\検証データ_mixpp_max_5data用_3data"
+                r"\結合_02_mixpp_max_3data_外れ値なし.csv",
+        "結果": r"05_材料ごとの機械学習データと予測検証データ"
+                r"\02_粉砕材混合PP実験\02_検討結果"
+                r"\02_粉砕材混合PP実験_検討結果(5all学習データ)",
+    },
+    "GPPS": {
+        "学習": r"05_材料ごとの機械学習データと予測検証データ"
+                r"\03_GPPS実験\03_学習・検証データ"
+                r"\学習データ_gpps_max_5data"
+                r"\結合_gpps_5data_20261014_060353.csv",
+        "検証": r"05_材料ごとの機械学習データと予測検証データ"
+                r"\03_GPPS実験\03_学習・検証データ"
+                r"\検証データ_gpps_max_5data用_3data"
+                r"\結合_gpps_3data_20261014_052315.csv",
+        "結果": r"05_材料ごとの機械学習データと予測検証データ"
+                r"\03_GPPS実験\03_検討結果"
+                r"\03_GPPS実験_検討結果(5all学習データ)",
+    },
+}
+\end{Verbatim}
+\subsection*{温度適切版}
+\begin{Verbatim}[fontsize=\footnotesize,frame=single]
+FILES = {
+    "PP": {
+        "学習": r"05_材料ごとの機械学習データと予測検証データ"
+                r"\01_バージンPP再々実験\01_学習・検証データ"
+                r"\学習データ_pp_max_温度適切5data"
+                r"\結合_03_pp_max_温度適切5data_外れ値なし.csv",
+        "検証": r"05_材料ごとの機械学習データと予測検証データ"
+                r"\01_バージンPP再々実験\01_学習・検証データ"
+                r"\検証データ_pp_max_温度適切5data用_3data"
+                r"\結合_05_pp_max_温度適切3data(no1.5-3.0)_外れ値なし.csv",
+        "結果": r"05_材料ごとの機械学習データと予測検証データ"
+                r"\01_バージンPP再々実験\01_検討結果"
+                r"\01_バージンPP再々実験_シフト検討結果(5適切学習データ)",
+    },
+    "MIX": {
+        "学習": r"05_材料ごとの機械学習データと予測検証データ"
+                r"\02_粉砕材混合PP実験\02_学習・検証データ"
+                r"\学習データ_mixpp_max_温度適切5data"
+                r"\結合_03_mixpp_max_温度適切5data_外れ値なし.csv",
+        "検証": r"05_材料ごとの機械学習データと予測検証データ"
+                r"\02_粉砕材混合PP実験\02_学習・検証データ"
+                r"\検証データ_mixpp_max_温度適切5data用_3data"
+                r"\結合_02_mixpp_max_温度適切3data_外れ値なし.csv",
+        "結果": r"05_材料ごとの機械学習データと予測検証データ"
+                r"\02_粉砕材混合PP実験\02_検討結果"
+                r"\02_粉砕材混合PP実験_検討結果(5適切学習データ)",
+    },
+    "GPPS": {
+        "学習": r"05_材料ごとの機械学習データと予測検証データ"
+                r"\03_GPPS実験\03_学習・検証データ"
+                r"\学習データ_gpps_max_温度適切5data"
+                r"\結合_gpps_5data_20261014_060353.csv",
+        "検証": r"05_材料ごとの機械学習データと予測検証データ"
+                r"\03_GPPS実験\03_学習・検証データ"
+                r"\検証データ_gpps_max_温度適切5data用_3data"
+                r"\結合_gpps_3data(温度適切)_20261014_052315.csv",
+        "結果": r"05_材料ごとの機械学習データと予測検証データ"
+                r"\03_GPPS実験\03_検討結果"
+                r"\03_GPPS実験_検討結果(5適切学習データ)",
+    },
+}
+\end{Verbatim}
+\end{document}

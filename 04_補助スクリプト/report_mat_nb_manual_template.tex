@@ -49,7 +49,7 @@
 % =====================================================================
 \section{この文書について}
 
-この文書は、フォルダ \file{01_機械学習コードフォルダ/材料別_温度シフトファクター検討/} の中にある 5 つのノートブック（以下「ノート」）の説明書です。このフォルダを初めて開いた人が、\textbf{何を目的に、何を調べるコードなのか}、\textbf{どんなデータに使えるのか}、\textbf{どう実行し、結果をどこで見るのか}を、この 1 冊で分かるように書きました。機械学習や統計を初めて学ぶ人でも読めるように、専門の言葉は 9 章の用語集で説明しています。
+この文書は、フォルダ \file{01_機械学習コードフォルダ/材料別_温度シフトファクター検討/} の中にある 6 つのノートブック（以下「ノート」）の説明書です。このフォルダを初めて開いた人が、\textbf{何を目的に、何を調べるコードなのか}、\textbf{どんなデータに使えるのか}、\textbf{どう実行し、結果をどこで見るのか}を、この 1 冊で分かるように書きました。機械学習や統計を初めて学ぶ人でも読めるように、専門の言葉は 9 章の用語集で説明しています。
 
 \begin{table}[!htbp]
 \caption{このフォルダのノート。時間は、3 材料をまとめて実行したときの目安（全ショット版／条件ごとの平均版）}\label{tab:nbs}
@@ -61,6 +61,7 @@
 \textbf{① シフトファクター検討用}\newline \file{@@NB_STUDY@@}\newline（\file{@@DIR_STUDY@@/}） & 温度の列（加熱シリンダ温度・流動中樹脂温度）ごとに温度のシフトファクターを推定して、シフトのないモデルと比べ、\textbf{どの列をシフトに使うのがよいか}を調べる。②で使う列の候補を出す & 約 2.5／5 時間 \\
 \textbf{② 学習用}\newline \file{@@NB_TRAIN@@}\newline（\file{@@DIR_TRAIN@@/}） & 設定で決めた 1 つの列でシフトする\textbf{モデルを学習して}、データの確認・図・表・学習済みモデルを一式作る（報告書・発表資料用の図を含む） & 約 25／45 分 \\
 \textbf{③ 厚みごとの比較}\newline \file{@@NB_THICK@@}\newline（\file{@@DIR_STUDY@@/}） & ①のモデルを\textbf{キャビティ厚みごとに}見直す。厚みごとにシフトが効いているか、どちらの温度が適するか、厚みごとに学習したモデルと全厚みのモデルのどちらがよいか & 約 45 分 \\
+\textbf{④ Tff の入力の有無の比較}\newline \file{@@NB_TFF@@}\newline（\file{@@DIR_STUDY@@/}） & ①の C から流動中樹脂温度 $\Tff$ を外したモデル（C\_noTff）を学習し、\textbf{$\Tff$ を GP の入力に使ったほうがよいか}を、①のすべてのモデルと比べる（2026 年 11 月 6 日から） & @@TIME_TFF@@ \\
 \textbf{解説付きの版}（2 つ）\newline \file{解説付き_…ipynb}\newline（①・②と同じフォルダ） & ①・②と同じコードの各行に、Python 初心者向けの解説のコメントを付けたもの。実行すると①・②と同じ結果になる & ①・②と同じ \\
 \bottomrule
 \end{tabularx}
@@ -85,6 +86,7 @@
 \item シフトに使う温度は、\textbf{加熱シリンダ温度 $\Tset$}（設定値）と、\textbf{流動中樹脂温度 $\Tff$}（流れている樹脂の先端の温度の実測値。結果のフォルダ名では「型内樹脂温度」、発表資料では「金型内樹脂最高温度」）のどちらが適しているか。
 \item そのモデルで、学習に使っていない成形条件（射出速度の両端）の粘度を、どれだけ当てられるか。
 \item キャビティの厚みごとに見ても、1〜3 が成り立つか（③のノート）。
+\item $\Tff$ がシフトの役目を果たさなくても、GP の入力に使ったほうがよいか（④のノート）。
 \end{enumerate}
 
 \subsection{データと変数}
@@ -138,23 +140,26 @@ A\_Tset\_Arr など & 縦だけずらす対案（$a_h=1$）。設定で選んだ
 \node[data] (csv) {材料ごとの CSV\\学習データ（5data）\\検証データ（3data）};
 \node[nb=blue!8, right=10mm of csv] (study) {\textbf{① シフトファクター検討用}\\温度の列と型ごとのシフトと\\基準の C を比べる};
 \node[nb=orange!12, right=15mm of study] (thick) {\textbf{③ 厚みごとの比較}\\①のモデルを\\厚みごとに見直す};
+\node[nb=red!8, above=8mm of thick] (tff) {\textbf{④ Tff の入力の有無の比較}\\①の C から $T_{\mathrm{ff}}$ を外して比べる};
 \node[nb=green!10, below=22mm of study] (train) {\textbf{② 学習用}\\設定 \texttt{SHIFT\_COL}・\texttt{SHIFT\_FORM}\\の 1 つのモデルを学習};
 \node[nb=gray!10, below=22mm of thick] (res) {\textbf{学習結果フォルダ}（材料ごと）\\3 つのノートが、それぞれの\\場所に結果を書く（5.4 節）};
 \draw[arr] (csv) -- (study);
 \draw[arr] (csv) |- (train);
 \draw[arr] (study) -- node[lab, above=1pt] {学習済み} node[lab, below=1pt] {モデル} (thick);
 \draw[arr, dashed] (study) -- node[lab, left=2pt] {まとめの \texttt{SHIFT\_COL}・\\\texttt{SHIFT\_FORM} の候補を\\見て人が決め、②に書く} (train);
+\draw[arr] (study.north east) -- node[lab, above left=0pt] {C と表} (tff.west);
 \draw[arr, gray] (train) -- (res);
 \draw[arr, gray] (thick) -- (res);
 \draw[arr, gray] (study.south east) -- (res.north west);
 \end{tikzpicture}
-\caption{3 つのノートの関係。実線はノートが読むもの、破線は人が決めること}\label{fig:flow}
+\caption{4 つのノートの関係。実線はノートが読むもの、破線は人が決めること}\label{fig:flow}
 \end{figure}
 
 \begin{enumerate}[itemsep=0.4ex,topsep=0.5ex]
 \item \textbf{①シフトファクター検討用を実行する}。選んだすべての材料に、アレニウス型と WLF 型の両方を当てはめて比べます（設定 \file{SHIFT_FORMS}）。最後の「まとめ」に、材料ごとに「学習用のノートの \file{SHIFT_COL}・\file{SHIFT_STRUCT}・\file{SHIFT_FORM} の候補」が出ます（列と型の組ごとに、温度のシフトが支持されるか、A と B のどちらかを決め、残った組の LML が最も大きいもの。どれも支持されなければ、シフトなしの \file{None} も候補。選び方は 6.1 節の表 \ref{tab:study} の後）。
-\item \textbf{②学習用の設定 \file{SHIFT_COL}・\file{SHIFT_FORM} を決めて、実行する}。候補を参考に、3data の誤差なども見て、人が決めます。\file{SHIFT_FORM} の型は、選んだすべての材料に使います（材料で候補の型が違うときは、材料ごとに実行を分けるか、どちらかにそろえる）。決まっていれば、①を飛ばして②だけを実行してもかまいません（2026 年 10 月 23 日の結果では、全ショット版で B\_Tset が支持され、既定の \file{SHIFT_COL} は加熱シリンダ温度です。既定の \file{SHIFT_FORM} はアレニウス型）。
+\item \textbf{②学習用の設定 \file{SHIFT_COL}・\file{SHIFT_FORM} を決めて、実行する}。候補を参考に、3data の誤差なども見て、人が決めます。\file{SHIFT_FORM} の型は、選んだすべての材料に使います（材料で候補の型が違うときは、材料ごとに実行を分けるか、どちらかにそろえる）。決まっていれば、①を飛ばして②だけを実行してもかまいません（2026 年 10 月 23 日の結果では、全ショット版で B\_Tset が支持され、既定の \file{SHIFT_COL} は加熱シリンダ温度です。既定の \file{SHIFT_FORM} はアレニウス型）。厚みごとに学習するときは、設定 \file{THICKNESS} に厚みを書いて、厚みごとに 1 回ずつ実行します（2026 年 11 月 5 日から。6.2 節）。
 \item \textbf{③厚みごとの比較は、①の後で実行する}（②とは独立）。①と同じ入力の取り方（\file{INPUT_MODE}）にします。③の \file{SHIFT_COLS}・\file{STRUCTS}・\file{SHIFT_FORMS} は①と同じ書き方・同じ既定で、①で学習したモデルの中から選びます（どちらも既定なら、そのままでよい。③は、その組み合わせのモデルと C を読む。2026 年 11 月 5 日から）。
+\item \textbf{④Tff の入力の有無の比較も、①の後で実行する}（②③とは独立）。①と同じ \file{INPUT_MODE} にし、①で選んだ学習結果フォルダを選びます。通常版と温度適切版は学習結果フォルダが別なので、版ごとに 1 回ずつ実行します（6.4 節）。
 \end{enumerate}
 解説付きの版は、元のノートと同じ動きをするので、どちらか一方を実行すれば十分です（同じ学習結果フォルダを選ぶと、結果は上書きされます）。
 
@@ -340,12 +345,15 @@ FILES = {"PP": {
 .5 \file{@@DIR_B_TFF_ARR@@}/.
 .5 \file{@@DIR_B_TFF_WLF@@}/.
 .5 \file{@@DIR_C@@}/.
+.4 @@TFF_DIR@@/\DTcomment{④Tff の入力の有無の比較（C\_noTff の学習済みモデル・表・図）}.
 .3 @@THICK_EACH@@/\DTcomment{③厚みごとの比較（読んだすべてのモデル。組ごとの図は、名前に組を付ける）}.
 .4 学習結果グラフ/.
 .4 温度シフトの確認/.
 .4 シフトに使う温度/.
 .4 厚みごとのモデルと総合の比較/.
 .4 {判定の一覧.csv}.
+.4 厚み0.5mm/\DTcomment{②学習用で \file{THICKNESS = 0.5} としたとき（厚みごとに別のフォルダ）}.
+.5 \file{<モデルのフォルダ>}/\DTcomment{②の結果のすべて（全厚みのときと同じ中身）}.
 .2 @@V_COND@@/\DTcomment{\file{INPUT_MODE = "cond"}（同じ構成）}.
 }
 \caption{学習結果フォルダの中の構成}\label{fig:tree}
@@ -417,7 +425,7 @@ FILES = {"PP": {
 \begin{points}
 \pt{ファイル}\file{@@DIR_TRAIN@@/@@NB_TRAIN@@}
 \pt{目的}シフトに使う列を 1 つ決めて、\textbf{そのモデルを学習し、データの確認から報告書用の図まで一式を作ります}。6月のノートの図（損失関数の推移・特徴スケール・カーネル行列・依存性グラフ・せん断速度 ― 粘度・3次元グラフ）を、同じ見せ方で作ります。
-\pt{主な設定}\file{SHIFT_COL}：シフトに使う列（学習ファイルの列名で書く）。\file{"加熱シリンダ温度[℃]"}（既定。B\_Tset\_Arr・B\_Tset\_WLF）、\file{"流動中樹脂温度(℃)"}（B\_Tff\_Arr・B\_Tff\_WLF）、\file{None}（シフトなし。C）。GPPS の書き方 \file{"加熱シリンダ温度(℃)"}、短い名前 \file{"Tset"}・\file{"Tff"} も使えます。温度でない列を書くと止まります。\file{SHIFT_STRUCT}：\file{"B"}（横・縦）か \file{"A"}（縦だけ）。\file{SHIFT_FORM}：型（\file{"arrhenius"}〔既定〕か \file{"wlf"}。選んだすべての材料に同じ型を使う。記号の末尾が \_Arr・\_WLF になる）。そのほか、外れ値を一覧に登録する材料（\file{OUTLIER_REGISTER}）、参考の Cross-WLF の設定（\file{CWLF_*}）。
+\pt{主な設定}\file{SHIFT_COL}：シフトに使う列（学習ファイルの列名で書く）。\file{"加熱シリンダ温度[℃]"}（既定。B\_Tset\_Arr・B\_Tset\_WLF）、\file{"流動中樹脂温度(℃)"}（B\_Tff\_Arr・B\_Tff\_WLF）、\file{None}（シフトなし。C）。GPPS の書き方 \file{"加熱シリンダ温度(℃)"}、短い名前 \file{"Tset"}・\file{"Tff"} も使えます。温度でない列を書くと止まります。\file{SHIFT_STRUCT}：\file{"B"}（横・縦）か \file{"A"}（縦だけ）。\file{SHIFT_FORM}：型（\file{"arrhenius"}〔既定〕か \file{"wlf"}。選んだすべての材料に同じ型を使う。記号の末尾が \_Arr・\_WLF になる）。\file{THICKNESS}：学習する厚み（2026 年 11 月 5 日から）。\file{None}（既定）なら全厚みの 5data で 1 つのモデルを学習します。厚みの数（例：\file{0.5}）を書くと、その厚みの 5data だけで学習し、同じ厚みの 3data で検証します（データの確認〔外れ値・\PIII\ の性質〕は、どちらでも全厚みで行う）。厚みごとに、値を変えて 1 回ずつ実行します。その厚みのデータがない材料（GPPS の 0.5 mm など）は、その回は学習しません。そのほか、外れ値を一覧に登録する材料（\file{OUTLIER_REGISTER}）、参考の Cross-WLF の設定（\file{CWLF_*}）。
 \pt{時間}3 材料で、全ショット版 約 35 分、条件ごとの平均版 約 60 分（2026 年 11 月 3 日の見直しと区間の延長を足した後の見積もり。C なら約 10 分）。
 \end{points}
 \begin{table}[!htbp]
@@ -430,6 +438,7 @@ FILES = {"PP": {
 2. データの読み込み & ①と同じ \\
 3. 外れ値の検知 & 条件の平均が、ほかの条件からの予測と大きく違う条件を拾う（規則 f）。PP・粉砕材混合 PP は、拾った条件が問題データ一覧に登録済みか。見直しの候補（問題の候補）の表も作る \\
 4. \PIII\ の性質 & \PIII\ が粘度の算出式の圧力でないか（リークの目安） \\
+4b. 学習する厚み & \file{THICKNESS} で厚みを選んだときだけ、学習・検証のデータを、その厚みの行に絞る（その厚みの学習・検証とも、設定温度が 3 水準あるか） \\
 5. 学習 & シフトの係数のプロファイル尤度と念入りな最適化（①と同じ）、最終モデル、損失関数の推移・特徴スケール・カーネル行列（セル5〜8） \\
 6. シフトファクター & 倍率の図とマスターカーブ（①と同じ） \\
 7. 依存性グラフ & 各説明変数を動かしたときの粘度（せん断速度を上げると粘度が下がるか、温度を上げると下がるか。セル9） \\
@@ -443,7 +452,7 @@ FILES = {"PP": {
 \end{table}
 \begin{points}
 \pt{図だけを描き直す}セル16・16-2・17（せん断速度 ― 粘度、依存性グラフ、3次元グラフ）は、セルの先頭に専用の設定エリアがあり、全体を一度実行した後で、\textbf{そのセルだけを直して実行し直せます}（学習はやり直しません）。軸の範囲・図の大きさ・文字の大きさ・タイトルなどを変えられます。
-\pt{出力}\file{<版>/@@THICK_TOTAL@@/<モデルのフォルダ>/}（例：\file{@@DIR_B_TSET_ARR@@/}。型ごとに別のフォルダ）に、すべての図・表・判定の一覧・まとめ・学習済みモデル。中に \file{せん断速度_粘度/}・\file{せん断速度_粘度_拡張版/}・\file{依存性グラフ_セル9-2/}・\file{3次元グラフ/}。外れ値の検知と \PIII\ の性質は \file{データ確認/}。
+\pt{出力}\file{<版>/@@THICK_TOTAL@@/<モデルのフォルダ>/}（例：\file{@@DIR_B_TSET_ARR@@/}。型ごとに別のフォルダ）に、すべての図・表・判定の一覧・まとめ・学習済みモデル。中に \file{せん断速度_粘度/}・\file{せん断速度_粘度_拡張版/}・\file{依存性グラフ_セル9-2/}・\file{3次元グラフ/}。外れ値の検知と \PIII\ の性質は \file{データ確認/}。\file{THICKNESS} で厚みを選んだときは、\file{<版>/@@THICK_EACH@@/厚み<厚み>mm/<モデルのフォルダ>/}（例：\file{厚み0.5mm/}。厚みは 1 mm なら \file{厚み1mm}）に同じものを書き、選んだ厚みのデータの概要（\file{学習した厚みのデータの概要.csv}）も置きます。厚みが 1 つなので、全厚み共通の図は、既定では作りません。
 \end{points}
 
 \subsection{③ 厚みごとの比較}
@@ -473,11 +482,42 @@ FILES = {"PP": {
 \end{table}
 \textbf{出力}：\file{<版>/@@THICK_EACH@@/} の \file{学習結果グラフ/}（3 節）、\file{温度シフトの確認/}（4 節）、\file{シフトに使う温度/}（5〜8 節）、\file{厚みごとのモデルと総合の比較/}（9 節）と、直下の \file{判定の一覧.csv}。
 
+\subsection{④ Tff の入力の有無の比較}
+\begin{points}
+\pt{ファイル}\file{@@DIR_STUDY@@/@@NB_TFF@@}
+\pt{目的}「流動中樹脂温度 $\Tff$ は、シフトの役目を果たさなくても、GP の入力に使ったほうがよいか」を調べます（2026 年 11 月 6 日のユーザーの問いから）。今のモデルは、どれも $\Tff$ を GP の入力かシフトのどちらかに使っています（表 \ref{tab:models}）。④は、①の C から $\Tff$ を外したモデル \textbf{C\_noTff}（$\ln\eta=f(\ln\gd,\ \ln\PIII,\ \Tset)$。シフトなし）を同じ 5data で学習し、①のすべてのモデルと比べます。C\_noTff は、A\_Tff・B\_Tff の係数を 0 にした点と同じモデルなので、その LML は①の \file{シフトファクターの推定.csv} の \file{LML_at_0} とも一致するはずです（④で確かめます）。
+\pt{前提}①を、同じ \file{INPUT_MODE} で、基準の C を含めて実行しておくこと（④は、①の学習済みの C・3data の予測値・表を読みます）。
+\pt{比べ方}対数周辺尤度（LML）は、\textbf{同じ材料・同じ版の中だけ}で比べます（材料や版が違うと、LML の大きさはデータの行数とばらつきで決まるため）。パラメータの数の差には基準（1 つで 1.92、2 つで 3.0）を当てます。3data の誤差（$\ln\eta$ の RMSE・被覆率）は、①の全モデルと並べます。
+\pt{主な設定}\file{LML_CLEAR}（1.92）、\file{RMSE_RATIO}（1.1。RMSE の比がこの内側なら同等）、\file{LML_CHECK}（1.0。C\_noTff の LML が①の値よりこれ以上低ければ ★）、\file{SAVE_ROOT}（結果の置き場所を変えるとき。既定は学習結果フォルダの中）。
+\pt{時間}@@TIME_TFF@@（学習は材料ごとに GP を 1 回。プロファイル尤度はありません）。
+\end{points}
+\begin{table}[!htbp]
+\caption{④の節の流れ}\label{tab:tff}
+\small
+\begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}p{0.27\linewidth}>{\raggedright\arraybackslash}X@{}}
+\toprule
+節 & すること（主な判定） \\
+\midrule
+2. 読み込み & ①の学習済みの C と表を読み、予測し直して一致するか \\
+3. 学習 & C\_noTff を学習。LML が①の θ = 0 の LML と合うか（局所解の目安） \\
+4. 尤度 & ①の全モデルと C\_noTff の LML の表（パラメータの数と基準つき）。C が C\_noTff より支持されるか、本番の候補が C\_noTff より支持されるか（★ は「$\Tff$ が尤度に効いていない」の知らせ） \\
+5. 3data の誤差 & ①の全モデルと C\_noTff の RMSE・被覆率。RMSE の比 C\_noTff / C が 1/1.1〜1.1 の中か。棒グラフとパリティ図 \\
+6. ハイパーパラメータ & C と C\_noTff の長さスケールなど \\
+7. 学習結果グラフ & C\_noTff のせん断速度 ― 粘度（厚みごと） \\
+8. まとめ & 尤度と誤差から「入れたほうがよい／どちらでもよい／外したほうがよい」 \\
+9. 判定の一覧 & すべての判定の表 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+\textbf{出力}：\file{<版>/@@THICK_TOTAL@@/@@TFF_DIR@@/} に、\file{学習済みモデル_C_noTff.joblib}、\file{対数周辺尤度の比較.csv}、\file{予測検証_3data_指標_全モデル.csv}、\file{Tffの入力の有無_まとめ.csv}、図（\file{予測検証_RMSEの比較_全モデル.png}・\file{予測検証_3data_パリティ_CとC_noTff.png}・\file{せん断速度_粘度/}）と \file{判定の一覧.csv}。①の結果のフォルダは変えません。
+
+\textbf{注意}：$\Tff$ は流れの結果で、予測のときには事前に分かっている必要があります。$\Tff$ を本番の入力から外すかは、④の結果を見て人が決めます（外す場合は、②に設定を足す別の作業になります）。
+
 \subsection{解説付きの版}
 \begin{points}
 \pt{ファイル}\file{@@DIR_TRAIN@@/解説付き_@@NB_TRAIN@@} と \file{@@DIR_STUDY@@/解説付き_@@NB_STUDY@@}
 \pt{何か}①・②と同じコードの各行の上に、Python 初心者向けの解説の行（\texttt{\#} ▶ で始まるコメント）を差し込んだものです。最初のセルに、Python の書き方の基本の表があります。コメントは実行に影響しないので、\textbf{実行すると元のノートと同じ結果が、同じ場所に保存されます}。
-\pt{使い方}コードを読んで学ぶときに使います。実行は、元のノートと解説付きの版のどちらか一方で十分です。③には解説付きの版はありません。
+\pt{使い方}コードを読んで学ぶときに使います。実行は、元のノートと解説付きの版のどちらか一方で十分です。③・④には解説付きの版はありません。
 \end{points}
 
 % =====================================================================
@@ -501,6 +541,7 @@ uv run python 04_補助スクリプト/mat_seed_check.py shot 5 20
 ① シフトファクター検討用 & \file{build_mat_shiftfactor_nb.py}。①②で同じセルの中身は \file{mat_nb_cells.py}、共通の部品は \file{mat_common.py} \\
 ② 学習用 & \file{build_mat_shift_nb.py}（部品は①と同じ） \\
 ③ 厚みごとの比較 & \file{build_mat_thick_nb.py}。厚みごとの部品は \file{mat_thickness.py} \\
+④ Tff の入力の有無の比較 & \file{build_mat_tff_input_nb.py}（C\_noTff は、このノートの中だけで足す。\file{mat_common.py} は変えない） \\
 解説付きの版 & \file{build_mat_shift_nb_commented.py [学習|検討]}。解説は \file{mat_shift_nb_解説/}・\file{mat_shiftfactor_nb_解説/}（元のノートのセルが変わるとエラーで知らせるので、解説を直す） \\
 この説明書 & \file{build_mat_nb_manual.py}（ひな形 \file{report_mat_nb_manual_template.tex}） \\
 \bottomrule
@@ -513,7 +554,7 @@ uv run python 04_補助スクリプト/build_mat_shift_nb.py "<ノートのパ�
 uv run python 04_補助スクリプト/build_mat_shift_nb_commented.py --force
 uv run python 04_補助スクリプト/build_mat_nb_manual.py
 \end{Verbatim}
-共通の部品 \file{mat_common.py} を直したときは、3 つのノートと解説付きの版、この説明書を作り直します。
+共通の部品 \file{mat_common.py} を直したときは、4 つのノート（①〜④）と解説付きの版、この説明書を作り直します。
 
 % =====================================================================
 \section{困ったとき}
