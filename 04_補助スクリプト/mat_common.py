@@ -1156,28 +1156,43 @@ FLOW_DEFAULT = dict(layouts=["temperature", "thickness"], band="predict", points
                     xlim={"thickness": None, "temperature": None}, ylim={"thickness": None, "temperature": None}, figsize=(12, 10), dpi=None,
                     font={"axis": 24, "legend": 24, "title": 24, "tick": 28}, marker=300, marker_shot=70, line=2.0, show_title=True,
                     show_xlabel=False, show_ylabel=False, formats=["png"], n_grid=120, show=None,
-                    legend_separate=False, point_color=True, point_edge=1.5)
+                    legend_separate=False, point_color=True, point_edge=None, point_fill="white", point_fill_alpha=1.0)
+# point_edge：点の枠線の太さ [pt]。数なら、色付き・色なしとも、すべての点（学習・検証・全厚み共通の図）をその太さにする（2026-11-09 のユーザーの依頼）。
+#   None なら今までどおり（色付き：学習 0.6・検証 2.5・全厚み共通の図 0.5、色なし：1.5）
 # legend_separate：True なら、グラフ本体に凡例を付けず、凡例だけを別の画像（<図の名前>_凡例）に保存する（2026-11-08 追加。既定は今までどおり）
-# point_color：False なら、データ点を色なし（塗りつぶしなしの黒い枠線。検証〔3data〕の点は灰色の枠線）にする。枠線の太さは point_edge（2026-11-08 追加）
+# point_color：False なら、データ点を色なし（塗りつぶしの色 point_fill〔既定は白〕と黒い枠線。検証〔3data〕の点は灰色の枠線）にする。枠線の太さは point_edge（2026-11-08 追加。同日、ユーザーの依頼で、塗りつぶしなし → 白の塗りつぶしに変えた）
+# point_fill・point_fill_alpha：色なしのときの、点の塗りつぶしの色と濃さ（0〜1。1 で不透明。枠線は不透明のまま。2026-11-09 のユーザーの依頼で追加）
 POINT_TEST_EDGE = "0.55"            # 色なしのときの、検証（3data）の点の枠線の色（灰色）
 
 
+def fill_rgba(color, alpha):
+    """塗りつぶしの色（名前・"#rrggbb"・"0.8" などの灰色）と濃さ alpha を、RGBA の組にする（枠線の濃さは変えないため、塗りつぶしだけに濃さを付ける）"""
+    from matplotlib.colors import to_rgba
+    return to_rgba(color, alpha)
+
+
+def edge_width(cfg, default):
+    """点の枠線の太さ：cfg["point_edge"] が数ならそれ、None なら default（今までの太さ）"""
+    return default if cfg["point_edge"] is None else cfg["point_edge"]
+
+
 def point_kw(cfg, col, test=False):
-    """データ点の scatter の引数（色・枠）。cfg["point_color"] が True なら今までどおりの色付き、False なら塗りつぶしなしの枠線（学習は黒、検証は灰色。太さ point_edge）"""
+    """データ点の scatter の引数（色・枠）。cfg["point_color"] が True なら今までどおりの色付き、False なら塗りつぶし（色 point_fill・濃さ point_fill_alpha）と枠線（学習は黒、検証は灰色）。
+    枠線の太さは point_edge（None なら今までどおり：色付きの学習 0.6・検証 2.5、色なし 1.5）"""
     if not cfg["point_color"]:
-        return dict(facecolors="none", edgecolors=POINT_TEST_EDGE if test else "k", linewidths=cfg["point_edge"], alpha=1.0)
+        return dict(facecolors=[fill_rgba(cfg["point_fill"], cfg["point_fill_alpha"])], edgecolors=POINT_TEST_EDGE if test else "k", linewidths=edge_width(cfg, 1.5))
     if test:
-        return dict(facecolors="white", edgecolors=col, linewidths=2.5)
-    return dict(color=col, alpha=0.85, edgecolors="k", linewidths=0.6)
+        return dict(facecolors="white", edgecolors=col, linewidths=edge_width(cfg, 2.5))
+    return dict(color=col, alpha=0.85, edgecolors="k", linewidths=edge_width(cfg, 0.6))
 
 
 def point_handle_kw(cfg, col, test=False, edge=0.6):
-    """凡例の点の記号の引数（point_kw と同じ見た目）"""
+    """凡例の点の記号の引数（point_kw と同じ見た目。edge は、point_edge が None で色付きのときの、学習の点の縁の太さ）"""
     if not cfg["point_color"]:
-        return dict(markerfacecolor="none", markeredgecolor=POINT_TEST_EDGE if test else "k", markeredgewidth=cfg["point_edge"])
+        return dict(markerfacecolor=fill_rgba(cfg["point_fill"], cfg["point_fill_alpha"]), markeredgecolor=POINT_TEST_EDGE if test else "k", markeredgewidth=edge_width(cfg, 1.5))
     if test:
-        return dict(markerfacecolor="white", markeredgewidth=2.5)
-    return dict(markerfacecolor=col, markeredgecolor="k", markeredgewidth=edge)
+        return dict(markerfacecolor="white", markeredgewidth=edge_width(cfg, 2.5))
+    return dict(markerfacecolor=col, markeredgecolor="k", markeredgewidth=edge_width(cfg, edge))
 
 
 def save_legend(handles, out_dir, base, formats, dpi, fontsize, ncol=1):
@@ -1192,6 +1207,97 @@ def save_legend(handles, out_dir, base, formats, dpi, fontsize, ncol=1):
         paths.append(path)
     plt.close(lf)
     return paths
+
+
+PARITY_DEFAULT = dict(figsize=(9.5, 9), dpi=None, font={"axis": 10, "legend": 10, "title": 12, "tick": 10},
+                      groups={"低速側": ("#1f77b4", "o"), "高速側": ("#d62728", "s"), "範囲内": ("#2ca02c", "^")},
+                      marker=6, alpha=0.8, point_color=True, point_edge=1.5, point_edge_color="black", point_fill="white", point_fill_alpha=1.0,
+                      errbar=True, err_color="0.3", err_line=1.2, err_alpha=1.0, err_on_top=False, capsize=3, diag_line=1.0,
+                      lim=None, margin=1.3, aspect="equal", legend_separate=False, legend_loc="upper left", show_title=True, show_xlabel=True, show_ylabel=True,
+                      xlabel=r"実測の粘度 $\eta$ (Pa·s)", ylabel=r"予測の粘度 $\eta$ (Pa·s)", grid=True, formats=["png"],
+                      same_style=None, same_label="3data")
+# 3data のパリティ図（学習用のノートのセル14）の見た目の既定（2026-11-08 追加）。
+# 2026-11-09 のユーザーの依頼で：95% 予測区間の縦線は、点の種類によらず同じ色 err_color（既定は濃い灰色 "0.3"）・同じ太さ err_line にした。
+# 縦線は既定で点の後ろに描く（err_on_top = False。ユーザーの指定）。高速側は区間が狭く〔上限/下限 約 1.03〜1.5 倍〕、縦線が点に隠れることがある。True なら点の上に描く。
+# same_style＝(色, 形) を渡すと、低速側・高速側を区別せず、すべての点を同じ形で描く。
+# 点は、色付き・色なしとも、枠線（色 point_edge_color・太さ point_edge）を付ける（2026-11-09 のユーザーの依頼。それまで色付きの点には枠線がなかった）。
+# aspect：グラフエリアの縦横比。"equal"＝両軸の 1 桁を同じ長さにする（範囲が同じなので正方形。今まで）／数＝縦 ÷ 横 の比（例 0.75）／None＝図の大きさいっぱい
+
+
+def parity_plot(p, title, out_dir, base, show=None, **kw):
+    """3data の予測のパリティ図（横軸：実測の粘度、縦軸：予測の粘度、縦線：95% 予測区間）を 1 枚保存する。
+    p は予測値の表（列 eta・予測η・下限95・上限95・group）。見た目は kw（PARITY_DEFAULT のキー）で変えられる：
+    点には、色付き・色なしとも、枠線（色 point_edge_color・太さ point_edge）を付ける。
+    point_color が False なら、点を塗りつぶし（色 point_fill・濃さ point_fill_alpha。既定は白）と枠線にする（低速側・高速側は点の形で見分ける）。
+    aspect は、グラフエリアの縦横比（"equal"・縦 ÷ 横 の数・None）。
+    区間の縦線は、点の種類によらず、色 err_color・太さ err_line・濃さ err_alpha で、err_on_top が True なら点の上に描く。
+    same_style が (色, 形) なら、低速側・高速側を区別せず、すべての点をその色と形で描く（凡例の名前は same_label）。
+    legend_separate が True なら、凡例をグラフに付けず、凡例だけを <base>_凡例 に保存する。保存したファイルの一覧を返す"""
+    import matplotlib.pyplot as plt
+    from matplotlib.lines import Line2D
+    unknown = set(kw) - set(PARITY_DEFAULT)
+    if unknown:
+        raise ValueError(f"パリティ図の設定に、知らない名前があります：{sorted(unknown)}")
+    cfg = {**PARITY_DEFAULT, **kw}
+    ft = {**PARITY_DEFAULT["font"], **(cfg["font"] or {})}
+    dpi = cfg["dpi"] or FIG_DPI
+    fig, ax = plt.subplots(figsize=cfg["figsize"])
+    same = cfg["same_style"] is not None
+    groups = {cfg["same_label"]: cfg["same_style"]} if same else cfg["groups"]
+    for g, (col, mk) in groups.items():
+        m = np.ones(len(p), dtype=bool) if same else (p["group"] == g).to_numpy()
+        if not m.any():
+            continue
+        x, y = p.loc[m, "eta"], p.loc[m, "予測η"]
+        if cfg["point_color"]:                  # 色付き：その組の色（濃さ alpha）で塗る
+            face = fill_rgba(col, cfg["alpha"])
+        else:                                   # 色なし：塗りつぶし（既定は白）
+            face = fill_rgba(cfg["point_fill"], cfg["point_fill_alpha"])
+        ax.plot(x, y, ls="none", marker=mk, ms=cfg["marker"], markerfacecolor=face, markeredgecolor=cfg["point_edge_color"], markeredgewidth=cfg["point_edge"],
+                zorder=3, label=f"{g}（{int(m.sum())} ショット）")     # どの点にも枠線（色 point_edge_color・太さ point_edge）を付ける
+        if cfg["errbar"]:                       # 95% 予測区間の縦線（点の種類によらず同じ色・太さ）
+            ax.errorbar(x, y, yerr=[y - p.loc[m, "下限95"], p.loc[m, "上限95"] - y], fmt="none", ecolor=cfg["err_color"], elinewidth=cfg["err_line"],
+                        capsize=cfg["capsize"], capthick=cfg["err_line"], alpha=cfg["err_alpha"], zorder=4 if cfg["err_on_top"] else 2)
+    if cfg["lim"] is not None:
+        lim = list(cfg["lim"])
+    else:
+        lim = [min(p["eta"].min(), p["下限95"].min()) / cfg["margin"], max(p["eta"].max(), p["上限95"].max()) * cfg["margin"]]
+    ax.plot(lim, lim, "k--", lw=cfg["diag_line"], label="予測 = 実測")
+    ax.set_xscale("log")
+    ax.set_yscale("log")
+    ax.set_xlim(lim)
+    ax.set_ylim(lim)
+    if cfg["aspect"] == "equal":                # 両軸の 1 桁を同じ長さに（範囲が同じなので、グラフエリアは正方形）
+        ax.set_aspect("equal")
+    elif cfg["aspect"] is not None:             # グラフエリアの 縦 ÷ 横 の比を指定
+        ax.set_box_aspect(float(cfg["aspect"]))
+    log_ticks(ax)
+    ax.tick_params(axis="both", which="major", labelsize=ft["tick"])
+    if cfg["show_xlabel"]:
+        ax.set_xlabel(cfg["xlabel"], fontsize=ft["axis"])
+    if cfg["show_ylabel"]:
+        ax.set_ylabel(cfg["ylabel"], fontsize=ft["axis"])
+    if cfg["show_title"]:
+        ax.set_title(title, fontsize=ft["title"])
+    if cfg["grid"]:
+        ax.grid(True, which="both", ls="--", alpha=0.4)
+    handles, _ = ax.get_legend_handles_labels()
+    if cfg["errbar"]:                           # 凡例に、区間の縦線の記号を足す
+        handles.append(Line2D([], [], ls="none", marker="|", ms=cfg["marker"] * 1.6, mew=cfg["err_line"], color=cfg["err_color"], alpha=cfg["err_alpha"], label="95% 予測区間"))
+    if not cfg["legend_separate"]:
+        ax.legend(handles=handles, loc=cfg["legend_loc"], fontsize=ft["legend"])
+    os.makedirs(out_dir, exist_ok=True)
+    saved = []
+    for fmt in cfg["formats"]:
+        path = os.path.join(out_dir, f"{base}.{fmt}")
+        fig.savefig(path, dpi=dpi, bbox_inches="tight")
+        saved.append(path)
+    if SHOW_FIGS if show is None else show:
+        plt.show()
+    plt.close(fig)
+    if cfg["legend_separate"]:
+        saved += save_legend(handles, out_dir, base + "_凡例", cfg["formats"], dpi, ft["legend"])
+    return saved
 
 
 T_CURVE_COLORS = ["#d62728", "#1f77b4", "#2ca02c", "#9467bd", "#8c564b"]       # 総合図の、加熱シリンダ温度ごとの線・帯の色（低い温度から：赤・青・緑）。点の色は厚みごと（赤・青・黄・緑）なので、色は同じでも、点は形で見分ける
@@ -1241,8 +1347,8 @@ def flow_plot_common(fit, mat, pool, train_conds, out_dir, stem, tr=None, **kw):
             xs += list(px)
             ys += list(py)
             if cfg["point_color"]:
-                ax.scatter(px, py, s=ms, color=col, marker=mk, alpha=0.8, edgecolors="k", linewidths=0.5, zorder=z)
-            else:                                                 # 色なし：塗りつぶしなしの黒い枠線（太さ point_edge）
+                ax.scatter(px, py, s=ms, color=col, marker=mk, alpha=0.8, edgecolors="k", linewidths=edge_width(cfg, 0.5), zorder=z)
+            else:                                                 # 色なし：塗りつぶし（既定は白）と黒い枠線（太さ point_edge）
                 ax.scatter(px, py, s=ms, marker=mk, zorder=z, **point_kw(cfg, col))
             hs.append(Line2D([], [], color=col, ls="none", marker=mk, markersize=np.sqrt(cfg["marker"]), label=f"{h:g} mm", **point_handle_kw(cfg, col, edge=0.5)))
         return hs

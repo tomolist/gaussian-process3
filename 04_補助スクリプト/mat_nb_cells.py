@@ -332,6 +332,92 @@ for mat in MATERIALS:
     cov = t[t["範囲"] == "全体"].set_index("モデル")["coverage95"]
     judge(bool((cov >= 0.8).all()), "95% 予測区間に入る割合が、どのモデルも 0.8 以上（" + "、".join(f"{k} {v:.2f}" for k, v in cov.items()) + "）", mat, "検証")'''
 
+# 学習用のノートのセル14（ユーザー依頼、2026-11-08）：先頭に、パリティ図の見た目の設定エリアを置き、図は mat_common.parity_plot で描く。
+# 計算・表・判定は VALID と同じ（シフトファクター検討用のノートは VALID のまま）。
+# 図は、低速側・高速側を色と形で分けた図（今までの図）と、2026-11-09 のユーザーの依頼で足した、すべての点を同じ丸で描いた図（…_同じ形.png。VALID_SAME_SHAPE）
+VALID_SETTINGS = r'''# ==========================================
+# ▼▼ 設定エリア（3data のパリティ図の見た目。このセルの設定だけを直して、このセルだけを実行し直せる） ▼▼
+# ==========================================
+VALID_FIGSIZE = (9.5, 9)            # 図の大きさ（幅, 高さ）[インチ]
+VALID_ASPECT = "equal"              # グラフエリアの縦横比。"equal"＝縦軸と横軸の 1 桁を同じ長さにする（両軸の範囲が同じなので正方形。今まで）／数＝縦 ÷ 横 の比（例：0.75＝横長、1.2＝縦長）／None＝図の大きさいっぱいに広げる
+VALID_DPI = None                    # 保存する画像の解像度（None なら FIG_DPI〔既定 600 dpi〕）
+VALID_FONT = {"axis": 10, "legend": 10, "title": 12, "tick": 10}   # 軸名・凡例・タイトル・目盛り数字の文字サイズ
+VALID_GROUPS = {"低速側": ("#1f77b4", "o"), "高速側": ("#d62728", "s"), "範囲内": ("#2ca02c", "^")}   # 3data の範囲ごとの（色, 点の形）。形は "o" 丸・"s" 四角・"^" 三角・"D" ひし形 など
+VALID_MARKER = 6                    # 点の大きさ
+VALID_ALPHA = 0.8                   # 点の塗りの濃さ（1 で不透明。色付きのときだけ。枠線は不透明のまま）
+VALID_POINT_COLOR = True            # データ点に色を付けるか。True：色付き（今までどおり）／False：色なし（塗りつぶし〔VALID_POINT_FILL〕と枠線。低速側・高速側は点の形で見分ける）
+VALID_POINT_EDGE = 1.5              # 点の枠線の太さ [pt]（色付き・色なしとも、すべての点に枠線を付ける。0 で枠線なし）
+VALID_POINT_EDGE_COLOR = "black"    # 点の枠線の色
+VALID_POINT_FILL = "white"          # 色なしのときの、点の塗りつぶしの色。"white"・"lightgray"・"0.8"（0＝黒〜1＝白の灰色）・"#ffe0e0" など
+VALID_POINT_FILL_ALPHA = 1.0        # 色なしのときの、塗りつぶしの濃さ（0〜1。1 で不透明。枠線は不透明のまま）
+VALID_ERRBAR = True                 # 95% 予測区間の縦線を描くか
+VALID_ERR_COLOR = "0.3"             # 縦線の色（点の種類〔低速側・高速側〕によらず同じ色）。"0.3" は濃い灰色（0＝黒〜1＝白）。"black"・"red"・"#404040" なども書ける
+VALID_ERR_LINE = 1.2                # 縦線と、端の横棒の太さ（点の種類によらず同じ太さ）
+VALID_ERR_ALPHA = 1.0               # 縦線の濃さ（0〜1）
+VALID_ERR_ON_TOP = False            # False：縦線を点の後ろに描く（区間が点より短い高速側では、縦線が点に隠れることがある）／True：点の上に描く
+VALID_CAPSIZE = 3                   # 縦線の端の横棒の長さ（0 で横棒なし）
+VALID_DIAG_LINE = 1.0               # 「予測 = 実測」の破線の太さ
+VALID_LIM = None                    # 両軸（粘度 [Pa·s]）の範囲。(下限, 上限)＝固定（縦軸と横軸は同じ範囲）／None＝データと区間を含む範囲を VALID_MARGIN 倍に広げる
+VALID_MARGIN = 1.3                  # 自動の範囲の、上下の余白の倍率
+VALID_LEGEND_SEPARATE = False       # True：凡例をグラフに付けず、凡例だけを別の画像（予測検証_3data_パリティ_凡例.png）に保存する／False：グラフの中に凡例を付ける（今までどおり）
+VALID_LEGEND_LOC = "upper left"     # 凡例の位置（グラフの中に付けるとき）。"upper left"・"lower right"・"best" など
+VALID_SHOW_TITLE = True             # タイトル（材料・モデル・3data の指標）を付けるか
+VALID_SHOW_XLABEL = True            # 軸名を付けるか
+VALID_SHOW_YLABEL = True
+VALID_XLABEL = r"実測の粘度 $\eta$ (Pa·s)"   # 軸名の文字
+VALID_YLABEL = r"予測の粘度 $\eta$ (Pa·s)"
+VALID_GRID = True                   # 目盛りの補助線を描くか
+VALID_FORMATS = ["png"]             # 保存形式。"png"・"pdf"・"svg" から選ぶ
+VALID_SHOW_MODELS = [MAIN_KEY]      # 画面にも表示するモデル
+VALID_SAME_SHAPE = True             # True：低速側・高速側を区別せず、すべての点を同じ形で描いた図（予測検証_3data_パリティ_同じ形.png）も作る
+VALID_SAME_STYLE = ("yellowgreen", "o")   # その図の点の（色, 形）。"yellowgreen" は黄緑、"o" は丸。色なし（VALID_POINT_COLOR = False）のときは、色は使わず塗りつぶし〔VALID_POINT_FILL〕と枠線
+VALID_SAME_LABEL = "3data"          # その図の凡例の点の名前
+# ==========================================
+val_kw = dict(figsize=VALID_FIGSIZE, aspect=VALID_ASPECT, dpi=VALID_DPI, font=VALID_FONT, groups=VALID_GROUPS, marker=VALID_MARKER, alpha=VALID_ALPHA, point_color=VALID_POINT_COLOR,
+              point_edge=VALID_POINT_EDGE, point_edge_color=VALID_POINT_EDGE_COLOR, point_fill=VALID_POINT_FILL, point_fill_alpha=VALID_POINT_FILL_ALPHA, errbar=VALID_ERRBAR, err_color=VALID_ERR_COLOR,
+              err_line=VALID_ERR_LINE, err_alpha=VALID_ERR_ALPHA, err_on_top=VALID_ERR_ON_TOP, capsize=VALID_CAPSIZE, diag_line=VALID_DIAG_LINE, lim=VALID_LIM,
+              margin=VALID_MARGIN, legend_separate=VALID_LEGEND_SEPARATE, legend_loc=VALID_LEGEND_LOC, show_title=VALID_SHOW_TITLE, show_xlabel=VALID_SHOW_XLABEL,
+              show_ylabel=VALID_SHOW_YLABEL, xlabel=VALID_XLABEL, ylabel=VALID_YLABEL, grid=VALID_GRID, formats=VALID_FORMATS)
+JUDGES[:] = [j for j in JUDGES if j["節"] != "検証"]     # このセルだけを実行し直したとき、判定が二重に記録されないように
+'''
+_VALID_PLOT_OLD = r'''    for key in KEYS:
+        p = PRED[(mat, key)]
+        r = t[(t["モデル"] == key) & (t["範囲"] == "全体")].iloc[0]
+        fig, ax = plt.subplots(figsize=(9.5, 9))
+        for g, (col, mk) in GCOL.items():
+            m = (p["group"] == g).to_numpy()
+            if m.any():
+                ax.errorbar(p.loc[m, "eta"], p.loc[m, "予測η"], yerr=[p.loc[m, "予測η"] - p.loc[m, "下限95"], p.loc[m, "上限95"] - p.loc[m, "予測η"]],
+                            fmt=mk, color=col, ms=6, elinewidth=1.2, capsize=3, alpha=0.8, label=f"{g}（{int(m.sum())} ショット）")
+        lim = [min(p["eta"].min(), p["下限95"].min()) / 1.3, max(p["eta"].max(), p["上限95"].max()) * 1.3]
+        ax.plot(lim, lim, "k--", lw=1, label="予測 = 実測")
+        ax.set_xscale("log")
+        ax.set_yscale("log")
+        ax.set_xlim(lim)
+        ax.set_ylim(lim)
+        ax.set_aspect("equal")
+        log_ticks(ax)
+        ax.set_xlabel(r"実測の粘度 $\eta$ (Pa·s)")
+        ax.set_ylabel(r"予測の粘度 $\eta$ (Pa·s)")
+        ax.set_title(f"{MAT_NAMES[mat]}　{model_title(key)}\n3data：RMSE(ln η) {r['RMSE']:.3f}、R²(ln η) {r['R2']:.4f}、R²(実数) {r['R2_real']:.4f}、被覆率 {r['coverage95']:.2f}")
+        ax.grid(True, which="both", ls="--", alpha=0.4)
+        ax.legend(loc="upper left")
+        save_fig(fig, out_dir(mat, key), "予測検証_3data_パリティ", show=SHOW_FIGS and key == MAIN_KEY)
+'''
+_VALID_PLOT_NEW = r'''    for key in KEYS:
+        r = t[(t["モデル"] == key) & (t["範囲"] == "全体")].iloc[0]
+        title = f"{MAT_NAMES[mat]}　{model_title(key)}\n3data：RMSE(ln η) {r['RMSE']:.3f}、R²(ln η) {r['R2']:.4f}、R²(実数) {r['R2_real']:.4f}、被覆率 {r['coverage95']:.2f}"
+        n_val_saved += len(parity_plot(PRED[(mat, key)], title, out_dir(mat, key), "予測検証_3data_パリティ", show=SHOW_FIGS and key in VALID_SHOW_MODELS, **val_kw))
+        if VALID_SAME_SHAPE:    # 低速側・高速側を区別せず、すべての点を同じ形で描いた図
+            n_val_saved += len(parity_plot(PRED[(mat, key)], title, out_dir(mat, key), "予測検証_3data_パリティ_同じ形", show=SHOW_FIGS and key in VALID_SHOW_MODELS,
+                                           same_style=VALID_SAME_STYLE, same_label=VALID_SAME_LABEL, **val_kw))
+'''
+_VALID_GCOL = '''GCOL = {"低速側": ("#1f77b4", "o"), "高速側": ("#d62728", "s"), "範囲内": ("#2ca02c", "^")}
+'''
+assert VALID.count(_VALID_PLOT_OLD) == 1 and VALID.count(_VALID_GCOL) == 1, "VALID の図の部分が見つからない（VALID_LEARN の置き換えを直す）"
+VALID_LEARN = (VALID_SETTINGS + VALID.replace(_VALID_GCOL, "n_val_saved = 0\n").replace(_VALID_PLOT_OLD, _VALID_PLOT_NEW)
+               + '\nprint(f"保存したパリティ図：{n_val_saved} 枚（凡例だけの画像を含む。モデルのフォルダの 予測検証_3data_パリティ.png・…_同じ形.png）")')
+
 # ---------------------------------------------------------------- 学習済みモデルの保存
 SAVE = r'''import joblib
 import sklearn
