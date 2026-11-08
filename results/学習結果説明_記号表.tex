@@ -34,7 +34,7 @@
 
 \title{樹脂粘度モデル開発　記号表\\[0.6ex]{\large すべての学習結果説明（手順2・3a〜3e・5a〜5b・材料別 GPR）で使う記号・モデル名・列名の一覧}}
 \author{}
-\date{2026年11月6日}
+\date{2026年11月8日}
 
 \begin{document}
 \maketitle
@@ -200,6 +200,7 @@ Tboth（Tset と Tff を同時に） & 依存性グラフの図と判定：設�
 念入りな最適化（5.1b）、\file{N_RESTARTS} & 最良の $\theta$ と $\theta=0$ の 2 点だけを、最適化のやり直し \file{N_RESTARTS}（既定 20。6月は 5）回で学習し直すこと。格子の各点の LML は、ハイパーパラメータの局所解で 1〜3 ずれるため。最良の $\theta$ の学習が、そのまま最終モデル。\file{dLML_vs_0} は、この 2 つの差（格子での差は \file{dLML_vs_0_grid}）。2026-11-03 から、この 2 つの LML を格子の表に入れ（格子の値と大きいほう。列 \file{careful}）、95\% 区間も、その表から出し直す（それまでは区間だけ格子の値から出していて、$\Delta$LML と食い違うことがあった。部品の \file{profile_careful}）。 & ― & 材 \\
 \file{mat_seed_check.py}、\file{乱数シードの確認.csv} & 補助スクリプト（ノートの外）：乱数シードを変えて最終モデルを学習し直し、LML と 3data の RMSE のばらつきを見る。2026-10-27 から、材料ごとに学習結果フォルダをダイアログ（または引数 \file{PP=<フォルダ>}）で選び、シフトファクター検討用のノートの結果（\file{シフトファクターの検討/}）を読んで、同じフォルダに \file{乱数シードの確認.csv}・\file{…_まとめ.csv}・\file{乱数シードの確認.png} を書く（10-26 までの結果では \file{<入力>/比較/}）。 & ― & 材 \\
 \file{FLOW_COMMON}、\file{FLOW_COMMON_XLIM}・\file{YLIM}・\file{NCOL} & 全厚み共通のせん断速度 ― 粘度の図の設定。温度ごとの図 \file{…_全厚み共通_<温度>C.png} と、全温度を 1 枚に重ねた総合図 \file{…_全厚み共通_全温度.png}（線・帯の色は温度：赤・青・緑。グラフに凡例・タイトルはなく、凡例は \file{…_凡例.png}）。6月のセル9-2 と同じ仕様（15 $\times$ 10 インチ、10 の累乗の目盛り）。 & ― & 材 \\
+\file{FLOW_LEGEND_SEPARATE}、\file{FLOW_POINT_COLOR}、\file{FLOW_POINT_EDGE} & 学習用のノートのセル16（せん断速度 ― 粘度の学習結果グラフ）の設定（2026-11-08 追加）。\file{FLOW_LEGEND_SEPARATE}：\file{True}（既定）なら、すべての図で凡例をグラフに付けず、凡例だけを \file{<図の名前>_凡例.png} に保存する（全厚み共通の温度ごとの図の「固定した値」も凡例の画像に書く）。\file{FLOW_POINT_COLOR}：\file{False} なら、データ点を色なし（塗りつぶしなしの黒い枠線。検証〔3data〕の点は灰色の枠線）にする。枠線の太さは \file{FLOW_POINT_EDGE}（既定 1.5 pt）。部品の \file{flow_plot}・\file{flow_plot_common} の引数は \file{legend_separate}・\file{point_color}・\file{point_edge}（既定は今までどおり）。 & ― & 材 \\
 \file{CWLF_STARTS} & 参考の Cross-WLF の当てはめの初期値の数（6月に近い値 1 つ ＋ 乱数。残差が最小のものを採る）。 & ― & 材 \\
 重ね合わせの残差 & 厚みごとに、全温度の条件平均の点を 3 次式で当てはめた残差の RMSE（ln η）。シフトで温度ごとの曲線が重なるほど小さい。 & ― & 材 \\
 P09 & 05 の問題データ一覧：GPPS の 3data、200 ℃・1.5 mm・3 mm/s のショット 2・3（P3\_3 が負）。「ショット」列に \file{2;3} と複数書ける（材料別 GPR のノートだけが読む書き方）。 & ― & 材 \\

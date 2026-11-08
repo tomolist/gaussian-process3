@@ -1155,7 +1155,43 @@ def flow_inputs(sub, lg, h, t):
 FLOW_DEFAULT = dict(layouts=["temperature", "thickness"], band="predict", points="cond", show_test=True, mark_sens=True, x_range=None, extend=1.3,
                     xlim={"thickness": None, "temperature": None}, ylim={"thickness": None, "temperature": None}, figsize=(12, 10), dpi=None,
                     font={"axis": 24, "legend": 24, "title": 24, "tick": 28}, marker=300, marker_shot=70, line=2.0, show_title=True,
-                    show_xlabel=False, show_ylabel=False, formats=["png"], n_grid=120, show=None)
+                    show_xlabel=False, show_ylabel=False, formats=["png"], n_grid=120, show=None,
+                    legend_separate=False, point_color=True, point_edge=1.5)
+# legend_separate：True なら、グラフ本体に凡例を付けず、凡例だけを別の画像（<図の名前>_凡例）に保存する（2026-11-08 追加。既定は今までどおり）
+# point_color：False なら、データ点を色なし（塗りつぶしなしの黒い枠線。検証〔3data〕の点は灰色の枠線）にする。枠線の太さは point_edge（2026-11-08 追加）
+POINT_TEST_EDGE = "0.55"            # 色なしのときの、検証（3data）の点の枠線の色（灰色）
+
+
+def point_kw(cfg, col, test=False):
+    """データ点の scatter の引数（色・枠）。cfg["point_color"] が True なら今までどおりの色付き、False なら塗りつぶしなしの枠線（学習は黒、検証は灰色。太さ point_edge）"""
+    if not cfg["point_color"]:
+        return dict(facecolors="none", edgecolors=POINT_TEST_EDGE if test else "k", linewidths=cfg["point_edge"], alpha=1.0)
+    if test:
+        return dict(facecolors="white", edgecolors=col, linewidths=2.5)
+    return dict(color=col, alpha=0.85, edgecolors="k", linewidths=0.6)
+
+
+def point_handle_kw(cfg, col, test=False, edge=0.6):
+    """凡例の点の記号の引数（point_kw と同じ見た目）"""
+    if not cfg["point_color"]:
+        return dict(markerfacecolor="none", markeredgecolor=POINT_TEST_EDGE if test else "k", markeredgewidth=cfg["point_edge"])
+    if test:
+        return dict(markerfacecolor="white", markeredgewidth=2.5)
+    return dict(markerfacecolor=col, markeredgecolor="k", markeredgewidth=edge)
+
+
+def save_legend(handles, out_dir, base, formats, dpi, fontsize, ncol=1):
+    """凡例だけを別の画像（out_dir/<base>.<形式>）に保存する。保存したファイルの一覧を返す"""
+    import matplotlib.pyplot as plt
+    os.makedirs(out_dir, exist_ok=True)
+    lf, paths = plt.figure(figsize=(6, 6)), []
+    lf.legend(handles=handles, loc="center", fontsize=fontsize, framealpha=1.0, edgecolor="black", ncol=ncol)
+    for fmt in formats:
+        path = os.path.join(out_dir, f"{base}.{fmt}")
+        lf.savefig(path, bbox_inches="tight", dpi=dpi)
+        paths.append(path)
+    plt.close(lf)
+    return paths
 
 
 T_CURVE_COLORS = ["#d62728", "#1f77b4", "#2ca02c", "#9467bd", "#8c564b"]       # 総合図の、加熱シリンダ温度ごとの線・帯の色（低い温度から：赤・青・緑）。点の色は厚みごと（赤・青・黄・緑）なので、色は同じでも、点は形で見分ける
@@ -1204,8 +1240,11 @@ def flow_plot_common(fit, mat, pool, train_conds, out_dir, stem, tr=None, **kw):
             col, mk = H_COLORS.get(float(h), "gray"), H_MARKS.get(float(h), "x")
             xs += list(px)
             ys += list(py)
-            ax.scatter(px, py, s=ms, color=col, marker=mk, alpha=0.8, edgecolors="k", linewidths=0.5, zorder=z)
-            hs.append(Line2D([], [], color=col, ls="none", marker=mk, markersize=np.sqrt(cfg["marker"]), markeredgecolor="k", markeredgewidth=0.5, label=f"{h:g} mm"))
+            if cfg["point_color"]:
+                ax.scatter(px, py, s=ms, color=col, marker=mk, alpha=0.8, edgecolors="k", linewidths=0.5, zorder=z)
+            else:                                                 # 色なし：塗りつぶしなしの黒い枠線（太さ point_edge）
+                ax.scatter(px, py, s=ms, marker=mk, zorder=z, **point_kw(cfg, col))
+            hs.append(Line2D([], [], color=col, ls="none", marker=mk, markersize=np.sqrt(cfg["marker"]), label=f"{h:g} mm", **point_handle_kw(cfg, col, edge=0.5)))
         return hs
 
     def decade_lim(v, user):
@@ -1230,8 +1269,8 @@ def flow_plot_common(fit, mat, pool, train_conds, out_dir, stem, tr=None, **kw):
         ax.plot(x, np.exp(mu + 1.96 * s), color=col, lw=0.5, alpha=0.6, zorder=16)
         ax.plot(x, np.exp(mu), color=col, lw=lw, zorder=20)
 
-    def finish(fig, ax, xs, ys, base, title, handles, separate_legend=False, handles_en=None, draw=None):
-        """軸・目盛り・凡例・タイトルを整えて保存する。separate_legend が True なら、グラフには凡例とタイトルを付けず、凡例だけを別の画像（base + "_凡例"）に保存する。
+    def finish(fig, ax, xs, ys, base, title, handles, separate_legend=False, handles_en=None, draw=None, keep_title=False):
+        """軸・目盛り・凡例・タイトルを整えて保存する。separate_legend が True なら、グラフには凡例とタイトルを付けず（keep_title が True ならタイトルは付ける）、凡例だけを別の画像（base + "_凡例"）に保存する。
         draw：軸の範囲を決めた後で、曲線と帯をその範囲いっぱいに描く関数 draw(ax, 横軸の範囲)"""
         ax.tick_params(axis="both", which="both", direction="in", top=True, right=True, labelsize=ft["tick"], pad=8)
         ax.set_xscale("log")
@@ -1251,8 +1290,8 @@ def flow_plot_common(fit, mat, pool, train_conds, out_dir, stem, tr=None, **kw):
         ax.grid(True, which="minor", linestyle=":", alpha=0.4, zorder=1)
         if not separate_legend:
             ax.legend(handles=handles, loc="lower left", fontsize=ft["legend"], framealpha=1.0, edgecolor="black", ncol=cfg["legend_ncol"])
-            if cfg["show_title"] and title:
-                ax.set_title(title, fontsize=ft["title"], fontweight="bold", pad=15)
+        if (not separate_legend or keep_title) and cfg["show_title"] and title:
+            ax.set_title(title, fontsize=ft["title"], fontweight="bold", pad=15)
         if cfg["show_xlabel"]:
             ax.set_xlabel(r"せん断速度 $\dot{\gamma}$ (1/s)", fontsize=ft["axis"], fontweight="bold", labelpad=15)
         if cfg["show_ylabel"]:
@@ -1279,10 +1318,16 @@ def flow_plot_common(fit, mat, pool, train_conds, out_dir, stem, tr=None, **kw):
         xs, ys = list(x), list(np.exp(mu))                       # 軸の範囲を決めるための値（データの範囲の曲線と点）。曲線そのものは、finish が軸の端まで描く
         hs = thickness_points(ax, tr[tr["Tset"] == t], xs, ys)
         head = [Line2D([], [], color="red", lw=cfg["line"], label="予測平均値"), Patch(facecolor="red", alpha=0.25, label=band_name), Patch(color="none", label="キャビティ厚み")]
-        ax.text(0.98, 0.97, f"固定した値\nP3_3：{p_med:.2f} MPa\nTff：{tff_med:.1f} ℃", transform=ax.transAxes, ha="right", va="top", fontsize=ft["legend"] * 0.75,
-                bbox=dict(boxstyle="round", facecolor="white", edgecolor="black"), zorder=30)
+        note = []
+        if cfg["legend_separate"]:                               # 凡例を別の画像にするときは、固定した値も凡例の画像に書く（グラフ本体には何も重ねない）
+            note = [Patch(color="none", label="固定した値（学習データの中央値）"), Patch(color="none", label=f"　P3_3：{p_med:.2f} MPa"),
+                    Patch(color="none", label=f"　Tff：{tff_med:.1f} ℃")]
+        else:
+            ax.text(0.98, 0.97, f"固定した値\nP3_3：{p_med:.2f} MPa\nTff：{tff_med:.1f} ℃", transform=ax.transAxes, ha="right", va="top", fontsize=ft["legend"] * 0.75,
+                    bbox=dict(boxstyle="round", facecolor="white", edgecolor="black"), zorder=30)
         finish(fig, ax, xs, ys, f"{stem}_全厚み共通_{int(t)}C",
-               f"{MAT_NAMES[mat]}　せん断速度と粘度の関係（設定温度 {int(t)} ℃）\n{model_title(fit['key'], fit.get('mode'))}", head + hs,
+               f"{MAT_NAMES[mat]}　せん断速度と粘度の関係（設定温度 {int(t)} ℃）\n{model_title(fit['key'], fit.get('mode'))}", head + hs + note,
+               separate_legend=cfg["legend_separate"], keep_title=True,
                draw=lambda a, xl, t=t, tm=tff_med: draw_curve(a, t, tm, "red", cfg["line"], xl))
 
     # ② 全温度を 1 枚に重ねた総合図（線・帯の色は温度、点の色・形は厚み）
@@ -1350,9 +1395,9 @@ def flow_plot(fit, mat, pool, train_conds, out_dir, stem, **kw):
                     trm = sub["cond"].isin(train_conds).to_numpy()
                 xs += list(x) + list(px)
                 ys += list(np.exp(mu)) + list(py)
-                ax.scatter(px[trm], py[trm], s=ms, color=col, marker=mk, alpha=0.85, edgecolors="k", linewidths=0.6, zorder=14)
+                ax.scatter(px[trm], py[trm], s=ms, marker=mk, zorder=14, **point_kw(cfg, col))
                 if cfg["show_test"] and (~trm).any():
-                    ax.scatter(px[~trm], py[~trm], s=ms, facecolors="white", edgecolors=col, marker=mk, linewidths=2.5, zorder=14)
+                    ax.scatter(px[~trm], py[~trm], s=ms, marker=mk, zorder=14, **point_kw(cfg, col, test=True))
                     any_test = True
                 if cfg["mark_sens"] and sens.any():
                     ax.scatter(px[sens], py[sens], s=ms * 1.3, color="k", marker="x", linewidths=3, zorder=25)
@@ -1360,15 +1405,17 @@ def flow_plot(fit, mat, pool, train_conds, out_dir, stem, **kw):
                 series.append((sv, col, mk))
             head = "キャビティ厚み" if not by_h else "設定温度"
             handles = [Patch(facecolor="gray", alpha=0.3, label=band_name), Patch(color="none", label=head)]
-            handles += [Line2D([], [], color=c, lw=cfg["line"], marker=m, markersize=np.sqrt(cfg["marker"]) * 0.8, markeredgecolor="k", markeredgewidth=0.6,
+            handles += [Line2D([], [], color=c, lw=cfg["line"], marker=m, markersize=np.sqrt(cfg["marker"]) * 0.8, **point_handle_kw(cfg, c),
                                label=(f"{sv:g} mm" if not by_h else f"{int(sv)} ℃")) for sv, c, m in series]
             if any_test:
-                handles.append(Line2D([], [], color="gray", ls="none", marker="o", markersize=np.sqrt(cfg["marker"]) * 0.8, markerfacecolor="white", markeredgewidth=2.5, label="検証（3data。白抜き）"))
+                test_lab = "検証（3data。白抜き）" if cfg["point_color"] else "検証（3data。灰色の枠）"
+                handles.append(Line2D([], [], color="gray", ls="none", marker="o", markersize=np.sqrt(cfg["marker"]) * 0.8, label=test_lab, **point_handle_kw(cfg, "gray", test=True)))
             if any_sens:
                 handles.append(Line2D([], [], color="k", ls="none", marker="x", markersize=np.sqrt(cfg["marker"]) * 0.8, markeredgewidth=3, label="感度確認の条件"))
             if cfg["band"] not in ("predict", "latent"):
                 handles = handles[1:]
-            ax.legend(handles=handles, loc="upper right", fontsize=ft["legend"], framealpha=1.0, edgecolor="black")
+            if not cfg["legend_separate"]:
+                ax.legend(handles=handles, loc="upper right", fontsize=ft["legend"], framealpha=1.0, edgecolor="black")
             ax.tick_params(axis="both", which="both", direction="in", top=True, right=True, labelsize=ft["tick"], pad=8)
             ax.set_xscale("log")
             ax.set_yscale("log")
@@ -1416,4 +1463,6 @@ def flow_plot(fit, mat, pool, train_conds, out_dir, stem, **kw):
             if SHOW_FIGS if cfg["show"] is None else cfg["show"]:
                 plt.show()
             plt.close(fig)
+            if cfg["legend_separate"]:                             # 凡例だけの画像（<図の名前>_凡例）
+                saved += save_legend(handles, out_dir, base + "_凡例", cfg["formats"], dpi, ft["legend"])
     return saved
