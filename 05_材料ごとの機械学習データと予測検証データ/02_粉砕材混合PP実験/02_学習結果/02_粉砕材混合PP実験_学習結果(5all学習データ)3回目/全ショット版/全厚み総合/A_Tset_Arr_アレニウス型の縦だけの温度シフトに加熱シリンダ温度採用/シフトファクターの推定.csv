@@ -1,0 +1,2 @@
+﻿材料,モデル,入力,型,θ の名前,単位,支持の基準,th_best,tv_best,diff_best,LML_best,LML_at_0,dLML_vs_0,th_lo,th_hi,tv_lo,tv_hi,diff_lo,diff_hi,n_in_95,n_points,at_edge,refine_converged,interval_closed,interval_at_range,n_review_up,review_gain_max,LML_best_grid,LML_at_0_grid,dLML_vs_0_grid
+粉砕材混合PP,A_Tset_Arr,全ショット版,アレニウス型,E_h・E_v,kJ/mol,1.92,0.0,5.5,5.5,1324.5186054782803,1314.870429924133,9.648175554147201,0.0,0.0,3.5,8.0,3.5,8.0,10,35,False,True,True,False,0,0.0,1324.3273223295446,1314.7970621862105,9.53026014333409
