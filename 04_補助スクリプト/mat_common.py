@@ -1195,12 +1195,12 @@ def point_handle_kw(cfg, col, test=False, edge=0.6):
     return dict(markerfacecolor=col, markeredgecolor="k", markeredgewidth=edge_width(cfg, edge))
 
 
-def save_legend(handles, out_dir, base, formats, dpi, fontsize, ncol=1):
-    """凡例だけを別の画像（out_dir/<base>.<形式>）に保存する。保存したファイルの一覧を返す"""
+def save_legend(handles, out_dir, base, formats, dpi, fontsize, ncol=1, facecolor=None, framealpha=1.0):
+    """凡例だけを別の画像（out_dir/<base>.<形式>）に保存する。facecolor：凡例の背景の色（None なら matplotlib の既定〔白〕）。保存したファイルの一覧を返す"""
     import matplotlib.pyplot as plt
     os.makedirs(out_dir, exist_ok=True)
     lf, paths = plt.figure(figsize=(6, 6)), []
-    lf.legend(handles=handles, loc="center", fontsize=fontsize, framealpha=1.0, edgecolor="black", ncol=ncol)
+    lf.legend(handles=handles, loc="center", fontsize=fontsize, framealpha=framealpha, edgecolor="black", ncol=ncol, **({} if facecolor is None else {"facecolor": facecolor}))
     for fmt in formats:
         path = os.path.join(out_dir, f"{base}.{fmt}")
         lf.savefig(path, bbox_inches="tight", dpi=dpi)
@@ -1213,15 +1213,20 @@ PARITY_DEFAULT = dict(figsize=(9.5, 9), dpi=None, font={"axis": 10, "legend": 10
                       groups={"低速側": ("#1f77b4", "o"), "高速側": ("#d62728", "s"), "範囲内": ("#2ca02c", "^")},
                       marker=6, alpha=0.8, point_color=True, point_edge=1.5, point_edge_color="black", point_fill="white", point_fill_alpha=1.0,
                       errbar=True, err_color="0.3", err_line=1.2, err_alpha=1.0, err_on_top=False, capsize=3, diag_line=1.0,
-                      lim=None, margin=1.3, aspect="equal", legend_separate=False, legend_loc="upper left", show_title=True, show_xlabel=True, show_ylabel=True,
-                      xlabel=r"実測の粘度 $\eta$ (Pa·s)", ylabel=r"予測の粘度 $\eta$ (Pa·s)", grid=True, formats=["png"],
-                      same_style=None, same_label="3data")
+                      lim=None, margin=1.3, aspect="equal", legend_separate=False, legend_loc="upper left", legend_face="white", legend_alpha=1.0,
+                      show_title=True, show_xlabel=True, show_ylabel=True,
+                      xlabel=r"実測の粘度 $\eta$ (Pa·s)", ylabel=r"予測の粘度 $\eta$ (Pa·s)", grid=True, tick_dir="in", tick_mirror=False, formats=["png"],
+                      same_style=None, same_label="3data", area_only=False, area_tick_labels=False)
 # 3data のパリティ図（学習用のノートのセル14）の見た目の既定（2026-11-08 追加）。
 # 2026-11-09 のユーザーの依頼で：95% 予測区間の縦線は、点の種類によらず同じ色 err_color（既定は濃い灰色 "0.3"）・同じ太さ err_line にした。
 # 縦線は既定で点の後ろに描く（err_on_top = False。ユーザーの指定）。高速側は区間が狭く〔上限/下限 約 1.03〜1.5 倍〕、縦線が点に隠れることがある。True なら点の上に描く。
 # same_style＝(色, 形) を渡すと、低速側・高速側を区別せず、すべての点を同じ形で描く。
 # 点は、色付き・色なしとも、枠線（色 point_edge_color・太さ point_edge）を付ける（2026-11-09 のユーザーの依頼。それまで色付きの点には枠線がなかった）。
 # aspect：グラフエリアの縦横比。"equal"＝両軸の 1 桁を同じ長さにする（範囲が同じなので正方形。今まで）／数＝縦 ÷ 横 の比（例 0.75）／None＝図の大きさいっぱい
+# 2026-11-09 のユーザーの依頼で：軸の目盛り線をグラフエリアの内側に向け（tick_dir = "in"。"out" で今までの外向き、"inout" で両側）、凡例の背景を白の塗りつぶし（legend_face・legend_alpha。
+# それまでは半透明〔matplotlib の既定 0.8〕で、補助線が透けていた）にした。tick_mirror が True なら、上と右の辺にも目盛りを付ける（セル16 の図と同じ）
+# 2026-11-09 のユーザーの依頼で：area_only が True なら、グラフエリア（軸の枠の中）だけの画像 <base>_グラフエリアのみ も保存する。タイトル・軸名・凡例・目盛りの数字は付けず
+# （area_tick_labels が True なら目盛りの数字は残す）、軸の枠に合わせて余白を切る。グラフエリアの大きさは、通常の図と同じ（資料で重ねて使えるように）
 
 
 def parity_plot(p, title, out_dir, base, show=None, **kw):
@@ -1229,10 +1234,12 @@ def parity_plot(p, title, out_dir, base, show=None, **kw):
     p は予測値の表（列 eta・予測η・下限95・上限95・group）。見た目は kw（PARITY_DEFAULT のキー）で変えられる：
     点には、色付き・色なしとも、枠線（色 point_edge_color・太さ point_edge）を付ける。
     point_color が False なら、点を塗りつぶし（色 point_fill・濃さ point_fill_alpha。既定は白）と枠線にする（低速側・高速側は点の形で見分ける）。
-    aspect は、グラフエリアの縦横比（"equal"・縦 ÷ 横 の数・None）。
+    aspect は、グラフエリアの縦横比（"equal"・縦 ÷ 横 の数・None）。tick_dir は目盛り線の向き（既定 "in"＝グラフエリアの内側）、tick_mirror は上と右の辺の目盛り。
+    凡例の背景は、色 legend_face（既定は白）・濃さ legend_alpha（既定 1＝不透明）で塗る。
     区間の縦線は、点の種類によらず、色 err_color・太さ err_line・濃さ err_alpha で、err_on_top が True なら点の上に描く。
     same_style が (色, 形) なら、低速側・高速側を区別せず、すべての点をその色と形で描く（凡例の名前は same_label）。
-    legend_separate が True なら、凡例をグラフに付けず、凡例だけを <base>_凡例 に保存する。保存したファイルの一覧を返す"""
+    legend_separate が True なら、凡例をグラフに付けず、凡例だけを <base>_凡例 に保存する。
+    area_only が True なら、グラフエリアだけ（タイトル・軸名・凡例・目盛りの数字なし）の画像 <base>_グラフエリアのみ も保存する。保存したファイルの一覧を返す"""
     import matplotlib.pyplot as plt
     from matplotlib.lines import Line2D
     unknown = set(kw) - set(PARITY_DEFAULT)
@@ -1273,6 +1280,7 @@ def parity_plot(p, title, out_dir, base, show=None, **kw):
         ax.set_box_aspect(float(cfg["aspect"]))
     log_ticks(ax)
     ax.tick_params(axis="both", which="major", labelsize=ft["tick"])
+    ax.tick_params(axis="both", which="both", direction=cfg["tick_dir"], top=cfg["tick_mirror"], right=cfg["tick_mirror"])   # 目盛り線の向き（主・補助とも）
     if cfg["show_xlabel"]:
         ax.set_xlabel(cfg["xlabel"], fontsize=ft["axis"])
     if cfg["show_ylabel"]:
@@ -1285,7 +1293,7 @@ def parity_plot(p, title, out_dir, base, show=None, **kw):
     if cfg["errbar"]:                           # 凡例に、区間の縦線の記号を足す
         handles.append(Line2D([], [], ls="none", marker="|", ms=cfg["marker"] * 1.6, mew=cfg["err_line"], color=cfg["err_color"], alpha=cfg["err_alpha"], label="95% 予測区間"))
     if not cfg["legend_separate"]:
-        ax.legend(handles=handles, loc=cfg["legend_loc"], fontsize=ft["legend"])
+        ax.legend(handles=handles, loc=cfg["legend_loc"], fontsize=ft["legend"], facecolor=cfg["legend_face"], framealpha=cfg["legend_alpha"])
     os.makedirs(out_dir, exist_ok=True)
     saved = []
     for fmt in cfg["formats"]:
@@ -1294,9 +1302,21 @@ def parity_plot(p, title, out_dir, base, show=None, **kw):
         saved.append(path)
     if SHOW_FIGS if show is None else show:
         plt.show()
+    if cfg["area_only"]:                        # グラフエリアだけの画像（同じ図から、文字と凡例を外して、軸の枠に合わせて切る）
+        if ax.get_legend() is not None:
+            ax.get_legend().remove()
+        ax.set_title("")
+        ax.set_xlabel("")
+        ax.set_ylabel("")
+        if not cfg["area_tick_labels"]:
+            ax.tick_params(axis="both", which="both", labelbottom=False, labelleft=False, labeltop=False, labelright=False)
+        for fmt in cfg["formats"]:
+            path = os.path.join(out_dir, f"{base}_グラフエリアのみ.{fmt}")
+            fig.savefig(path, dpi=dpi, bbox_inches="tight", pad_inches=0.02)
+            saved.append(path)
     plt.close(fig)
     if cfg["legend_separate"]:
-        saved += save_legend(handles, out_dir, base + "_凡例", cfg["formats"], dpi, ft["legend"])
+        saved += save_legend(handles, out_dir, base + "_凡例", cfg["formats"], dpi, ft["legend"], facecolor=cfg["legend_face"], framealpha=cfg["legend_alpha"])
     return saved
 
 

@@ -361,13 +361,19 @@ VALID_LIM = None                    # 両軸（粘度 [Pa·s]）の範囲。(下
 VALID_MARGIN = 1.3                  # 自動の範囲の、上下の余白の倍率
 VALID_LEGEND_SEPARATE = False       # True：凡例をグラフに付けず、凡例だけを別の画像（予測検証_3data_パリティ_凡例.png）に保存する／False：グラフの中に凡例を付ける（今までどおり）
 VALID_LEGEND_LOC = "upper left"     # 凡例の位置（グラフの中に付けるとき）。"upper left"・"lower right"・"best" など
+VALID_LEGEND_FACE = "white"         # 凡例の背景の塗りつぶしの色。"white"・"0.9"（0＝黒〜1＝白の灰色）・"#fff8e0" など
+VALID_LEGEND_ALPHA = 1.0            # 凡例の背景の濃さ（0〜1。1 で不透明＝後ろの補助線が透けない。matplotlib の既定は 0.8）
 VALID_SHOW_TITLE = True             # タイトル（材料・モデル・3data の指標）を付けるか
 VALID_SHOW_XLABEL = True            # 軸名を付けるか
 VALID_SHOW_YLABEL = True
 VALID_XLABEL = r"実測の粘度 $\eta$ (Pa·s)"   # 軸名の文字
 VALID_YLABEL = r"予測の粘度 $\eta$ (Pa·s)"
 VALID_GRID = True                   # 目盛りの補助線を描くか
+VALID_TICK_DIR = "in"               # 軸の目盛り線の向き。"in"＝グラフエリアの内側／"out"＝外側（今まで）／"inout"＝両側
+VALID_TICK_MIRROR = False           # True：上と右の辺にも目盛り線を付ける（セル16 の図と同じ）／False：下と左の辺だけ
 VALID_FORMATS = ["png"]             # 保存形式。"png"・"pdf"・"svg" から選ぶ
+VALID_AREA_ONLY = True              # True：グラフエリア（軸の枠の中）だけの画像（…_グラフエリアのみ.png。タイトル・軸名・凡例・目盛りの数字なし）も、それぞれの図について保存する
+VALID_AREA_TICK_LABELS = False      # True：グラフエリアだけの画像にも、目盛りの数字を残す
 VALID_SHOW_MODELS = [MAIN_KEY]      # 画面にも表示するモデル
 VALID_SAME_SHAPE = True             # True：低速側・高速側を区別せず、すべての点を同じ形で描いた図（予測検証_3data_パリティ_同じ形.png）も作る
 VALID_SAME_STYLE = ("yellowgreen", "o")   # その図の点の（色, 形）。"yellowgreen" は黄緑、"o" は丸。色なし（VALID_POINT_COLOR = False）のときは、色は使わず塗りつぶし〔VALID_POINT_FILL〕と枠線
@@ -376,8 +382,9 @@ VALID_SAME_LABEL = "3data"          # その図の凡例の点の名前
 val_kw = dict(figsize=VALID_FIGSIZE, aspect=VALID_ASPECT, dpi=VALID_DPI, font=VALID_FONT, groups=VALID_GROUPS, marker=VALID_MARKER, alpha=VALID_ALPHA, point_color=VALID_POINT_COLOR,
               point_edge=VALID_POINT_EDGE, point_edge_color=VALID_POINT_EDGE_COLOR, point_fill=VALID_POINT_FILL, point_fill_alpha=VALID_POINT_FILL_ALPHA, errbar=VALID_ERRBAR, err_color=VALID_ERR_COLOR,
               err_line=VALID_ERR_LINE, err_alpha=VALID_ERR_ALPHA, err_on_top=VALID_ERR_ON_TOP, capsize=VALID_CAPSIZE, diag_line=VALID_DIAG_LINE, lim=VALID_LIM,
-              margin=VALID_MARGIN, legend_separate=VALID_LEGEND_SEPARATE, legend_loc=VALID_LEGEND_LOC, show_title=VALID_SHOW_TITLE, show_xlabel=VALID_SHOW_XLABEL,
-              show_ylabel=VALID_SHOW_YLABEL, xlabel=VALID_XLABEL, ylabel=VALID_YLABEL, grid=VALID_GRID, formats=VALID_FORMATS)
+              margin=VALID_MARGIN, legend_separate=VALID_LEGEND_SEPARATE, legend_loc=VALID_LEGEND_LOC, legend_face=VALID_LEGEND_FACE, legend_alpha=VALID_LEGEND_ALPHA,
+              show_title=VALID_SHOW_TITLE, show_xlabel=VALID_SHOW_XLABEL, show_ylabel=VALID_SHOW_YLABEL, xlabel=VALID_XLABEL, ylabel=VALID_YLABEL, grid=VALID_GRID,
+              tick_dir=VALID_TICK_DIR, tick_mirror=VALID_TICK_MIRROR, formats=VALID_FORMATS, area_only=VALID_AREA_ONLY, area_tick_labels=VALID_AREA_TICK_LABELS)
 JUDGES[:] = [j for j in JUDGES if j["節"] != "検証"]     # このセルだけを実行し直したとき、判定が二重に記録されないように
 '''
 _VALID_PLOT_OLD = r'''    for key in KEYS:
@@ -416,7 +423,7 @@ _VALID_GCOL = '''GCOL = {"低速側": ("#1f77b4", "o"), "高速側": ("#d62728",
 '''
 assert VALID.count(_VALID_PLOT_OLD) == 1 and VALID.count(_VALID_GCOL) == 1, "VALID の図の部分が見つからない（VALID_LEARN の置き換えを直す）"
 VALID_LEARN = (VALID_SETTINGS + VALID.replace(_VALID_GCOL, "n_val_saved = 0\n").replace(_VALID_PLOT_OLD, _VALID_PLOT_NEW)
-               + '\nprint(f"保存したパリティ図：{n_val_saved} 枚（凡例だけの画像を含む。モデルのフォルダの 予測検証_3data_パリティ.png・…_同じ形.png）")')
+               + '\nprint(f"保存したパリティ図：{n_val_saved} 枚（凡例だけ・グラフエリアだけの画像を含む。モデルのフォルダの 予測検証_3data_パリティ.png・…_同じ形.png）")')
 
 # ---------------------------------------------------------------- 学習済みモデルの保存
 SAVE = r'''import joblib
