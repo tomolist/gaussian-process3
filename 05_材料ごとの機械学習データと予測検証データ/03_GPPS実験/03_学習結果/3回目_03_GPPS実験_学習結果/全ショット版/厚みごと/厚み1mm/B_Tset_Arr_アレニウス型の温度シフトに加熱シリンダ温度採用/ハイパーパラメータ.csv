@@ -1,0 +1,2 @@
+﻿材料,model,E_h,E_v,LML,amplitude,noise_var,noise_sd,noise_at_lower_bound,ls_at_bound,lin_amplitude,lin_sigma0,ls_ln γ̇ + ln a_h(Tset),ls_ln P3_3,ls_ln Tff
+GPPS,B_Tset_Arr,5.0,16.0,323.54308766150365,0.1973436878615616,5.578897481271276e-05,0.007469201752042367,False,True,0.8881637486519911,9.999999999999997e-06,0.3483369254886287,100.00000000000004,12.030266817440648

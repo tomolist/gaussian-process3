@@ -1,0 +1,2 @@
+﻿材料,model,E_h,E_v,LML,amplitude,noise_var,noise_sd,noise_at_lower_bound,ls_at_bound,ls_ln γ̇,ls_ln P3_3,ls_ln Tff
+粉砕材混合PP,A_Tset_Arr,,6.5,360.42743253452016,1.4856318282610266,2.2673396619797556e-05,0.004761659019690254,False,False,0.6174303735142375,43.32101831951225,51.14322896613245

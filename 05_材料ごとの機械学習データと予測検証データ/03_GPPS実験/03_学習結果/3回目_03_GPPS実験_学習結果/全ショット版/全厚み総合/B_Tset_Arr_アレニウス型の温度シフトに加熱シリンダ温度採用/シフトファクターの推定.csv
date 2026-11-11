@@ -1,0 +1,2 @@
+﻿材料,モデル,入力,型,θ の名前,単位,支持の基準,th_best,tv_best,diff_best,LML_best,LML_at_0,dLML_vs_0,th_lo,th_hi,tv_lo,tv_hi,diff_lo,diff_hi,n_in_95,n_points,at_edge,refine_converged,interval_closed,interval_at_range,n_review_up,review_gain_max,LML_best_grid,LML_at_0_grid,dLML_vs_0_grid
+GPPS,B_Tset_Arr,全ショット版,アレニウス型,E_h・E_v,kJ/mol,3.0,1.0,9.0,8.0,936.2102806269903,913.6257057745628,22.584574852427522,1.0,1.0,7.0,11.0,6.0,10.0,5,315,False,True,True,False,1,0.6532265876167003,936.2102800568365,913.6257040715055,22.584575985330957
