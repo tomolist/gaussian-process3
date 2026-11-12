@@ -2,7 +2,7 @@
 type: report
 status: 要確認
 date: 2026-11-09
-commit:
+commit: 06fde4f
 ---
 
 # 予測誤差の MAE・MSE・MAPE と、ポスター2 の予測性能の文
