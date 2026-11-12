@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""A0 縦 2 枚のポスターの簡略版（3〜5 分の発表用。PowerPoint の 2 スライド）を作る：05_…/学習結果報告書作成_261015/ポスター/報告書Bから作成_簡略版.pptx
+"""A0 縦 2 枚のポスターの簡略版（3〜5 分の発表用。PowerPoint の 2 スライド）を作る：05_…/06_学習結果報告書作成_261015/ポスター/報告書Bから作成/報告書Bから作成_簡略版.pptx
 
 今のポスター（build_poster.py が作る 報告書Bから作成.pptx）を、2026-11-04 のユーザーの依頼で簡略にしたもの。
   ・文は、発表者がいなくてもポスターだけで「何を目指して、何を行い、どうなったか」が伝わる長さにする。細かい定義・手法の注・補足の数値は、
@@ -21,7 +21,7 @@
 
 使い方（リポジトリ直下で。先に make_poster_simple_figs.py で図を作る）:
   uv run python 04_補助スクリプト/build_poster_simple.py [--out <フォルダ>] [--fig-dir <簡略版の図のフォルダ>]
-  （既定：--out はポスターのフォルダ、--fig-dir は ポスター/図_簡略版/）
+  （既定：--out は ポスター/報告書Bから作成/、--fig-dir は ポスター/報告書Bから作成/図_簡略版/。2026-11-04 にユーザーが 報告書Bから作成/ の下に移した）
 """
 import argparse
 import math
@@ -41,7 +41,8 @@ from build_poster import BLUE, GREEN, GREEN_LINE, LIGHT, PT_MM, box, est_width, 
 
 POSTER = bp.POSTER
 FIG = bp.FIG                                            # 今のポスターの図（ポスター/図/。見本から切り出した写真・説明図）
-FIG_DIR = os.path.join(POSTER, "図_簡略版")             # 簡略版の図（make_poster_simple_figs.py）
+B_DIR = os.path.join(POSTER, "報告書Bから作成")         # 報告書Bから作成のポスターの一式（2026-11-04 にユーザーが移した）
+FIG_DIR = os.path.join(B_DIR, "図_簡略版")              # 簡略版の図（make_poster_simple_figs.py）
 OUT_NAME = "報告書Bから作成_簡略版.pptx"
 
 PAGE_W, PAGE_H = 841.0, 1189.0   # A0 縦 [mm]
@@ -556,8 +557,8 @@ def build(fig_dir):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--out", default=POSTER, help="pptx を出すフォルダ（既定：ポスターのフォルダ）")
-    ap.add_argument("--fig-dir", default=FIG_DIR, help="簡略版の図（make_poster_simple_figs.py）のフォルダ（既定：ポスター/図_簡略版/）")
+    ap.add_argument("--out", default=B_DIR, help="pptx を出すフォルダ（既定：ポスター/報告書Bから作成/）")
+    ap.add_argument("--fig-dir", default=FIG_DIR, help="簡略版の図（make_poster_simple_figs.py）のフォルダ（既定：ポスター/報告書Bから作成/図_簡略版/）")
     a = ap.parse_args()
     out = os.path.join(a.out, OUT_NAME)
     if os.path.exists(out):

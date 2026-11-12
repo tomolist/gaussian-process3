@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
-"""報告書B（05_…/学習結果報告書作成_261015/報告書B_完成版.tex）の図を作る（英語。学習はやり直さない）。
+"""報告書B（05_…/06_学習結果報告書作成_261015/報告書B_完成版.tex）の図を作る（英語。学習はやり直さない）。
 
 図1〜5：作成中報告書B.pdf から 600 dpi の PNG で切り出す（図/Fig1.png〜Fig5.png。なければ作る。--crops で作り直す）
 検証の図（報告書の図6）：学習に用いていない射出率条件（3data）の、実測と予測の粘度（B_Tff・条件平均の入力。縦線＝95% 予測区間）
 マスターカーブの図（報告書では既定で載せない）：温度シフトファクターで換算した条件平均の点（B_Tff・条件平均の入力。塗り＝学習 5data、白抜き＝検証 3data）
 
 使い方（リポジトリ直下で）: uv run python 04_補助スクリプト/make_report_B_figs.py [--crops]
-出力: 05_材料ごとの機械学習データと予測検証データ/学習結果報告書作成_261015/図/ の Fig1〜5.png、Parity_<材料>.pdf、MasterCurve_<材料>.pdf
+出力: 05_材料ごとの機械学習データと予測検証データ/06_学習結果報告書作成_261015/図/ の Fig1〜5.png、Parity_<材料>.pdf、MasterCurve_<材料>.pdf
 （PDF には確認用の PNG も付ける）
 報告書B の図に合わせて、図の文字は英語にする（CLAUDE.md §8 の「図は日本語」の例外。ユーザーの報告書の書式に合わせるため）。
 """
@@ -29,9 +29,11 @@ import mat_common as mc  # noqa: E402
 MATS = ["PP", "MIX", "GPPS"]
 KEY = "B_Tff"
 MODE_DIR = "条件平均の入力"
-RES_SUFFIX = "_学習結果(5all学習データ)"   # 10-26 までの結果のフォルダの名前の末尾（<材料フォルダ> の後ろ。2026-11-02 に「_学習結果」から変えた）
+MAT_BASE = {"PP": "01_バージンPP再々実験", "MIX": "02_粉砕材混合PP実験", "GPPS": "03_GPPS実験"}   # 材料の名前（結果のフォルダの名前に使われている。材料フォルダ mc.MAT_FOLDERS は、2026-11-12 から「<材料の名前>(データと結果)」）
+RES_NAME = "1回目_{}_学習結果"             # 10-26 までの結果のフォルダの名前（{} は MAT_BASE。2026-11-08 までにユーザーが「<材料の名前>_学習結果(5all学習データ)」から変えた）
 RES_PARENT = "_学習結果"                   # 10-26 までの結果のフォルダを入れたフォルダ（<材料フォルダ>/<番号>_学習結果/。<番号> は材料フォルダの先頭 2 桁。2026-11-03 のユーザーの整理〔a4ad4b8〕）
-OUT =os.path.join(mc.DATA_ROOT, "学習結果報告書作成_261015", "図")
+REPORT_DIR = "06_学習結果報告書作成_261015"   # 報告書・ポスター・発表資料のフォルダ（2026-11-12 にユーザーが「学習結果報告書作成_261015」から変えた）
+OUT =os.path.join(mc.DATA_ROOT, REPORT_DIR, "図")
 PANEL = (2.15, 1.80)                      # 1 枚の大きさ（インチ）。報告書では 3 枚を横に並べる
 H_STYLE = {0.5: "#e8212b", 1.0: "#1f4fe0", 1.5: "#f2b705", 2.0: "#22c32e"}   # 厚みの色（報告書B の図4 と同じ並び：赤・青・黄・緑）
 T_MARKS = ["o", "^", "s"]                 # 加熱シリンダ温度の形（報告書B の図4 と同じ：低い順に ●・▲・■）
@@ -43,9 +45,14 @@ plt.rcParams.update({"font.family": "DejaVu Sans", "font.size": 7, "axes.labelsi
                      "mathtext.fontset": "dejavusans", "pdf.fonttype": 42})
 
 
-def model_dir(mat):
+def res_dir(mat):
+    """10-26 までの結果のフォルダ（その下に、入力の取り方ごとのフォルダ）"""
     folder = mc.MAT_FOLDERS[mat]
-    return os.path.join(mc.DATA_ROOT, folder, folder[:2] + RES_PARENT, f"{folder}{RES_SUFFIX}", MODE_DIR, KEY)
+    return os.path.join(mc.DATA_ROOT, folder, folder[:2] + RES_PARENT, RES_NAME.format(MAT_BASE[mat]))
+
+
+def model_dir(mat):
+    return os.path.join(res_dir(mat), MODE_DIR, KEY)
 
 
 def save(fig, stem):
@@ -60,7 +67,7 @@ def decade_lim(lo, hi):
     return 10.0 ** np.floor(np.log10(lo / 1.3)), 10.0 ** np.ceil(np.log10(hi * 1.3))
 
 
-SRC_PDF = os.path.join(mc.DATA_ROOT, "学習結果報告書作成_261015", "作成中報告書B.pdf")
+SRC_PDF = os.path.join(mc.DATA_ROOT, REPORT_DIR, "作成中報告書B.pdf")
 CROP_DPI = 600
 PAGE_H_BP = 841.89                        # A4 の高さ（bp）
 CROPS = {                                 # 図1〜5 の範囲（作成中報告書B.pdf のページ、左下が原点の bp：左 下 右 上。図の題は含めない）
@@ -114,7 +121,7 @@ def main():
         t0 = mc.shifted_cond_means(pool, None, cfg, 0.0, 0.0)
         t1 = mc.shifted_cond_means(pool, KEY, cfg, th, tv)
         r0, r1 = mc.superpose_rmse(t0), mc.superpose_rmse(t1)
-        ref = pd.read_csv(os.path.join(mc.DATA_ROOT, mc.MAT_FOLDERS[mat], mc.MAT_FOLDERS[mat][:2] + RES_PARENT, f"{mc.MAT_FOLDERS[mat]}{RES_SUFFIX}", MODE_DIR, "比較",
+        ref = pd.read_csv(os.path.join(res_dir(mat), MODE_DIR, "比較",
                                        "シフトファクターの倍率.csv"), encoding="utf-8-sig")
         ref = ref[ref["モデル"] == KEY].iloc[0]
         assert np.isclose(r0, ref["重ね合わせの残差（シフト前）"]) and np.isclose(r1, ref["重ね合わせの残差（シフト後）"]), \

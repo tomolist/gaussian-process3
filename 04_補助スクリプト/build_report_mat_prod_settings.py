@@ -7,7 +7,8 @@
   厚みごとの比較のノートの 全ショット版/厚みごと/。ほかに、候補のモデルの学習済みモデル（.joblib）に記録された設定。
 - 全厚みの設定は、検討用のノートと同じ「候補の選び方」（mat_common.shift_candidates。2026-11-03 のユーザー決定）で決め、候補の選び方.csv の結論と一致することを確かめる。
 - 厚みごとの設定は、全厚みと同じモデルにする（理由は報告書の 4 章）。参考に、厚みごとのプロファイル尤度に同じ規則を当てた結果も出す。
-- 書くもの：--out のフォルダ（リポジトリ直下からの相対パス。省くと 05_材料ごとの機械学習データと予測検証データ/）に 本番学習の設定の決定.tex と .pdf。
+- 書くもの：--out のフォルダ（リポジトリ直下からの相対パス。省くと 05_材料ごとの機械学習データと予測検証データ/04_本番学習の設定(検討結果説明書)/。2026-11-12 にユーザーが移した場所）に 本番学習の設定の決定.tex と .pdf。
+- 学習済みモデルの記録（データの概要.csv）にある学習データ・検証データの場所は、2026-11-12 のフォルダの整理の前の名前のことがあるので、今の場所に読み替えて書く（now_path）。
   同じ名前のファイルがあれば止まる（上書きしない）。LuaLaTeX の補助ファイルは _tmp/report_mat_prod/<日時>/ に出す。
 """
 import datetime
@@ -30,10 +31,12 @@ import report_common as rc  # noqa: E402
 W = rc.W
 ROOT_REL = "05_材料ごとの機械学習データと予測検証データ"
 ROOT = os.path.join(W, ROOT_REL)
-FOLD = {"PP": "01_バージンPP再々実験", "MIX": "02_粉砕材混合PP実験", "GPPS": "03_GPPS実験"}
+MAT_BASE = {"PP": "01_バージンPP再々実験", "MIX": "02_粉砕材混合PP実験", "GPPS": "03_GPPS実験"}   # 材料の名前
+FOLD = {k: f"{v}(データと結果)" for k, v in MAT_BASE.items()}   # 05 フォルダの中の材料フォルダ（2026-11-12 のユーザーのフォルダの整理で「(データと結果)」が付いた）
 MJ = {"PP": "PP", "MIX": "粉砕材混合 PP", "GPPS": "GPPS"}
 VERS = {"通常版": "(5all学習データ)", "温度適切版": "(5適切学習データ)"}
 STEM = "本番学習の設定の決定"
+OUT_DEFAULT = os.path.join(ROOT, "04_本番学習の設定(検討結果説明書)")   # 書く場所の既定（2026-11-12 にユーザーが 05 フォルダの直下から移した）
 NB = "01_機械学習コードフォルダ/材料別_温度シフトファクター検討/材料別_温度シフト機械学習コード/材料別_温度シフトGPR_ARD対応Matern52＋線形＋ホワイトノイズ.ipynb"
 SF = ("全ショット版", "全厚み総合", "シフトファクターの検討")
 TH = ("全ショット版", "厚みごと")
@@ -43,7 +46,7 @@ CASES = [(v, m) for v in VERS for m in FOLD]
 HS = [0.5, 1.0, 1.5, 2.0]
 DAG, DDAG = "\\textsuperscript{†}", "\\textsuperscript{‡}"
 
-out_dir = os.path.join(W, sys.argv[sys.argv.index("--out") + 1]) if "--out" in sys.argv else ROOT
+out_dir = os.path.join(W, sys.argv[sys.argv.index("--out") + 1]) if "--out" in sys.argv else OUT_DEFAULT
 TEX, PDF = os.path.join(out_dir, STEM + ".tex"), os.path.join(out_dir, STEM + ".pdf")
 for _p in (TEX, PDF):
     if os.path.exists(_p):
@@ -126,6 +129,14 @@ def tt(s):
 def mat_rel(mat, p):
     """材料フォルダからのパス（/ 区切り）"""
     return os.path.relpath(p, os.path.join(ROOT, FOLD[mat])).replace("\\", "/")
+
+
+def now_path(p):
+    """記録された場所（リポジトリ直下から）を、今の場所に読み替える（2026-11-12 のユーザーのフォルダの整理で、材料フォルダに「(データと結果)」が付いた）"""
+    q = str(p).replace("\\", "/")
+    for b in MAT_BASE.values():
+        q = q.replace(f"{ROOT_REL}/{b}/", f"{ROOT_REL}/{b}(データと結果)/")
+    return q
 
 
 # ---------------------------------------------------------------- 読み込みと、全厚みの候補
@@ -234,8 +245,8 @@ def run_files():
         out.append("\\begin{itemize}[itemsep=0.1ex,topsep=0.2ex]")
         for m in mats:
             dg = D[(ver, m)]["data"].set_index("組")
-            out.append(f"\\item {MJ[m]}（\\file{{05_…/{FOLD[m]}/}} から）：学習 \\file{{{mat_rel(m, os.path.join(W, dg.loc['5data', 'ファイル']))}}}、"
-                       f"検証 \\file{{{mat_rel(m, os.path.join(W, dg.loc['3data', 'ファイル']))}}}、"
+            out.append(f"\\item {MJ[m]}（\\file{{05_…/{FOLD[m]}/}} から）：学習 \\file{{{mat_rel(m, os.path.join(W, now_path(dg.loc['5data', 'ファイル'])))}}}、"
+                       f"検証 \\file{{{mat_rel(m, os.path.join(W, now_path(dg.loc['3data', 'ファイル'])))}}}、"
                        f"学習結果フォルダ \\file{{{mat_rel(m, D[(ver, m)]['base'])}/}}")
         out.append("\\end{itemize}")
     return "\n".join(out)
@@ -471,7 +482,7 @@ def files_snippet(ver):
     lines = ["FILES = {"]
     for mat in FOLD:
         dg = D[(ver, mat)]["data"].set_index("組")
-        items = [("学習", dg.loc["5data", "ファイル"]), ("検証", dg.loc["3data", "ファイル"]), ("結果", os.path.relpath(D[(ver, mat)]["base"], W))]
+        items = [("学習", now_path(dg.loc["5data", "ファイル"])), ("検証", now_path(dg.loc["3data", "ファイル"])), ("結果", os.path.relpath(D[(ver, mat)]["base"], W))]
         lines.append(f'    "{mat}": {{')
         for k, p in items:
             head = f'        "{k}": '

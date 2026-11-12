@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""ポスター（05_…/学習結果報告書作成_261015/ポスター/報告書Bから作成.pptx）の図を作る（日本語。学習はやり直さない）。
+"""ポスター（05_…/06_学習結果報告書作成_261015/ポスター/報告書Bから作成/報告書Bから作成.pptx）の図を作る（日本語。学習はやり直さない）。
 
 使うモデルは報告書B と同じ B_Tff・条件平均の入力（保存済みの 学習済みモデル_B_Tff.joblib と、予測検証の表）。
   見本_*.png        ：見本のポスター（報告書Aから作成2.pdf）から、写真・説明図を文字や矢印ごと切り出したもの（300 dpi）
@@ -39,9 +39,11 @@ MATS = ["PP", "MIX", "GPPS"]
 MAT_JA = {"PP": "PP", "MIX": "粉砕材混合PP", "GPPS": "GPPS"}
 KEY = "B_Tff"
 MODE = "cond"            # 読むモデルの入力の取り方（報告書B・ポスターは条件平均の入力で作った。発表資料の make_slide_figs.py は "shot" に変えて使う）
-RES_SUFFIX = "_学習結果(5all学習データ)"   # 10-26 までの結果のフォルダの名前の末尾（<材料フォルダ> の後ろ。2026-11-02 に「_学習結果」から変えた）
+MAT_BASE = {"PP": "01_バージンPP再々実験", "MIX": "02_粉砕材混合PP実験", "GPPS": "03_GPPS実験"}   # 材料の名前（結果のフォルダの名前に使われている。材料フォルダ mc.MAT_FOLDERS は、2026-11-12 から「<材料の名前>(データと結果)」）
+RES_NAME = "1回目_{}_学習結果"             # 10-26 までの結果のフォルダの名前（{} は MAT_BASE。2026-11-08 までにユーザーが「<材料の名前>_学習結果(5all学習データ)」から変えた）
 RES_PARENT = "_学習結果"                   # 10-26 までの結果のフォルダを入れたフォルダ（<材料フォルダ>/<番号>_学習結果/。<番号> は材料フォルダの先頭 2 桁。2026-11-03 のユーザーの整理〔a4ad4b8〕）
-POSTER = os.path.join(mc.DATA_ROOT, "学習結果報告書作成_261015", "ポスター")
+REPORT_DIR = "06_学習結果報告書作成_261015"   # 報告書・ポスター・発表資料のフォルダ（2026-11-12 にユーザーが「学習結果報告書作成_261015」から変えた）
+POSTER = os.path.join(mc.DATA_ROOT, REPORT_DIR, "ポスター")
 OUT = os.path.join(POSTER, "図")
 SAMPLE_PDF = os.path.join(POSTER, "報告書Aから作成2.pdf")
 DPI = 300
@@ -199,14 +201,18 @@ def fig_shift_concept():
 
 
 # ---------------------------------------------------------------- 学習結果の図
-def model_dir(mat):
+def res_dir(mat):
+    """10-26 までの結果のフォルダ（その下に、入力の取り方ごとのフォルダ）"""
     folder = mc.MAT_FOLDERS[mat]
-    return os.path.join(mc.DATA_ROOT, folder, folder[:2] + RES_PARENT, f"{folder}{RES_SUFFIX}", mc.MODE_JA[MODE], KEY)
+    return os.path.join(mc.DATA_ROOT, folder, folder[:2] + RES_PARENT, RES_NAME.format(MAT_BASE[mat]))
+
+
+def model_dir(mat):
+    return os.path.join(res_dir(mat), mc.MODE_JA[MODE], KEY)
 
 
 def compare_dir(mat):
-    folder = mc.MAT_FOLDERS[mat]
-    return os.path.join(mc.DATA_ROOT, folder, folder[:2] + RES_PARENT, f"{folder}{RES_SUFFIX}", mc.MODE_JA[MODE], "比較")
+    return os.path.join(res_dir(mat), mc.MODE_JA[MODE], "比較")
 
 
 def log_axes(ax, xlim, ylim):

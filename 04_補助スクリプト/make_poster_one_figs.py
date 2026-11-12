@@ -48,7 +48,7 @@ from PIL import Image  # noqa: E402
 import make_report_B_figs as rb  # noqa: E402  （作成中報告書B.pdf の場所）
 import mat_common as mc  # noqa: E402
 
-POSTER = os.path.join(mc.DATA_ROOT, "学習結果報告書作成_261015", "ポスター")
+POSTER = os.path.join(mc.DATA_ROOT, rb.REPORT_DIR, "ポスター")   # 2026-11-12 にユーザーが 06_学習結果報告書作成_261015 に名前を変えた
 B_DIR = os.path.join(POSTER, "報告書Bから作成")
 OUT_DEFAULT = os.path.join(B_DIR, "図_簡略版_A0一枚")
 SAMPLE_T = os.path.join(POSTER, "図", "見本_樹脂温度の経時変化.png")

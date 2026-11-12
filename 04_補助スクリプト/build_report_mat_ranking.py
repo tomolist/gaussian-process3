@@ -8,7 +8,7 @@
   - 同じフォルダの 全ショット版/厚みごと/ の プロファイル尤度_厚みごと.csv・温度シフトの確認_厚みごと.csv・厚みごとの比較_まとめ.csv・厚みごとと総合の比較.csv
   - C から Tff を外したモデル（C_noTff）の 3data の指標：2026-11-06 の確かめの実行の結果 _tmp/tff_input/run3/<版>/<材料>/…/Tffの入力の有無の比較/予測検証_3data_指標_全モデル.csv
     （ユーザーが本物の学習結果フォルダで比較のノートを実行したら、そちらを読むように直す。C_noTff の LML は、検討の結果の LML_at_0 から取る）
-- 書くもの：--out のフォルダ（省くと 05_材料ごとの機械学習データと予測検証データ/）に 本番学習の設定の根拠_ランキング表.tex と .pdf。
+- 書くもの：--out のフォルダ（省くと 05_材料ごとの機械学習データと予測検証データ/04_本番学習の設定(検討結果説明書)/。2026-11-12 にユーザーが移した場所）に 本番学習の設定の根拠_ランキング表.tex と .pdf。
   同じ名前のファイルがあれば止まる（上書きしない）。LuaLaTeX の補助ファイルは _tmp/report_mat_ranking/<日時>/。
 """
 import datetime
@@ -32,10 +32,12 @@ import report_common as rc  # noqa: E402
 W = rc.W
 ROOT_REL = "05_材料ごとの機械学習データと予測検証データ"
 ROOT = os.path.join(W, ROOT_REL)
-FOLD = {"PP": "01_バージンPP再々実験", "MIX": "02_粉砕材混合PP実験", "GPPS": "03_GPPS実験"}
+MAT_BASE = {"PP": "01_バージンPP再々実験", "MIX": "02_粉砕材混合PP実験", "GPPS": "03_GPPS実験"}   # 材料の名前
+FOLD = {k: f"{v}(データと結果)" for k, v in MAT_BASE.items()}   # 05 フォルダの中の材料フォルダ（2026-11-12 のユーザーのフォルダの整理で「(データと結果)」が付いた）
 MJ = {"PP": "PP", "MIX": "粉砕材混合 PP", "GPPS": "GPPS"}
 VERS = {"通常版": "(5all学習データ)", "温度適切版": "(5適切学習データ)"}
 STEM = "本番学習の設定の根拠_ランキング表"
+OUT_DEFAULT = os.path.join(ROOT, "04_本番学習の設定(検討結果説明書)")   # 書く場所の既定（2026-11-12 にユーザーが 05 フォルダの直下から移した）
 SF = ("全ショット版", "全厚み総合", "シフトファクターの検討")
 TH = ("全ショット版", "厚みごと")
 CASES = [(v, m) for v in VERS for m in FOLD]
@@ -44,7 +46,7 @@ TMP_NOTFF = os.path.join(W, "_tmp", "tff_input", "run3")      # C_noTff の 3dat
 DAG = "\\textsuperscript{†}"
 LML_CLEAR, RMSE_RATIO = 1.92, 1.1                              # Tff の入力の判断の基準（比較のノートと同じ）
 
-out_dir = os.path.join(W, sys.argv[sys.argv.index("--out") + 1]) if "--out" in sys.argv else ROOT
+out_dir = os.path.join(W, sys.argv[sys.argv.index("--out") + 1]) if "--out" in sys.argv else OUT_DEFAULT
 TEX, PDF = os.path.join(out_dir, STEM + ".tex"), os.path.join(out_dir, STEM + ".pdf")
 for _p in (TEX, PDF):
     if os.path.exists(_p):

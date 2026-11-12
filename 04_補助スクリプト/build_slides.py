@@ -8,7 +8,7 @@
 使い方（リポジトリ直下で）:
   uv run python 04_補助スクリプト/make_slide_figs.py
   uv run python 04_補助スクリプト/build_slides.py
-出力: 05_材料ごとの機械学習データと予測検証データ/学習結果報告書作成_261015/パワーポイント/報告書B_5章以降_発表資料.pptx
+出力: 05_材料ごとの機械学習データと予測検証データ/06_学習結果報告書作成_261015/パワーポイント/報告書B_5章以降_発表資料.pptx
 """
 import math
 import os
@@ -26,7 +26,7 @@ from pptx.util import Emu  # noqa: E402
 
 import poster_parts as pp  # noqa: E402
 
-BASE = os.path.join("05_材料ごとの機械学習データと予測検証データ", "学習結果報告書作成_261015", "パワーポイント")
+BASE = os.path.join("05_材料ごとの機械学習データと予測検証データ", "06_学習結果報告書作成_261015", "パワーポイント")   # 2026-11-12 にユーザーが「学習結果報告書作成_261015」から名前を変えた
 FIG = os.path.join(BASE, "図")
 OUT = os.path.join(BASE, "報告書B_5章以降_発表資料.pptx")
 FONT = "BIZ UDPゴシック"
@@ -41,7 +41,7 @@ FIG_DPI = 300
 pp.SYM = re.compile("(γ̇|η̂|ȳ|x̄|x′)")               # 上に点・山形・横棒の付く記号とプライムは、和文の書体では位置がずれるので、数式用の書体で書く
 MATS = [("PP", "PP", "PP"), ("MIX", "粉砕材混合PP", "粉砕材混合 PP"), ("GPPS", "GPPS", "GPPS")]   # (図の名前, 数値の表の名前, 本文の名前)
 MODE_DIR = "ショットごとの入力"                      # 読む結果の入力の取り方（make_slide_figs.py の mp.MODE と同じ。ユーザー決定、2026-10-23）
-RES_SUFFIX = "_学習結果(5all学習データ)"              # 10-26 までの結果のフォルダの名前の末尾（<材料フォルダ> の後ろ。2026-11-02 に「_学習結果」から変えた）
+RES_NAME = "1回目_{}_学習結果"                       # 10-26 までの結果のフォルダの名前（{} は MAT_BASE の材料の名前。2026-11-08 までにユーザーが「<材料の名前>_学習結果(5all学習データ)」から変えた）
 RES_PARENT = "_学習結果"                              # 10-26 までの結果のフォルダを入れたフォルダ（<材料フォルダ>/<番号>_学習結果/。<番号> は材料フォルダの先頭 2 桁。2026-11-03 のユーザーの整理〔a4ad4b8〕）
 
 
@@ -810,14 +810,15 @@ def s_shift_effect():
 
 
 # ---------------------------------------------------------------- 6 学習結果：厚みごとの確認（ノート「…_厚みごとの比較.ipynb」の CSV を使う）
-MAT_FOLDER = {"PP": "01_バージンPP再々実験", "MIX": "02_粉砕材混合PP実験", "GPPS": "03_GPPS実験"}
+MAT_BASE = {"PP": "01_バージンPP再々実験", "MIX": "02_粉砕材混合PP実験", "GPPS": "03_GPPS実験"}   # 材料の名前（結果のフォルダの名前に使われている）
+MAT_FOLDER = {k: f"{v}(データと結果)" for k, v in MAT_BASE.items()}                                  # 05 フォルダの中の材料フォルダ（2026-11-12 のユーザーのフォルダの整理で「(データと結果)」が付いた）
 WIN_JA = {"Tff": "金型内樹脂最高温度", "Tset": "加熱シリンダ温度", "差なし": "差なし", "—": "—"}
 WIN_FILL = {"Tff": "D3E0EC", "Tset": "F9D9BE", "差なし": "FFFFFF", "—": "F1F3F5"}
 
 
 def tcsv(mat, name):
     f = MAT_FOLDER[mat]
-    return pd.read_csv(os.path.join("05_材料ごとの機械学習データと予測検証データ", f, f[:2] + RES_PARENT, f"{f}{RES_SUFFIX}", MODE_DIR, "厚みごとの比較", name), encoding="utf-8-sig")
+    return pd.read_csv(os.path.join("05_材料ごとの機械学習データと予測検証データ", f, f[:2] + RES_PARENT, RES_NAME.format(MAT_BASE[mat]), MODE_DIR, "厚みごとの比較", name), encoding="utf-8-sig")
 
 
 def pe(v):

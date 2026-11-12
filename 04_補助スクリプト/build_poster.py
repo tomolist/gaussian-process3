@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-"""A0 縦のポスター（PowerPoint）を作る：05_…/学習結果報告書作成_261015/ポスター/報告書Bから作成.pptx
+"""A0 縦のポスター（PowerPoint）を作る：05_…/06_学習結果報告書作成_261015/ポスター/報告書Bから作成/報告書Bから作成.pptx
 
-内容は、学習結果報告書作成_261015 の報告書（過去報告書A・報告書B）と、見本のポスター（ポスター/報告書Aから作成2.pdf）の書式に合わせる。
+内容は、06_学習結果報告書作成_261015 の報告書（過去報告書A・報告書B）と、見本のポスター（ポスター/報告書Aから作成2.pdf）の書式に合わせる。
 読み手：プラスチック成形の知識はあるが、機械学習は知らない人。
 図は make_poster_figs.py が作ったもの（ポスター/図/）と、報告書B の図3・図4（図/Fig3.png・Fig4.png）。
 文字はテキストボックス、表は PowerPoint の表、図は画像として置くので、PowerPoint で後から直せる。
@@ -23,10 +23,10 @@ from pptx.oxml.ns import qn
 from pptx.util import Mm, Pt
 
 REPO = "."
-REPORT = os.path.join(REPO, "05_材料ごとの機械学習データと予測検証データ", "学習結果報告書作成_261015")
+REPORT = os.path.join(REPO, "05_材料ごとの機械学習データと予測検証データ", "06_学習結果報告書作成_261015")   # 2026-11-12 にユーザーが「学習結果報告書作成_261015」から名前を変えた
 POSTER = os.path.join(REPORT, "ポスター")
 FIG = os.path.join(POSTER, "図")
-OUT = os.path.join(POSTER, "報告書Bから作成.pptx")
+OUT = os.path.join(POSTER, "報告書Bから作成", "報告書Bから作成.pptx")   # 2026-11-04 にユーザーが 報告書Bから作成/ の下に移した
 
 FONT = "BIZ UDPゴシック"
 BLUE = "006699"          # 見出しの帯（見本と同じ）

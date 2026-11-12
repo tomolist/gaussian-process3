@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""簡略版のポスター（ポスター/報告書Bから作成_簡略版.pptx。A0 × 2 枚）の図を作る（日本語。学習はしない）。
+"""簡略版のポスター（ポスター/報告書Bから作成/報告書Bから作成_簡略版.pptx。A0 × 2 枚）の図を作る（日本語。学習はしない）。
 
 2026-11-04 のユーザーの指摘（グラフの凡例・軸名や、図の中の文字が小さい など）を受けて、図は「ポスターに貼る大きさ（mm）」で作り、
 図の中の文字の大きさが、そのままポスター上の pt になるようにした（凡例・注 22 pt 以上、目盛り 24 pt、軸名 28 pt）。
@@ -17,7 +17,7 @@
 すでにあるファイルは上書きしない（1 つでもあれば止まる）。作り直すときは、前の図を _to_delete/ へ移すか、--out で別のフォルダに出す。
 
 使い方（リポジトリ直下で）:
-  uv run python 04_補助スクリプト/make_poster_simple_figs.py [--out <フォルダ>]   （既定：ポスター/図_簡略版/）
+  uv run python 04_補助スクリプト/make_poster_simple_figs.py [--out <フォルダ>]   （既定：ポスター/報告書Bから作成/図_簡略版/。11-04 にユーザーが 報告書Bから作成/ の下に移した）
 """
 import argparse
 import os
@@ -47,8 +47,8 @@ import mat_common as mc  # noqa: E402
 Image.MAX_IMAGE_PIXELS = None
 MATS = ["PP", "MIX", "GPPS"]
 MAT_JA = {"PP": "PP", "MIX": "粉砕材混合 PP", "GPPS": "GPPS"}
-POSTER = os.path.join(mc.DATA_ROOT, "学習結果報告書作成_261015", "ポスター")
-OUT_DEFAULT = os.path.join(POSTER, "図_簡略版")
+POSTER = mpf.POSTER                            # 05_…/06_学習結果報告書作成_261015/ポスター（2026-11-12 にユーザーがフォルダの名前を変えた）
+OUT_DEFAULT = os.path.join(POSTER, "報告書Bから作成", "図_簡略版")   # 2026-11-04 にユーザーが 報告書Bから作成/ の下に移した
 DPI = 300
 CROP_DPI = 1000
 PAGE_DIR = os.path.join(mc.REPO, "_tmp", "poster_simple", "pages1000")    # 作成中報告書B.pdf の 2 ページ目の画像（1000 dpi）を置く作業フォルダ
@@ -299,7 +299,7 @@ NAMES = (["樹脂圧力の経時変化.png", "算出式.png", "温度シフト�
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--out", default=OUT_DEFAULT, help="図を出すフォルダ（既定：ポスター/図_簡略版/）")
+    ap.add_argument("--out", default=OUT_DEFAULT, help="図を出すフォルダ（既定：ポスター/報告書Bから作成/図_簡略版/）")
     a = ap.parse_args()
     there = [n for n in NAMES if os.path.exists(os.path.join(a.out, n))]
     if there:

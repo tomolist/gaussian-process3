@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""簡略版のポスター（報告書Bから作成_簡略版.pptx）の台本（A4 の PDF と tex）を作る：ポスター/報告書Bから作成_簡略版_台本.pdf・.tex
+"""簡略版のポスター（報告書Bから作成_簡略版.pptx）の台本（A4 の PDF と tex）を作る：ポスター/報告書Bから作成/報告書Bから作成_簡略版_台本.pdf・.tex
 
 2026-11-04 のユーザーの依頼：ポスターの文は簡潔にし、それ以外は口頭で説明する。各節の補足説明（台本）を、ポスターと同じフォルダに作る（PDF ＋ tex）。
 節ごとに「話すこと」（そのまま読める文。【 】は図を指す合図）と「質問されたときの補足」（ポスターから消した詳しい内容）を書く。
@@ -7,7 +7,7 @@
 同じ日の 2 回目の指摘でポスターを A0 × 2 枚に直したのに合わせて、節の題・図を指す合図（3D 図、表と射出率の帯、パリティプロットなど）を直した。
 数値は、ポスターと同じ ポスター/図/ポスターの数値.csv から読む。すでにあるファイルは上書きしない（あれば止まる）。
 
-使い方（リポジトリ直下で）: uv run python 04_補助スクリプト/build_poster_simple_script.py [--out <フォルダ>]   （既定：ポスターのフォルダ）
+使い方（リポジトリ直下で）: uv run python 04_補助スクリプト/build_poster_simple_script.py [--out <フォルダ>]   （既定：ポスター/報告書Bから作成/。2026-11-04 にユーザーが移した）
 """
 import argparse
 import datetime
@@ -190,7 +190,7 @@ def build_tex(S):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--out", default=POSTER, help="tex と PDF を出すフォルダ（既定：ポスターのフォルダ）")
+    ap.add_argument("--out", default=os.path.join(POSTER, "報告書Bから作成"), help="tex と PDF を出すフォルダ（既定：ポスター/報告書Bから作成/）")
     a = ap.parse_args()
     tex_path, pdf_path = os.path.join(a.out, f"{STEM}.tex"), os.path.join(a.out, f"{STEM}.pdf")
     for p in (tex_path, pdf_path):

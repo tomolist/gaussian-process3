@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""報告書B（05_…/学習結果報告書作成_261015/報告書B_完成版_2枚.tex・報告書B_完成版_3枚.tex）を LuaLaTeX で 2 回ずつ組み、
+"""報告書B（05_…/06_学習結果報告書作成_261015/報告書B_完成版_2枚.tex・報告書B_完成版_3枚.tex）を LuaLaTeX で 2 回ずつ組み、
 PDF を同じフォルダに置く。補助ファイル（aux・log）は _tmp/report_B/build に置く。
 使い方（リポジトリ直下で）: uv run python 04_補助スクリプト/build_report_B.py [原稿の名前 ...] [--figs]
   原稿の名前を省くと、2 枚版と 3 枚版の両方を組む（例：「報告書B_完成版_3枚」だけを指定することもできる）。
@@ -13,7 +13,7 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
-SRC_DIR = os.path.join(REPO, "05_材料ごとの機械学習データと予測検証データ", "学習結果報告書作成_261015")
+SRC_DIR = os.path.join(REPO, "05_材料ごとの機械学習データと予測検証データ", "06_学習結果報告書作成_261015")   # 2026-11-12 にユーザーが「学習結果報告書作成_261015」から名前を変えた
 STEMS = ["報告書B_完成版_2枚", "報告書B_完成版_3枚"]
 BUILD = os.path.join(REPO, "_tmp", "report_B", "build")
 

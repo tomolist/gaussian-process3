@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""発表資料（05_…/学習結果報告書作成_261015/パワーポイント/報告書B_5章以降_発表資料.pptx）の図を作る（日本語。学習はやり直さない）。
+"""発表資料（05_…/06_学習結果報告書作成_261015/パワーポイント/報告書B_5章以降_発表資料.pptx）の図を作る（日本語。学習はやり直さない）。
 
 内容は、ポスター「報告書Bから作成」の 5 章（機械学習）以降。使うモデルは B_Tset（加熱シリンダ温度でシフト）・ショットごとの入力（ユーザー決定、2026-10-23。
 報告書B・ポスターは B_Tff・条件平均の入力のまま）。保存済みの 学習済みモデル_B_Tset.joblib と、予測検証の表を読む。build_slides.py が、この図を貼って発表資料を組み立てる。
@@ -38,7 +38,7 @@ from sklearn.gaussian_process.kernels import RBF, ConstantKernel as C, DotProduc
 
 import mat_common as mc  # noqa: E402
 
-OUT = os.path.join(mc.DATA_ROOT, "学習結果報告書作成_261015", "パワーポイント", "図")
+OUT = os.path.join(mc.DATA_ROOT, mp.REPORT_DIR, "パワーポイント", "図")
 FS = 18                                            # 図の文字の大きさ [pt]（スライドの最小の文字と同じ）
 PAL = {"main": "#17324D", "accent": "#E07A1F", "sub": "#5B6B7B", "light": "#EEF3F8"}   # build_slides.py と同じ配色
 mpd.PAL["S"] = PAL                                 # make_poster_design_figs の図を、この配色・保存先で使う

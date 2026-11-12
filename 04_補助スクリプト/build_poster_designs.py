@@ -6,14 +6,14 @@
   案C「材料別に比べる」データ詳細型：3 材料の結果を表の形（予測曲線・温度シフトの効果・予測検証・数値）に並べ、考察まで
 
 読み手：プラスチック成形の知識はあるが、機械学習は知らない人。数値は、報告書B・前のポスターと同じモデル（B_Tff・条件平均の入力）による。
-図は make_poster_design_figs.py（図_オリジナル/）と make_poster_figs.py（図/ の見本の切り出し）、報告書B の図（学習結果報告書作成_261015/図/）。
+図は make_poster_design_figs.py（図_オリジナル/）と make_poster_figs.py（図/ の見本の切り出し）、報告書B の図（06_学習結果報告書作成_261015/図/）。
 文字・図形は PowerPoint の図形なので、後から PowerPoint で直せる。
 
 使い方（リポジトリ直下で）:
   uv run python 04_補助スクリプト/make_poster_figs.py          （見本の切り出し。前のポスターで作成済みなら不要）
   uv run python 04_補助スクリプト/make_poster_design_figs.py   （3 案の図）
   uv run python 04_補助スクリプト/build_poster_designs.py [A] [B] [C]   （省くと 3 案とも）
-出力: 05_…/学習結果報告書作成_261015/ポスター/オリジナル案A_ひと目でわかる版.pptx など
+出力: 05_…/06_学習結果報告書作成_261015/ポスター/オリジナル案A_ひと目でわかる版.pptx など
 """
 import os
 import sys
@@ -23,7 +23,7 @@ from pptx.enum.shapes import MSO_SHAPE  # noqa: E402
 
 from poster_parts import PT_MM, Poster, text_width  # noqa: E402
 
-REPORT = os.path.join(".", "05_材料ごとの機械学習データと予測検証データ", "学習結果報告書作成_261015")
+REPORT = os.path.join(".", "05_材料ごとの機械学習データと予測検証データ", "06_学習結果報告書作成_261015")   # 2026-11-12 にユーザーが「学習結果報告書作成_261015」から名前を変えた
 POSTER = os.path.join(REPORT, "ポスター")
 FIGO = os.path.join(POSTER, "図_オリジナル")
 FIGS = os.path.join(POSTER, "図")
