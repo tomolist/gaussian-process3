@@ -47,7 +47,7 @@ import mat_common as mc  # noqa: E402
 Image.MAX_IMAGE_PIXELS = None
 MATS = ["PP", "MIX", "GPPS"]
 MAT_JA = {"PP": "PP", "MIX": "粉砕材混合 PP", "GPPS": "GPPS"}
-POSTER = mpf.POSTER                            # 05_…/06_学習結果報告書作成_261015/ポスター（2026-11-12 にユーザーがフォルダの名前を変えた）
+POSTER = mpf.POSTER                            # 05_…/07_学習結果報告書作成_261015/ポスター（2026-11-12 にユーザーがフォルダの名前を変え、2026-11-15 に番号が 06 → 07 になった）
 OUT_DEFAULT = os.path.join(POSTER, "報告書Bから作成", "図_簡略版")   # 2026-11-04 にユーザーが 報告書Bから作成/ の下に移した
 DPI = 300
 CROP_DPI = 1000
